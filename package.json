@@ -1,6 +1,7 @@
 {
   "name": "tsundoko",
   "version": "0.0.0",
+  "private": true,
   "description": "Lightweight, AI-first bookmarking app",
   "homepage": "https://github.com/Robot-Inventor/tsundoko#readme",
   "bugs": {
@@ -16,9 +17,13 @@
   "scripts": {
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
-    "lint": "knip && tsrs && oxlint src"
+    "lint": "knip && tsrs && oxlint src",
+    "ci:version": "changeset version",
+    "ci:publish": "changeset publish"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "^1.0.1",
+    "@changesets/cli": "^3.0.3",
     "@robot-inventor/oxlint-config": "^2.2.0",
     "@robot-inventor/tsconfig-base": "^7.2.0",
     "knip": "^6.47.0",
