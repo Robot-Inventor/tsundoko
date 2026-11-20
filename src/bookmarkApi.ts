@@ -1,5 +1,6 @@
+import { type BookmarkPreview, bookmarkMessages } from "./lib/bookmark";
+import { bookmarkExists, insertBookmark, listBookmarks } from "./db/bookmarks";
 import { bookmarkUrl, invalidBookmarkUrlMessage, parseBookmarkUrl } from "./lib/bookmarkUrl";
-import { Buffer } from "node:buffer";
 import { Hono } from "hono";
 import { MIMEType } from "node:util";
 import { bodyLimit } from "hono/body-limit";
@@ -27,6 +28,9 @@ const redirectStatuses = new Set(
 const httpStatus = {
     badGateway: 502,
     badRequest: 400,
+    conflict: 409,
+    created: 201,
+    internalServerError: 500,
     ok: 200,
     payloadTooLarge: 413,
     unsupportedMediaType: 415
@@ -36,14 +40,12 @@ const previewRequest = type("string.json.parse").to({
     url: bookmarkUrl
 });
 
-interface BookmarkPreview {
-    description: string | null;
-    faviconUrl: string | null;
-    siteName: string;
-    thumbnailUrl: string | null;
-    title: string;
-    url: string;
-}
+const normalizeBookmarkUrl = (url: URL): string => {
+    const normalized = new URL(url);
+    normalized.hash = "";
+
+    return normalized.href;
+};
 
 const parseContentType = (value?: string | null): MIMEType | null => {
     if (!value) {
@@ -167,40 +169,65 @@ const getPreview = async (url: URL): Promise<BookmarkPreview> => {
             cleanText(result.ogTitle, maxTitleLength) ??
             cleanText(result.twitterTitle, maxTitleLength) ??
             pageUrl.hostname,
-        url: url.href
+        url: normalizeBookmarkUrl(url)
     };
 };
 
-const bookmarkPreviewApi = new Hono().post(
-    "/api/bookmark-preview",
-    bodyLimit({
-        maxSize: maxRequestBytes,
-        onError: (context) => context.json({ error: "入力が長すぎます。" }, httpStatus.payloadTooLarge)
-    }),
-    async (context) => {
+const bookmarkApi = new Hono()
+    .get("/api/bookmarks", async (context) => {
         context.header("Cache-Control", "no-store");
 
-        if (parseContentType(context.req.header("content-type"))?.essence !== "application/json") {
-            return context.json({ error: "JSONでURLを送信してください。" }, httpStatus.unsupportedMediaType);
-        }
-
-        const input = previewRequest(await context.req.text());
-
-        if (input instanceof type.errors) {
-            return context.json({ error: invalidBookmarkUrlMessage }, httpStatus.badRequest);
-        }
-
         try {
-            return context.json(await getPreview(input.url), httpStatus.ok);
+            return context.json(await listBookmarks(), httpStatus.ok);
         } catch {
-            return context.json(
-                { error: "ページの情報を取得できませんでした。URLを確認して再試行してください。" },
-                httpStatus.badGateway
-            );
+            return context.json({ error: bookmarkMessages.loadFailed }, httpStatus.internalServerError);
         }
-    }
-);
+    })
+    .post(
+        "/api/bookmarks",
+        bodyLimit({
+            maxSize: maxRequestBytes,
+            onError: (context) => context.json({ error: "入力が長すぎます。" }, httpStatus.payloadTooLarge)
+        }),
+        async (context) => {
+            context.header("Cache-Control", "no-store");
 
-type BookmarkPreviewApi = typeof bookmarkPreviewApi;
+            if (parseContentType(context.req.header("content-type"))?.essence !== "application/json") {
+                return context.json({ error: "JSONでURLを送信してください。" }, httpStatus.unsupportedMediaType);
+            }
 
-export { type BookmarkPreview, type BookmarkPreviewApi, bookmarkPreviewApi };
+            const input = previewRequest(await context.req.text());
+
+            if (input instanceof type.errors) {
+                return context.json({ error: invalidBookmarkUrlMessage }, httpStatus.badRequest);
+            }
+
+            try {
+                if (await bookmarkExists(normalizeBookmarkUrl(input.url))) {
+                    return context.json({ error: bookmarkMessages.duplicate }, httpStatus.conflict);
+                }
+            } catch {
+                return context.json({ error: bookmarkMessages.saveFailed }, httpStatus.internalServerError);
+            }
+
+            const preview = await getPreview(input.url).catch(() => null);
+
+            if (!preview) {
+                return context.json({ error: bookmarkMessages.fetchFailed }, httpStatus.badGateway);
+            }
+
+            try {
+                const saved = await insertBookmark(preview);
+
+                return saved
+                    ? context.json(saved, httpStatus.created)
+                    : context.json({ error: bookmarkMessages.duplicate }, httpStatus.conflict);
+            } catch {
+                return context.json({ error: bookmarkMessages.saveFailed }, httpStatus.internalServerError);
+            }
+        }
+    );
+
+type BookmarkApi = typeof bookmarkApi;
+
+export { type BookmarkApi, bookmarkApi };

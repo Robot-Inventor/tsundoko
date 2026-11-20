@@ -1,49 +1,82 @@
 import { type Bookmark, BookmarkCard } from "./BookmarkCard";
 import { invalidBookmarkUrlMessage, maxBookmarkUrlLength, parseBookmarkUrl } from "../lib/bookmarkUrl";
-import { useRef, useState } from "react";
-import type { BookmarkPreviewApi } from "../bookmarkPreview";
+import { useEffect, useRef, useState } from "react";
+import type { BookmarkApi } from "../bookmarkApi";
 import { Button } from "./ui/button";
 import { Input } from "./ui/Input";
+import { Skeleton } from "./ui/skeleton";
+import { bookmarkMessages } from "../lib/bookmark";
 import { hc } from "hono/client";
 
-const previewClient = hc<BookmarkPreviewApi>("/");
+const bookmarkClient = hc<BookmarkApi>("/");
 const formErrors = {
-    duplicate: "このURLはすでに追加されています。",
-    fetch: "ページの情報を取得できませんでした。URLを確認して再試行してください。",
-    invalid: invalidBookmarkUrlMessage
+    duplicate: bookmarkMessages.duplicate,
+    fetch: bookmarkMessages.fetchFailed,
+    invalid: invalidBookmarkUrlMessage,
+    save: bookmarkMessages.saveFailed
 } as const;
 
 const formErrorMessages = Object.values(formErrors);
+const httpStatus = {
+    badGateway: 502,
+    badRequest: 400,
+    conflict: 409
+} as const;
 
-const bookmarkIdentity = (url: string): string => url.split("#")[0] ?? url;
+type AddBookmarkResult = { bookmark: Bookmark } | { error: string };
 
-const requestPreview = async (url: URL): Promise<Bookmark | null> => {
+const requestBookmark = async (url: URL): Promise<AddBookmarkResult> => {
     try {
-        const response = await previewClient.api["bookmark-preview"].$post({
+        const response = await bookmarkClient.api.bookmarks.$post({
             json: {
                 url: url.href
             }
         });
 
-        if (!response.ok) {
-            return null;
+        if (response.ok) {
+            const saved = await response.json();
+
+            return {
+                bookmark: {
+                    ...saved,
+                    addedAt: new Date(saved.addedAt)
+                }
+            };
+        }
+
+        if (response.status === httpStatus.conflict) {
+            return {
+                error: formErrors.duplicate
+            };
+        }
+
+        if (response.status === httpStatus.badRequest) {
+            return {
+                error: formErrors.invalid
+            };
+        }
+
+        if (response.status === httpStatus.badGateway) {
+            return {
+                error: formErrors.fetch
+            };
         }
 
         return {
-            ...(await response.json()),
-            addedAt: new Date()
+            error: formErrors.save
         };
     } catch {
-        return null;
+        return {
+            error: formErrors.save
+        };
     }
 };
 
 interface BookmarkFormProps {
-    bookmarks: Bookmark[];
     onAdd: (bookmark: Bookmark) => void;
 }
 
-const BookmarkForm = ({ bookmarks, onAdd }: BookmarkFormProps): React.JSX.Element => {
+const BookmarkForm = ({ onAdd }: BookmarkFormProps): React.JSX.Element => {
     const [input, setInput] = useState("");
     const [error, setError] = useState("");
     const [status, setStatus] = useState("");
@@ -58,28 +91,25 @@ const BookmarkForm = ({ bookmarks, onAdd }: BookmarkFormProps): React.JSX.Elemen
         setError("");
         setStatus("");
         const url = parseBookmarkUrl(input);
-        const duplicate =
-            url && bookmarks.some((bookmark) => bookmarkIdentity(bookmark.url) === bookmarkIdentity(url.href));
 
-        if (!url || duplicate) {
-            setError(url ? formErrors.duplicate : formErrors.invalid);
-
+        if (!url) {
+            setError(formErrors.invalid);
             urlInput.current?.focus();
 
             return;
         }
 
         setAdding(true);
-        const bookmark = await requestPreview(url);
+        const result = await requestBookmark(url);
         setAdding(false);
 
-        if (!bookmark) {
-            setError(formErrors.fetch);
+        if ("error" in result) {
+            setError(result.error);
 
             return;
         }
 
-        onAdd(bookmark);
+        onAdd(result.bookmark);
         setInput("");
         setStatus("ブックマークを追加しました。");
     };
@@ -88,7 +118,7 @@ const BookmarkForm = ({ bookmarks, onAdd }: BookmarkFormProps): React.JSX.Elemen
 
     return (
         <form
-            action="/api/bookmark-preview"
+            action="/api/bookmarks"
             className="mt-4 max-w-2xl"
             method="post"
             noValidate
@@ -142,31 +172,125 @@ const BookmarkForm = ({ bookmarks, onAdd }: BookmarkFormProps): React.JSX.Elemen
     );
 };
 
-const BookmarkHome = (): React.JSX.Element => {
-    const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+type LoadState = "error" | "loading" | "ready";
+
+const bookmarkGrid = "mt-6 grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-4";
+const skeletonCount = 6;
+
+interface BookmarkListProps {
+    bookmarks: Bookmark[];
+    loadState: LoadState;
+    onRetry: () => void;
+}
+
+const BookmarkList = ({ bookmarks, loadState, onRetry }: BookmarkListProps): React.JSX.Element => {
+    if (loadState === "loading" && !bookmarks.length) {
+        return (
+            <>
+                <p className="sr-only" role="status">
+                    ブックマークを読み込んでいます。
+                </p>
+                <div aria-hidden="true" className={bookmarkGrid}>
+                    {Array.from({ length: skeletonCount }, (_bookmark, index) => (
+                        <Skeleton className="h-64 rounded-xl" key={index} />
+                    ))}
+                </div>
+            </>
+        );
+    }
+
+    if (loadState === "ready" && !bookmarks.length) {
+        return <p className="mt-3 text-sm text-muted-foreground">まだブックマークはありません。</p>;
+    }
 
     return (
         <>
-            <BookmarkForm
-                bookmarks={bookmarks}
-                onAdd={(bookmark) => {
-                    setBookmarks((current) => [bookmark, ...current]);
-                }}
-            />
-            {bookmarks.length ? (
-                <ul
-                    aria-label="追加したブックマーク"
-                    className="mt-6 grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-4"
-                >
+            {loadState === "error" && (
+                <div className="mt-3 flex items-center gap-2">
+                    <p className="text-sm text-muted-foreground" role="alert">
+                        {bookmarkMessages.loadFailed}
+                    </p>
+                    <Button onClick={onRetry} size="sm" type="button" variant="outline">
+                        再試行
+                    </Button>
+                </div>
+            )}
+            {Boolean(bookmarks.length) && (
+                <ul aria-label="追加したブックマーク" className={bookmarkGrid}>
                     {bookmarks.map((bookmark) => (
-                        <li className="min-w-0" key={bookmark.url}>
+                        <li className="min-w-0" key={bookmark.id}>
                             <BookmarkCard bookmark={bookmark} />
                         </li>
                     ))}
                 </ul>
-            ) : (
-                <p className="mt-3 text-sm text-muted-foreground">まだブックマークはありません。</p>
             )}
+        </>
+    );
+};
+
+const BookmarkHome = (): React.JSX.Element => {
+    const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+    const [loadState, setLoadState] = useState<LoadState>("loading");
+    const [reload, setReload] = useState(false);
+
+    useEffect(() => {
+        const request = {
+            cancelled: false
+        };
+
+        void (async (): Promise<void> => {
+            try {
+                const response = await bookmarkClient.api.bookmarks.$get();
+
+                if (!response.ok) {
+                    if (!request.cancelled) {
+                        setLoadState("error");
+                    }
+
+                    return;
+                }
+
+                const loaded = (await response.json()).map((bookmark) => ({
+                    ...bookmark,
+                    addedAt: new Date(bookmark.addedAt)
+                }));
+
+                if (!request.cancelled) {
+                    setBookmarks((current) => {
+                        const loadedIds = new Set(loaded.map((bookmark) => bookmark.id));
+
+                        return [...current.filter((bookmark) => !loadedIds.has(bookmark.id)), ...loaded];
+                    });
+
+                    setLoadState("ready");
+                }
+            } catch {
+                if (!request.cancelled) {
+                    setLoadState("error");
+                }
+            }
+        })();
+
+        return (): void => {
+            request.cancelled = true;
+        };
+    }, [reload]);
+
+    return (
+        <>
+            <BookmarkForm
+                onAdd={(bookmark) => {
+                    setBookmarks((current) => [bookmark, ...current]);
+                }}
+            />
+            <BookmarkList
+                bookmarks={bookmarks}
+                loadState={loadState}
+                onRetry={() => {
+                    setLoadState("loading");
+                    setReload((current) => !current);
+                }}
+            />
         </>
     );
 };

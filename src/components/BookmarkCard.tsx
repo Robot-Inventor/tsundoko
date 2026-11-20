@@ -1,10 +1,11 @@
 import { Card, CardFooter, CardHeader } from "./ui/Card";
 import { GlobeIcon, ImageOffIcon } from "lucide-react";
-import type { BookmarkPreview } from "../bookmarkPreview";
+import type { BookmarkPreview } from "../lib/bookmark";
 import { useState } from "react";
 
 interface Bookmark extends BookmarkPreview {
     addedAt: Date;
+    id: string;
 }
 
 const dateFormat = new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" });

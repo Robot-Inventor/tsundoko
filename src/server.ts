@@ -1,11 +1,11 @@
 import { Hono } from "hono";
-import { bookmarkPreviewApi } from "./bookmarkPreview";
+import { bookmarkApi } from "./bookmarkApi";
 import { serveStatic } from "@hono/bun";
 
 const app = new Hono();
 
 app.get("/api/health", (context) => context.json({ ok: true }));
-app.route("/", bookmarkPreviewApi);
+app.route("/", bookmarkApi);
 app.get("*", serveStatic({ root: "./dist" }));
 
 export default {

@@ -1,6 +1,7 @@
 import { type } from "arktype";
 
-const maxBookmarkUrlLength = 4096;
+// Keep URL bytes below PostgreSQL's btree limit for the unique URL index.
+const maxBookmarkUrlLength = 2000;
 const invalidBookmarkUrlMessage = "http://またはhttps://で始まるURLを入力してください。";
 
 const bookmarkUrl = type("string.trim")

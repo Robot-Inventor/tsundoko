@@ -1,0 +1,88 @@
+{
+    "id": "cd076e90-77e7-476c-99a8-6a1e93d59632",
+    "prevId": "00000000-0000-0000-0000-000000000000",
+    "version": "7",
+    "dialect": "postgresql",
+    "tables": {
+        "public.bookmarks": {
+            "name": "bookmarks",
+            "schema": "",
+            "columns": {
+                "id": {
+                    "name": "id",
+                    "type": "uuid",
+                    "primaryKey": true,
+                    "notNull": true,
+                    "default": "gen_random_uuid()"
+                },
+                "url": {
+                    "name": "url",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true
+                },
+                "title": {
+                    "name": "title",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true
+                },
+                "description": {
+                    "name": "description",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false
+                },
+                "siteName": {
+                    "name": "siteName",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true
+                },
+                "thumbnailUrl": {
+                    "name": "thumbnailUrl",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false
+                },
+                "faviconUrl": {
+                    "name": "faviconUrl",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false
+                },
+                "addedAt": {
+                    "name": "addedAt",
+                    "type": "timestamp with time zone",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "default": "now()"
+                }
+            },
+            "indexes": {},
+            "foreignKeys": {},
+            "compositePrimaryKeys": {},
+            "uniqueConstraints": {
+                "bookmarks_url_unique": {
+                    "name": "bookmarks_url_unique",
+                    "nullsNotDistinct": false,
+                    "columns": ["url"]
+                }
+            },
+            "policies": {},
+            "checkConstraints": {},
+            "isRLSEnabled": false
+        }
+    },
+    "enums": {},
+    "schemas": {},
+    "sequences": {},
+    "roles": {},
+    "policies": {},
+    "views": {},
+    "_meta": {
+        "columns": {},
+        "schemas": {},
+        "tables": {}
+    }
+}
