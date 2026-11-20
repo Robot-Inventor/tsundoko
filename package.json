@@ -13,7 +13,6 @@
     "url": "git+https://github.com/Robot-Inventor/tsundoko.git"
   },
   "type": "module",
-  "main": "index.js",
   "scripts": {
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
