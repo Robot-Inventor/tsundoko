@@ -18,6 +18,7 @@
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "lint": "knip && tsrs && oxlint src",
+    "build": "",
     "ci:version": "changeset version",
     "ci:publish": "changeset publish"
   },
