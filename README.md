@@ -1,2 +1,3 @@
-# tsundoko
+# Tsundoko
+
 Lightweight, AI-first bookmarking app
