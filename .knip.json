@@ -1,0 +1,7 @@
+{
+    "$schema": "https://unpkg.com/knip@6/schema.json",
+    "entry": ["src/components/ui/*.tsx"],
+    "ignoreIssues": {
+        "package.json": ["subpaths"]
+    }
+}
