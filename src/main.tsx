@@ -1,12 +1,9 @@
 import "./index.css";
+import { App } from "./app";
 import { createRoot } from "react-dom/client";
 
 const root = document.querySelector("#root");
 
 if (root) {
-    createRoot(root).render(
-        <main>
-            <h1>Tsundoko</h1>
-        </main>
-    );
+    createRoot(root).render(<App />);
 }
