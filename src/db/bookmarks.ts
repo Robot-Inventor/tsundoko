@@ -1,7 +1,11 @@
 import type { BookmarkPreview, SavedBookmark } from "../lib/bookmark";
 import { desc, eq, ilike, or, sql } from "drizzle-orm";
+import type { PreviewData } from "../lib/preview";
+import type { XPostThumbnail } from "../lib/xPost";
 import { bookmarks } from "./schema";
 import { db } from "./index";
+import { normalizeBookmarkUrl } from "../lib/bookmarkUrl";
+import { saveThumbnail } from "../lib/thumbnailStore";
 
 type BookmarkRow = typeof bookmarks.$inferSelect;
 
@@ -11,6 +15,7 @@ const toSavedBookmark = (row: BookmarkRow): SavedBookmark => ({
     faviconUrl: row.faviconUrl,
     id: row.id,
     siteName: row.siteName,
+    thumbnailFit: row.thumbnailFile === null ? "center" : "top",
     thumbnailUrl: row.thumbnailUrl,
     title: row.title,
     url: row.url
@@ -46,10 +51,11 @@ const listBookmarks = async (query: string): Promise<SavedBookmark[]> => {
 
 const getBookmarkImageUrls = async (
     id: string
-): Promise<Pick<BookmarkRow, "faviconUrl" | "thumbnailUrl" | "url"> | null> => {
+): Promise<Pick<BookmarkRow, "faviconUrl" | "thumbnailFile" | "thumbnailUrl" | "url"> | null> => {
     const [row] = await db
         .select({
             faviconUrl: bookmarks.faviconUrl,
+            thumbnailFile: bookmarks.thumbnailFile,
             thumbnailUrl: bookmarks.thumbnailUrl,
             url: bookmarks.url
         })
@@ -59,7 +65,7 @@ const getBookmarkImageUrls = async (
     return row ?? null;
 };
 
-const insertBookmark = async (bookmark: BookmarkPreview): Promise<SavedBookmark | null> => {
+const insertBookmark = async (bookmark: BookmarkPreview & { id: string }): Promise<SavedBookmark | null> => {
     const [saved] = await db
         .insert(bookmarks)
         .values(bookmark)
@@ -69,4 +75,26 @@ const insertBookmark = async (bookmark: BookmarkPreview): Promise<SavedBookmark 
     return saved ? toSavedBookmark(saved) : null;
 };
 
-export { bookmarkExists, getBookmarkImageUrls, insertBookmark, listBookmarks };
+const saveBookmark = async (
+    url: URL,
+    xPost: XPostThumbnail | null,
+    preview: PreviewData | null
+): Promise<SavedBookmark | null> => {
+    const id = crypto.randomUUID();
+    // Saving the file before the row keeps the stored path from outliving an actual file.
+    // A failed save only loses the rendered thumbnail; the OG fallback still applies.
+    const thumbnailFile = xPost ? await saveThumbnail(id, xPost.png).catch(() => null) : null;
+    const bookmark = {
+        description: preview?.description ?? null,
+        faviconUrl: preview?.faviconUrl ?? null,
+        siteName: xPost?.siteName ?? preview?.siteName ?? url.hostname,
+        thumbnailFile,
+        thumbnailUrl: preview?.thumbnailUrl ?? null,
+        title: xPost?.title ?? preview?.title ?? url.hostname,
+        url: normalizeBookmarkUrl(url)
+    } as const satisfies BookmarkPreview;
+
+    return insertBookmark({ ...bookmark, id });
+};
+
+export { bookmarkExists, getBookmarkImageUrls, listBookmarks, saveBookmark };

@@ -1,11 +1,10 @@
 import { Card, CardFooter, CardHeader } from "./ui/Card";
 import { GlobeIcon, ImageOffIcon } from "lucide-react";
-import type { BookmarkPreview } from "../lib/bookmark";
+import type { SavedBookmark } from "../lib/bookmark";
 import { useState } from "react";
 
-interface Bookmark extends BookmarkPreview {
+interface Bookmark extends Omit<SavedBookmark, "addedAt"> {
     addedAt: Date;
-    id: string;
 }
 
 const dateFormat = new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" });
@@ -13,13 +12,14 @@ const dateFormat = new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" });
 const BookmarkCard = ({ bookmark }: { bookmark: Bookmark }): React.JSX.Element => {
     const [thumbnailFailed, setThumbnailFailed] = useState(false);
     const [faviconFailed, setFaviconFailed] = useState(false);
+    const hasThumbnail = bookmark.thumbnailFit === "top" || bookmark.thumbnailUrl !== null;
 
     return (
         <Card className="h-full">
-            {bookmark.thumbnailUrl && !thumbnailFailed ? (
+            {hasThumbnail && !thumbnailFailed ? (
                 <img
                     alt=""
-                    className="aspect-video w-full bg-muted object-cover"
+                    className={`aspect-video w-full bg-muted object-cover${bookmark.thumbnailFit === "top" ? " object-top" : ""}`}
                     decoding="async"
                     loading="lazy"
                     onError={() => {

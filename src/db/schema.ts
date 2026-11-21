@@ -6,6 +6,8 @@ const bookmarks = pgTable("bookmarks", {
     faviconUrl: text(),
     id: uuid().primaryKey().defaultRandom(),
     siteName: text().notNull(),
+    // Relative path under the data directory when the thumbnail is stored locally (e.g. X post renders).
+    thumbnailFile: text(),
     thumbnailUrl: text(),
     title: text().notNull(),
     url: text().notNull().unique()

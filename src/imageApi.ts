@@ -1,6 +1,7 @@
 import { type Context, Hono } from "hono";
 import { getBookmarkImageUrls } from "./db/bookmarks";
 import { parseContentType } from "./lib/mediaType";
+import { readThumbnail } from "./lib/thumbnailStore";
 import { type } from "arktype";
 import { validator } from "hono/validator";
 
@@ -92,12 +93,6 @@ const serveImage = async (context: Context, imageUrl: string | null): Promise<Re
     }
 };
 
-const getThumbnailUrl = async (id: string | null): Promise<string | null> => {
-    const bookmark = id ? await getBookmarkImageUrls(id) : null;
-
-    return bookmark?.thumbnailUrl ?? null;
-};
-
 const getFaviconUrl = async (id: string | null): Promise<string | null> => {
     const bookmark = id ? await getBookmarkImageUrls(id) : null;
 
@@ -117,9 +112,18 @@ const getFaviconUrl = async (id: string | null): Promise<string | null> => {
 
 const imageApi = new Hono()
     .get("/api/thumbnail", imageIdQuery, async (context) => {
-        const thumbnailUrl = await getThumbnailUrl(context.req.valid("query"));
+        const id = context.req.valid("query");
+        const bookmark = id ? await getBookmarkImageUrls(id) : null;
+        const stored = bookmark?.thumbnailFile ? await readThumbnail(bookmark.thumbnailFile) : null;
 
-        return serveImage(context, thumbnailUrl);
+        if (stored) {
+            context.header("content-type", "image/png");
+            context.header("Cache-Control", imageCacheControl);
+
+            return context.body(stored);
+        }
+
+        return serveImage(context, bookmark?.thumbnailUrl ?? null);
     })
     .get("/api/favicon", imageIdQuery, async (context) => {
         const faviconUrl = await getFaviconUrl(context.req.valid("query"));

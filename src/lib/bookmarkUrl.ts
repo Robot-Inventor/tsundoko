@@ -19,4 +19,12 @@ const parseBookmarkUrl = (input: string): URL | null => {
     return parsed instanceof type.errors ? null : parsed;
 };
 
-export { bookmarkUrl, invalidBookmarkUrlMessage, maxBookmarkUrlLength, parseBookmarkUrl };
+// Drop the fragment so a page with and without its anchor is treated as one bookmark.
+const normalizeBookmarkUrl = (url: URL): string => {
+    const normalized = new URL(url);
+    normalized.hash = "";
+
+    return normalized.href;
+};
+
+export { bookmarkUrl, invalidBookmarkUrlMessage, maxBookmarkUrlLength, normalizeBookmarkUrl, parseBookmarkUrl };
