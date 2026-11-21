@@ -1,10 +1,11 @@
-import { HouseIcon, MenuIcon } from "lucide-react";
+import { HouseIcon, MenuIcon, SearchIcon, XIcon } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "./components/ui/sheet";
+import { desktopLayout, useSearch } from "./hooks/useSearch";
 import { useEffect, useRef, useState } from "react";
 import { BookmarkHome } from "./components/BookmarkHome";
 import { Button } from "./components/ui/button";
-
-const desktopLayout = "(min-width: 48rem)";
+import { SearchBar } from "./components/SearchBar";
+import { cn } from "./lib/utils";
 
 interface HomeNavigationProps {
     homeLinkRef?: React.Ref<HTMLAnchorElement>;
@@ -35,6 +36,7 @@ const HomeNavigation = ({ homeLinkRef, onNavigate }: HomeNavigationProps): React
 
 const App = (): React.JSX.Element => {
     const [menuOpen, setMenuOpen] = useState(false);
+    const search = useSearch();
     const desktopHomeLink = useRef<HTMLAnchorElement>(null);
 
     useEffect(() => {
@@ -59,7 +61,11 @@ const App = (): React.JSX.Element => {
                 <Sheet onOpenChange={setMenuOpen} open={menuOpen}>
                     <SheetTrigger
                         aria-label="メニューを開く"
-                        render=<Button className="size-11 md:hidden" size="icon" variant="ghost" />
+                        render=<Button
+                            className={cn("size-11 md:hidden", search.searchOpen && "hidden")}
+                            size="icon"
+                            variant="ghost"
+                        />
                     >
                         <MenuIcon aria-hidden="true" />
                     </SheetTrigger>
@@ -74,7 +80,41 @@ const App = (): React.JSX.Element => {
                         />
                     </SheetContent>
                 </Sheet>
-                <span className="font-semibold">Tsundoko</span>
+                <span className={cn("font-semibold", search.searchOpen && "hidden md:inline")}>Tsundoko</span>
+                <Button
+                    aria-label="検索を開く"
+                    className={cn("ms-auto size-11 md:hidden", search.searchOpen && "hidden")}
+                    onClick={search.openSearch}
+                    size="icon"
+                    variant="ghost"
+                >
+                    <SearchIcon aria-hidden="true" />
+                </Button>
+                {/* Centered on the viewport instead of the space next to the logo; w-full prevents shrink-to-fit
+                    sizing from collapsing the absolutely positioned bar to the input's intrinsic width. */}
+                <div className="absolute left-1/2 top-1/2 hidden w-full max-w-xl -translate-x-1/2 -translate-y-1/2 md:block">
+                    <SearchBar
+                        inputRef={search.desktopSearchInput}
+                        onSearch={search.runSearch}
+                        onSearchTextChange={search.setSearchText}
+                        searchText={search.searchText}
+                    />
+                </div>
+                {search.searchOpen && (
+                    <div className="flex w-full items-center gap-2 md:hidden">
+                        <SearchBar
+                            autoFocus
+                            className="min-w-0 flex-1"
+                            inputRef={search.mobileSearchInput}
+                            onSearch={search.runSearch}
+                            onSearchTextChange={search.setSearchText}
+                            searchText={search.searchText}
+                        />
+                        <Button aria-label="検索を閉じる" onClick={search.closeSearch} size="icon" variant="ghost">
+                            <XIcon aria-hidden="true" />
+                        </Button>
+                    </div>
+                )}
             </header>
 
             <div className="flex min-h-[calc(100dvh-3.5rem)]">
@@ -83,7 +123,7 @@ const App = (): React.JSX.Element => {
                 </aside>
                 <main className="min-w-0 flex-1 p-4 md:p-6">
                     <h1 className="text-xl font-semibold">ホーム</h1>
-                    <BookmarkHome />
+                    <BookmarkHome onSearchClear={search.clearSearch} query={search.query} />
                 </main>
             </div>
         </>

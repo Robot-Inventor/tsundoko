@@ -1,5 +1,5 @@
 import type { BookmarkPreview, SavedBookmark } from "../lib/bookmark";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, ilike, or, sql } from "drizzle-orm";
 import { bookmarks } from "./schema";
 import { db } from "./index";
 
@@ -22,8 +22,24 @@ const bookmarkExists = async (url: string): Promise<boolean> => {
     return Boolean(existing.length);
 };
 
-const listBookmarks = async (): Promise<SavedBookmark[]> => {
-    const rows = await db.select().from(bookmarks).orderBy(desc(bookmarks.addedAt), desc(bookmarks.id));
+// `%` and `_` are LIKE wildcards and `\` escapes them, so all three must be escaped for a literal match.
+const likePattern = (query: string): string => `%${query.replace(/[\\%_]/gu, "\\$&")}%`;
+
+const listBookmarks = async (query: string): Promise<SavedBookmark[]> => {
+    const condition = query
+        ? or(
+              ilike(bookmarks.title, likePattern(query)),
+              ilike(bookmarks.description, likePattern(query)),
+              ilike(bookmarks.siteName, likePattern(query)),
+              ilike(bookmarks.url, likePattern(query))
+          )
+        : sql`true`;
+
+    const rows = await db
+        .select()
+        .from(bookmarks)
+        .where(condition)
+        .orderBy(desc(bookmarks.addedAt), desc(bookmarks.id));
 
     return rows.map(toSavedBookmark);
 };

@@ -7,6 +7,7 @@ import { bodyLimit } from "hono/body-limit";
 import { decodeBuffer } from "encoding-sniffer";
 import ogs from "open-graph-scraper";
 import { type } from "arktype";
+import { validator } from "hono/validator";
 
 const maxRedirects = 5;
 const fetchTimeout = 8000;
@@ -39,6 +40,17 @@ const httpStatus = {
 const previewRequest = type("string.json.parse").to({
     url: bookmarkUrl
 });
+
+// oxlint-disable id-length -- "q" is the search parameter name defined by the API.
+const searchQuery = validator("query", (value): { q: string } => {
+    const raw = value["q"];
+
+    // A repeated parameter arrives as an array; treat the first value as the query.
+    return {
+        q: (Array.isArray(raw) ? raw[0] : raw)?.trim() ?? ""
+    };
+});
+// oxlint-enable id-length
 
 const normalizeBookmarkUrl = (url: URL): string => {
     const normalized = new URL(url);
@@ -174,11 +186,11 @@ const getPreview = async (url: URL): Promise<BookmarkPreview> => {
 };
 
 const bookmarkApi = new Hono()
-    .get("/api/bookmarks", async (context) => {
+    .get("/api/bookmarks", searchQuery, async (context) => {
         context.header("Cache-Control", "no-store");
 
         try {
-            return context.json(await listBookmarks(), httpStatus.ok);
+            return context.json(await listBookmarks(context.req.valid("query").q), httpStatus.ok);
         } catch {
             return context.json({ error: bookmarkMessages.loadFailed }, httpStatus.internalServerError);
         }
