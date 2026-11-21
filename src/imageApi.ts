@@ -1,23 +1,23 @@
-import { Hono } from "hono";
-import { getBookmarkThumbnailUrl } from "./db/bookmarks";
+import { type Context, Hono } from "hono";
+import { getBookmarkImageUrls } from "./db/bookmarks";
 import { parseContentType } from "./lib/mediaType";
 import { type } from "arktype";
 import { validator } from "hono/validator";
 
 const fetchTimeout = 8000;
 const maxImageBytes = 10_485_760;
-// Thumbnails are stable per page, so letting the browser cache them for a day keeps reloads cheap.
-const thumbnailCacheControl = "public, max-age=86400";
+// Thumbnails and favicons are stable per page, so letting the browser cache them for a day keeps reloads cheap.
+const imageCacheControl = "public, max-age=86400";
 
 const httpStatus = {
     badGateway: 502,
     notFound: 404
 } as const;
 
-// The proxy is keyed by bookmark id, so only saved bookmarks' thumbnails can be fetched.
+// The proxy is keyed by bookmark id, so only saved bookmarks' images can be fetched.
 const bookmarkId = type("string.uuid");
 
-const thumbnailQuery = validator("query", (value): string | null => {
+const imageIdQuery = validator("query", (value): string | null => {
     const raw = value["id"];
     const id = (Array.isArray(raw) ? raw[0] : raw)?.trim() ?? "";
 
@@ -32,7 +32,7 @@ const readImage = async (body: ReadableStream<Uint8Array>): Promise<Uint8Array<A
         size += chunk.byteLength;
 
         if (size > maxImageBytes) {
-            throw new Error("Thumbnail image exceeded its size limit");
+            throw new Error("Proxied image exceeded its size limit");
         }
 
         chunks.push(chunk);
@@ -51,18 +51,16 @@ const readImage = async (body: ReadableStream<Uint8Array>): Promise<Uint8Array<A
     return bytes;
 };
 
-const thumbnailApi = new Hono().get("/api/thumbnail", thumbnailQuery, async (context) => {
+const serveImage = async (context: Context, imageUrl: string | null): Promise<Response> => {
+    // Error responses must not be cached by the browser, unlike successful ones.
     context.header("Cache-Control", "no-store");
 
-    const id = context.req.valid("query");
-    const thumbnailUrl = id ? await getBookmarkThumbnailUrl(id) : null;
-
-    if (!thumbnailUrl) {
+    if (!imageUrl) {
         return context.body(null, httpStatus.notFound);
     }
 
     try {
-        const response = await fetch(thumbnailUrl, {
+        const response = await fetch(imageUrl, {
             credentials: "omit",
             headers: {
                 accept: "image/*"
@@ -86,12 +84,47 @@ const thumbnailApi = new Hono().get("/api/thumbnail", thumbnailQuery, async (con
         const image = await readImage(response.body);
 
         context.header("content-type", contentType.essence);
-        context.header("Cache-Control", thumbnailCacheControl);
+        context.header("Cache-Control", imageCacheControl);
 
         return context.body(image);
     } catch {
         return context.body(null, httpStatus.badGateway);
     }
-});
+};
 
-export { thumbnailApi };
+const getThumbnailUrl = async (id: string | null): Promise<string | null> => {
+    const bookmark = id ? await getBookmarkImageUrls(id) : null;
+
+    return bookmark?.thumbnailUrl ?? null;
+};
+
+const getFaviconUrl = async (id: string | null): Promise<string | null> => {
+    const bookmark = id ? await getBookmarkImageUrls(id) : null;
+
+    if (!bookmark) {
+        return null;
+    }
+
+    // SVG cannot pass serveImage's validation, so Google's favicon service renders those instead.
+    const stored = bookmark.faviconUrl?.endsWith(".svg") ? null : bookmark.faviconUrl;
+
+    const googleFaviconUrl = new URL("https://www.google.com/s2/favicons");
+    googleFaviconUrl.searchParams.set("domain", new URL(bookmark.url).hostname);
+    googleFaviconUrl.searchParams.set("sz", "32");
+
+    return stored ?? googleFaviconUrl.href;
+};
+
+const imageApi = new Hono()
+    .get("/api/thumbnail", imageIdQuery, async (context) => {
+        const thumbnailUrl = await getThumbnailUrl(context.req.valid("query"));
+
+        return serveImage(context, thumbnailUrl);
+    })
+    .get("/api/favicon", imageIdQuery, async (context) => {
+        const faviconUrl = await getFaviconUrl(context.req.valid("query"));
+
+        return serveImage(context, faviconUrl);
+    });
+
+export { imageApi };

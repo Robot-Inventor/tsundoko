@@ -13,12 +13,6 @@ const dateFormat = new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" });
 const BookmarkCard = ({ bookmark }: { bookmark: Bookmark }): React.JSX.Element => {
     const [thumbnailFailed, setThumbnailFailed] = useState(false);
     const [faviconFailed, setFaviconFailed] = useState(false);
-    const [fallbackFailed, setFallbackFailed] = useState(false);
-    const fallbackFavicon = new URL("https://www.google.com/s2/favicons");
-    fallbackFavicon.searchParams.set("domain", new URL(bookmark.url).hostname);
-    fallbackFavicon.searchParams.set("sz", "32");
-    const originalFavicon = faviconFailed ? null : bookmark.faviconUrl;
-    const favicon = originalFavicon ?? (fallbackFailed ? null : fallbackFavicon.href);
 
     return (
         <Card className="h-full">
@@ -58,7 +52,9 @@ const BookmarkCard = ({ bookmark }: { bookmark: Bookmark }): React.JSX.Element =
 
             <CardFooter>
                 <span className="flex min-w-0 items-center gap-1.5">
-                    {favicon ? (
+                    {faviconFailed ? (
+                        <GlobeIcon aria-hidden="true" className="size-4 shrink-0" />
+                    ) : (
                         <img
                             alt=""
                             className="size-4 shrink-0 rounded-full object-cover"
@@ -66,18 +62,11 @@ const BookmarkCard = ({ bookmark }: { bookmark: Bookmark }): React.JSX.Element =
                             height={16}
                             loading="lazy"
                             onError={() => {
-                                if (originalFavicon) {
-                                    setFaviconFailed(true);
-                                } else {
-                                    setFallbackFailed(true);
-                                }
+                                setFaviconFailed(true);
                             }}
-                            referrerPolicy="no-referrer"
-                            src={favicon}
+                            src={`/api/favicon?id=${bookmark.id}`}
                             width={16}
                         />
-                    ) : (
-                        <GlobeIcon aria-hidden="true" className="size-4 shrink-0" />
                     )}
                     <span className="truncate">{bookmark.siteName}</span>
                 </span>

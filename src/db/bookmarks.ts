@@ -44,10 +44,19 @@ const listBookmarks = async (query: string): Promise<SavedBookmark[]> => {
     return rows.map(toSavedBookmark);
 };
 
-const getBookmarkThumbnailUrl = async (id: string): Promise<string | null> => {
-    const [row] = await db.select({ thumbnailUrl: bookmarks.thumbnailUrl }).from(bookmarks).where(eq(bookmarks.id, id));
+const getBookmarkImageUrls = async (
+    id: string
+): Promise<Pick<BookmarkRow, "faviconUrl" | "thumbnailUrl" | "url"> | null> => {
+    const [row] = await db
+        .select({
+            faviconUrl: bookmarks.faviconUrl,
+            thumbnailUrl: bookmarks.thumbnailUrl,
+            url: bookmarks.url
+        })
+        .from(bookmarks)
+        .where(eq(bookmarks.id, id));
 
-    return row?.thumbnailUrl ?? null;
+    return row ?? null;
 };
 
 const insertBookmark = async (bookmark: BookmarkPreview): Promise<SavedBookmark | null> => {
@@ -60,4 +69,4 @@ const insertBookmark = async (bookmark: BookmarkPreview): Promise<SavedBookmark 
     return saved ? toSavedBookmark(saved) : null;
 };
 
-export { bookmarkExists, getBookmarkThumbnailUrl, insertBookmark, listBookmarks };
+export { bookmarkExists, getBookmarkImageUrls, insertBookmark, listBookmarks };

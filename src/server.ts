@@ -1,13 +1,13 @@
 import { Hono } from "hono";
 import { bookmarkApi } from "./bookmarkApi";
+import { imageApi } from "./imageApi";
 import { serveStatic } from "@hono/bun";
-import { thumbnailApi } from "./thumbnailApi";
 
 const app = new Hono();
 
 app.get("/api/health", (context) => context.json({ ok: true }));
 app.route("/", bookmarkApi);
-app.route("/", thumbnailApi);
+app.route("/", imageApi);
 app.get("*", serveStatic({ root: "./dist" }));
 
 export default {
