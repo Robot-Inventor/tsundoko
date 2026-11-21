@@ -18,7 +18,7 @@ const BookmarkCard = ({ bookmark }: { bookmark: Bookmark }): React.JSX.Element =
     const hasThumbnail = bookmark.thumbnailFit === "top" || bookmark.thumbnailUrl !== null;
 
     return (
-        <Card className="flex h-21 flex-row gap-3 overflow-visible rounded-none bg-transparent ring-0 sm:h-full sm:flex-col sm:gap-4 sm:overflow-hidden sm:rounded-xl sm:bg-card sm:ring-1 sm:ring-foreground/10">
+        <Card className="relative flex h-21 flex-row gap-3 overflow-visible rounded-none bg-transparent ring-0 sm:h-full sm:flex-col sm:gap-4 sm:overflow-hidden sm:rounded-xl sm:bg-card sm:ring-1 sm:ring-foreground/10">
             {hasThumbnail && !thumbnailFailed ? (
                 <img
                     alt=""
@@ -40,7 +40,7 @@ const BookmarkCard = ({ bookmark }: { bookmark: Bookmark }): React.JSX.Element =
                 <CardHeader className="px-0 sm:px-4">
                     <h2 className="font-heading text-base leading-snug font-semibold">
                         <a
-                            className="block rounded-sm underline-offset-4 hover:underline focus-visible:focus-outline"
+                            className="block rounded-sm after:absolute after:inset-0 after:content-[''] focus-visible:focus-outline"
                             href={bookmark.url}
                             rel="noopener noreferrer"
                             target="_blank"
