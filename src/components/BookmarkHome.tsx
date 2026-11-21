@@ -8,7 +8,8 @@ import { bookmarkMessages } from "../lib/bookmark";
 
 type LoadState = "error" | "loading" | "ready";
 
-const bookmarkGrid = "mt-6 grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-4";
+const bookmarkGrid = "mt-6 grid -mx-2 grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-6 sm:mx-0 sm:gap-4";
+
 const skeletonCount = 6;
 
 interface BookmarkListProps {
@@ -27,7 +28,7 @@ const BookmarkList = ({ bookmarks, loadState, onRetry, query }: BookmarkListProp
                 </p>
                 <div aria-hidden="true" className={bookmarkGrid}>
                     {Array.from({ length: skeletonCount }, (_bookmark, index) => (
-                        <Skeleton className="h-64 rounded-xl" key={index} />
+                        <Skeleton className="h-21 rounded-lg sm:h-64 sm:rounded-xl" key={index} />
                     ))}
                 </div>
             </>

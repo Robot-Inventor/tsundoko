@@ -11,13 +11,16 @@ const Card = ({ className, ...props }: React.ComponentProps<"article">): React.J
     />
 );
 
-const CardHeader = (props: React.ComponentProps<"header">): React.JSX.Element => (
-    <header className="grid gap-1.5 px-4" data-slot="card-header" {...props} />
+const CardHeader = ({ className, ...props }: React.ComponentProps<"header">): React.JSX.Element => (
+    <header className={cn("grid gap-1.5 px-4", className)} data-slot="card-header" {...props} />
 );
 
-const CardFooter = (props: React.ComponentProps<"footer">): React.JSX.Element => (
+const CardFooter = ({ className, ...props }: React.ComponentProps<"footer">): React.JSX.Element => (
     <footer
-        className="mt-auto flex items-center justify-between gap-2 border-t bg-muted/50 p-4 text-xs text-muted-foreground"
+        className={cn(
+            "mt-auto flex items-center justify-between gap-2 border-t bg-muted/50 p-4 text-xs text-muted-foreground",
+            className
+        )}
         data-slot="card-footer"
         {...props}
     />
