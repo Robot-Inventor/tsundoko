@@ -44,6 +44,12 @@ const listBookmarks = async (query: string): Promise<SavedBookmark[]> => {
     return rows.map(toSavedBookmark);
 };
 
+const getBookmarkThumbnailUrl = async (id: string): Promise<string | null> => {
+    const [row] = await db.select({ thumbnailUrl: bookmarks.thumbnailUrl }).from(bookmarks).where(eq(bookmarks.id, id));
+
+    return row?.thumbnailUrl ?? null;
+};
+
 const insertBookmark = async (bookmark: BookmarkPreview): Promise<SavedBookmark | null> => {
     const [saved] = await db
         .insert(bookmarks)
@@ -54,4 +60,4 @@ const insertBookmark = async (bookmark: BookmarkPreview): Promise<SavedBookmark 
     return saved ? toSavedBookmark(saved) : null;
 };
 
-export { bookmarkExists, insertBookmark, listBookmarks };
+export { bookmarkExists, getBookmarkThumbnailUrl, insertBookmark, listBookmarks };

@@ -2,10 +2,10 @@ import { type BookmarkPreview, bookmarkMessages } from "./lib/bookmark";
 import { bookmarkExists, insertBookmark, listBookmarks } from "./db/bookmarks";
 import { bookmarkUrl, invalidBookmarkUrlMessage, parseBookmarkUrl } from "./lib/bookmarkUrl";
 import { Hono } from "hono";
-import { MIMEType } from "node:util";
 import { bodyLimit } from "hono/body-limit";
 import { decodeBuffer } from "encoding-sniffer";
 import ogs from "open-graph-scraper";
+import { parseContentType } from "./lib/mediaType";
 import { type } from "arktype";
 import { validator } from "hono/validator";
 
@@ -57,18 +57,6 @@ const normalizeBookmarkUrl = (url: URL): string => {
     normalized.hash = "";
 
     return normalized.href;
-};
-
-const parseContentType = (value?: string | null): MIMEType | null => {
-    if (!value) {
-        return null;
-    }
-
-    try {
-        return new MIMEType(value);
-    } catch {
-        return null;
-    }
 };
 
 const readHtml = async (body: ReadableStream<Uint8Array>, charset: string | null): Promise<string> => {

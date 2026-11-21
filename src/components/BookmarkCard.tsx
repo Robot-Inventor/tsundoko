@@ -31,8 +31,7 @@ const BookmarkCard = ({ bookmark }: { bookmark: Bookmark }): React.JSX.Element =
                     onError={() => {
                         setThumbnailFailed(true);
                     }}
-                    referrerPolicy="no-referrer"
-                    src={bookmark.thumbnailUrl}
+                    src={`/api/thumbnail?id=${bookmark.id}`}
                 />
             ) : (
                 <div className="grid aspect-video place-items-center bg-muted text-muted-foreground">
