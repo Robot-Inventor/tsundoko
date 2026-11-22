@@ -1,41 +1,20 @@
-import { ArchiveIcon, ArchiveRestoreIcon, Trash2Icon } from "lucide-react";
 import { type BookmarkActionKind, requestBookmarkAction } from "../lib/bookmarkActions";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "./ui/drawer";
 import { type ReactNode, useRef, useState } from "react";
+import { exitAnimationMs, restingOffsetPx } from "../lib/swipe";
 import type { Bookmark } from "../lib/bookmark";
 import { BookmarkCard } from "./BookmarkCard";
+import { SwipeReveal } from "./SwipeReveal";
 import { cn } from "../lib/utils";
 import { getBookmarkCardActions } from "./bookmarkCardActions";
 
 // A swipe reveals the colored background in proportion to the finger travel; crossing
 // 30% of the row width reveals the icon, releasing past it commits the action.
 const swipeThresholdRatio = 0.3;
-const exitAnimationMs = 200;
 // Small movements are still taps and must keep opening the bookmark link.
 const dragActivationPx = 8;
 const longPressDurationMs = 500;
-const restingOffsetPx = 0;
 const touchPointerType = "touch";
-
-interface SwipeStyle {
-    backgroundClass: string;
-    icon: typeof ArchiveIcon;
-}
-
-const swipeStyles: Record<BookmarkActionKind, SwipeStyle> = {
-    archive: {
-        backgroundClass: "bg-green-600",
-        icon: ArchiveIcon
-    },
-    delete: {
-        backgroundClass: "bg-destructive",
-        icon: Trash2Icon
-    },
-    unarchive: {
-        backgroundClass: "bg-green-600",
-        icon: ArchiveRestoreIcon
-    }
-};
 
 const clampOffset = (offset: number, width: number): number => Math.min(Math.max(offset, -width), width);
 
@@ -52,15 +31,20 @@ const resolvePendingAction = (offsetPx: number, archived: boolean): BookmarkActi
 };
 
 // Sends the action once the slide-out finished; the optimistic removal then unmounts the item.
-const commitAfterSlideOut = (action: BookmarkActionKind, bookmark: Bookmark, resetToResting: () => void): void => {
+const commitAfterSlideOut = (
+    action: BookmarkActionKind,
+    bookmark: Bookmark,
+    resetToResting: (action: BookmarkActionKind | null) => void
+): void => {
     window.setTimeout(() => {
         requestBookmarkAction(action, bookmark);
-        resetToResting();
+        resetToResting(action);
     }, exitAnimationMs);
 };
 
 interface SwipeGesture {
     action: BookmarkActionKind | null;
+    collapsing: boolean;
     dragging: boolean;
     iconVisible: boolean;
     offsetPx: number;
@@ -90,6 +74,9 @@ const useSwipeToAction = (archived: boolean, bookmark: Bookmark, onLongPress: ()
     const [dragging, setDragging] = useState(false);
     const [iconVisible, setIconVisible] = useState(false);
     const [exitAction, setExitAction] = useState<BookmarkActionKind | null>(null);
+    // Keeps the reveal's style during the return so its icon can animate out instead of
+    // vanishing the instant the offset hits rest.
+    const [returnAction, setReturnAction] = useState<BookmarkActionKind | null>(null);
     const gesture = useRef<{
         longPressTimer: number | null;
         moved: boolean;
@@ -97,13 +84,27 @@ const useSwipeToAction = (archived: boolean, bookmark: Bookmark, onLongPress: ()
         startX: number;
     } | null>(null);
 
+    const returnTimer = useRef<number | null>(null);
+
     const suppressClick = useRef(false);
     // oxlint-disable-next-line react/refs -- Only the ref object is passed on; it is never read during render.
     const onContentClickCapture = createClickCaptureGuard(suppressClick);
 
-    const resetToResting = (): void => {
+    // The reveal stays mounted for one exit-animation cycle so the icon fades out and the
+    // strip collapses in step with the returning card.
+    const resetToResting = (action: BookmarkActionKind | null): void => {
+        if (returnTimer.current !== null) {
+            clearTimeout(returnTimer.current);
+            returnTimer.current = null;
+        }
+
         setIconVisible(false);
+        setReturnAction(action);
         setOffsetPx(restingOffsetPx);
+        returnTimer.current = window.setTimeout(() => {
+            returnTimer.current = null;
+            setReturnAction(null);
+        }, exitAnimationMs);
     };
 
     const releaseGesture = (): boolean => {
@@ -127,6 +128,8 @@ const useSwipeToAction = (archived: boolean, bookmark: Bookmark, onLongPress: ()
         }
 
         const { clientX, pointerId } = event;
+        // A fresh press ends a collapse still animating so its style cannot bleed into the new drag.
+        setReturnAction(null);
         suppressClick.current = false;
         gesture.current = {
             longPressTimer: window.setTimeout(() => {
@@ -179,7 +182,7 @@ const useSwipeToAction = (archived: boolean, bookmark: Bookmark, onLongPress: ()
         const { offsetWidth: width } = event.currentTarget;
 
         if (Math.abs(offsetPx) < width * swipeThresholdRatio) {
-            resetToResting();
+            resetToResting(resolvePendingAction(offsetPx, archived));
 
             return;
         }
@@ -192,12 +195,13 @@ const useSwipeToAction = (archived: boolean, bookmark: Bookmark, onLongPress: ()
 
     const handlePointerCancel = (): void => {
         if (releaseGesture()) {
-            resetToResting();
+            resetToResting(resolvePendingAction(offsetPx, archived));
         }
     };
 
     return {
-        action: exitAction ?? resolvePendingAction(offsetPx, archived),
+        action: exitAction ?? returnAction ?? resolvePendingAction(offsetPx, archived),
+        collapsing: returnAction !== null,
         dragging,
         iconVisible,
         offsetPx,
@@ -220,7 +224,6 @@ const BookmarkListItem = ({ archived, bookmark }: BookmarkListItemProps): ReactN
         setDrawerOpen(true);
     });
 
-    const style = swipe.action ? swipeStyles[swipe.action] : null;
     const contentStyle = {
         transform: `translateX(${swipe.offsetPx.toString()}px)`,
         transition: swipe.dragging ? "none" : `transform ${exitAnimationMs.toString()}ms ease-out`
@@ -228,24 +231,13 @@ const BookmarkListItem = ({ archived, bookmark }: BookmarkListItemProps): ReactN
 
     return (
         <li className="relative min-w-0 overflow-clip">
-            {style && swipe.offsetPx !== restingOffsetPx && (
-                <div
-                    aria-hidden="true"
-                    className={`absolute inset-y-0 flex items-center justify-center ${style.backgroundClass} sm:rounded-xl`}
-                    style={{
-                        [swipe.action === "delete" ? "right" : "left"]: restingOffsetPx,
-                        width: Math.abs(swipe.offsetPx)
-                    }}
-                >
-                    {/* The icon springs in once the swipe passes the threshold. */}
-                    <span
-                        className="grid place-items-center text-white transition-[opacity,transform] duration-150 ease-out data-[hidden=true]:scale-25 data-[hidden=true]:opacity-0"
-                        data-hidden={!swipe.iconVisible}
-                    >
-                        <style.icon aria-hidden="true" className="size-7" />
-                    </span>
-                </div>
-            )}
+            <SwipeReveal
+                action={swipe.action}
+                collapsing={swipe.collapsing}
+                dragging={swipe.dragging}
+                iconVisible={swipe.iconVisible}
+                offsetPx={swipe.offsetPx}
+            />
 
             {/* pan-y keeps vertical scrolling with the browser; horizontal pans reach the handlers.
                 Native long-press UI must not steal the gesture from the drawer. */}
