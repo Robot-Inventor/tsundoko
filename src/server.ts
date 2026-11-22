@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { apiPort } from "./apiPort";
 import { bookmarkApi } from "./bookmarkApi";
 import { imageApi } from "./imageApi";
 import { readFile } from "node:fs/promises";
@@ -32,5 +33,5 @@ app.get("*", async (context) =>
 export default {
     fetch: app.fetch,
     hostname: "127.0.0.1",
-    port: 3000
+    port: apiPort
 };
