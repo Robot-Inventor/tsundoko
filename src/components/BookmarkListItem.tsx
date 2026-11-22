@@ -249,8 +249,10 @@ const BookmarkListItem = ({ archived, bookmark }: BookmarkListItemProps): ReactN
 
             {/* pan-y keeps vertical scrolling with the browser; horizontal pans reach the handlers.
                 Native long-press UI must not steal the gesture from the drawer. */}
+            {/* h-full passes the grid-stretched li height down to the Card's sm:h-full,
+                so cards in one row keep an equal height regardless of title length. */}
             <div
-                className="relative touch-pan-y select-none [-webkit-touch-callout:none]"
+                className="relative h-full touch-pan-y select-none [-webkit-touch-callout:none]"
                 onClickCapture={swipe.onContentClickCapture}
                 onContextMenu={(event) => {
                     event.preventDefault();

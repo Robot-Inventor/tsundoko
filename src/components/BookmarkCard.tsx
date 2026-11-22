@@ -49,8 +49,11 @@ const BookmarkCard = ({ archived, bookmark }: BookmarkCardProps): ReactNode => {
     const [faviconFailed, setFaviconFailed] = useState(false);
     const hasThumbnail = bookmark.thumbnailFit === "top" || bookmark.thumbnailUrl !== null;
 
+    // sm:border instead of the base ring: the grid item's overflow-clip cuts a ring painted
+    // outside the card once it fills the row, and an inset ring would be covered by the
+    // flush thumbnail; a real border sits in the card's own border box, which overflow-hidden never clips.
     return (
-        <Card className="relative flex h-21 flex-row gap-3 overflow-visible rounded-none bg-transparent ring-0 sm:h-full sm:flex-col sm:gap-4 sm:overflow-hidden sm:rounded-xl sm:bg-card sm:ring-1 sm:ring-foreground/10">
+        <Card className="relative flex h-21 flex-row gap-3 overflow-visible rounded-none bg-transparent ring-0 sm:h-full sm:flex-col sm:gap-4 sm:overflow-hidden sm:rounded-xl sm:bg-card sm:border sm:border-foreground/10">
             <div className="relative w-2/5 shrink-0 self-stretch overflow-hidden rounded-lg sm:w-full sm:rounded-none">
                 {hasThumbnail && !thumbnailFailed ? (
                     <img
