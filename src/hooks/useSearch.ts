@@ -58,7 +58,7 @@ const useSearch = (): UseSearchResult => {
             return;
         }
 
-        // Mounting the bar focuses its input via autoFocus.
+        // The bar mounts on open; it focuses its input itself.
         setSearchOpen(true);
     }, [searchOpen]);
 

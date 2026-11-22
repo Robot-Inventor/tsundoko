@@ -101,8 +101,8 @@ const AppLayout = (): ReactNode => {
                 {search.searchOpen && (
                     <div className="flex w-full items-center gap-2 md:hidden">
                         <SearchBar
-                            autoFocus
                             className="min-w-0 flex-1"
+                            focusOnMount
                             inputRef={search.mobileSearchInput}
                             onSearch={search.runSearch}
                             onSearchTextChange={search.setSearchText}

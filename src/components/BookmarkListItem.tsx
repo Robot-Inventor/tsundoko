@@ -243,6 +243,8 @@ const BookmarkListItem = ({ archived, bookmark }: BookmarkListItemProps): ReactN
                 Native long-press UI must not steal the gesture from the drawer. */}
             {/* h-full passes the grid-stretched li height down to the Card's sm:h-full so one row's cards keep equal heights. */}
             {/* Swipe margins ride inside the transform: 16px sides, half the row gap top and bottom. */}
+            {/* The wrapper is not interactive; this only cancels the stretched link's click after a swipe. */}
+            {/* oxlint-disable-next-line react-doctor/click-events-have-key-events */}
             <div
                 className="relative h-full touch-pan-y select-none [-webkit-touch-callout:none] max-sm:px-4 max-sm:py-3"
                 onClickCapture={swipe.onContentClickCapture}
