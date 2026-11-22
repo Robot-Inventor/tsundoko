@@ -1,5 +1,6 @@
 import { SearchIcon, XIcon } from "lucide-react";
 import { Input } from "./ui/Input";
+import type { ReactNode } from "react";
 
 interface SearchBarProps {
     autoFocus?: boolean;
@@ -17,7 +18,7 @@ const SearchBar = ({
     onSearch,
     onSearchTextChange,
     searchText
-}: SearchBarProps): React.JSX.Element => (
+}: SearchBarProps): ReactNode => (
     <form
         className={className}
         noValidate

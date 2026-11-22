@@ -1,0 +1,1 @@
+ALTER TABLE "bookmarks" ADD COLUMN "archivedAt" timestamp with time zone;

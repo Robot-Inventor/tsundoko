@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 const desktopLayout = "(min-width: 48rem)";
 
@@ -114,4 +114,17 @@ const useSearch = (): UseSearchResult => {
     };
 };
 
-export { desktopLayout, useSearch };
+const SearchContext = createContext<UseSearchResult | null>(null);
+
+// Lives around the router Outlet in AppLayout so that both the header bar and every page share one search state.
+const useSearchContext = (): UseSearchResult => {
+    const context = useContext(SearchContext);
+
+    if (!context) {
+        throw new Error("useSearchContext requires the search context from AppLayout.");
+    }
+
+    return context;
+};
+
+export { SearchContext, desktopLayout, useSearch, useSearchContext };

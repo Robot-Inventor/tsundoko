@@ -1,17 +1,18 @@
 import { Drawer } from "@base-ui/react/drawer";
+import type { ReactNode } from "react";
 import { cn } from "../../lib/utils";
 
 // The backdrop and the panel must finish exiting together: the portal unmounts
 // when the panel's transition ends, so a longer backdrop fade would be cut off.
 const sheetTransition = "duration-[450ms] ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none";
 
-const Sheet = (props: Omit<Drawer.Root.Props, "swipeDirection">): React.JSX.Element => (
+const Sheet = (props: Omit<Drawer.Root.Props, "swipeDirection">): ReactNode => (
     // "left" is the swipe direction that dismisses: the start-anchored sheet exits
     // through the edge it slid in from, like a native app menu.
     <Drawer.Root {...props} swipeDirection="left" />
 );
 
-const SheetTrigger = (props: Drawer.Trigger.Props): React.JSX.Element => (
+const SheetTrigger = (props: Drawer.Trigger.Props): ReactNode => (
     <Drawer.Trigger data-slot="sheet-trigger" {...props} />
 );
 
@@ -19,7 +20,7 @@ const SheetContent = ({
     children,
     className,
     ...props
-}: Omit<Drawer.Popup.Props, "className"> & { className?: string }): React.JSX.Element => (
+}: Omit<Drawer.Popup.Props, "className"> & { className?: string }): ReactNode => (
     <Drawer.Portal>
         {/* Every dim state lives in the background alpha, never in `opacity`:
             Chromium drops backdrop-filter while an element's opacity is below 1. */}
@@ -46,7 +47,7 @@ const SheetContent = ({
     </Drawer.Portal>
 );
 
-const SheetTitle = (props: Drawer.Title.Props): React.JSX.Element => (
+const SheetTitle = (props: Drawer.Title.Props): ReactNode => (
     // The dialog's accessible name; visually hidden because the sheet content makes it obvious.
     <Drawer.Title className="sr-only" data-slot="sheet-title" {...props} />
 );

@@ -1,11 +1,11 @@
-import type { BookmarkPreview, SavedBookmark } from "../lib/bookmark";
-import { desc, eq, ilike, or, sql } from "drizzle-orm";
+import type { BookmarkPreview, BookmarkScope, SavedBookmark } from "../lib/bookmark";
+import { and, desc, eq, ilike, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { deleteThumbnail, saveThumbnail } from "../lib/thumbnailStore";
 import type { PreviewData } from "../lib/preview";
 import type { XPostThumbnail } from "../lib/xPost";
 import { bookmarks } from "./schema";
 import { db } from "./index";
 import { normalizeBookmarkUrl } from "../lib/bookmarkUrl";
-import { saveThumbnail } from "../lib/thumbnailStore";
 
 type BookmarkRow = typeof bookmarks.$inferSelect;
 
@@ -30,8 +30,8 @@ const bookmarkExists = async (url: string): Promise<boolean> => {
 // `%` and `_` are LIKE wildcards and `\` escapes them, so all three must be escaped for a literal match.
 const likePattern = (query: string): string => `%${query.replace(/[\\%_]/gu, "\\$&")}%`;
 
-const listBookmarks = async (query: string): Promise<SavedBookmark[]> => {
-    const condition = query
+const listBookmarks = async (query: string, scope: BookmarkScope): Promise<SavedBookmark[]> => {
+    const searchCondition = query
         ? or(
               ilike(bookmarks.title, likePattern(query)),
               ilike(bookmarks.description, likePattern(query)),
@@ -40,10 +40,12 @@ const listBookmarks = async (query: string): Promise<SavedBookmark[]> => {
           )
         : sql`true`;
 
+    const scopeCondition = scope === "active" ? isNull(bookmarks.archivedAt) : isNotNull(bookmarks.archivedAt);
+
     const rows = await db
         .select()
         .from(bookmarks)
-        .where(condition)
+        .where(and(searchCondition, scopeCondition))
         .orderBy(desc(bookmarks.addedAt), desc(bookmarks.id));
 
     return rows.map(toSavedBookmark);
@@ -97,4 +99,32 @@ const saveBookmark = async (
     return insertBookmark({ ...bookmark, id });
 };
 
-export { bookmarkExists, getBookmarkImageUrls, listBookmarks, saveBookmark };
+const setBookmarkArchived = async (id: string, archivedAt: Date | null): Promise<SavedBookmark | null> => {
+    const [row] = await db.update(bookmarks).set({ archivedAt }).where(eq(bookmarks.id, id)).returning();
+
+    return row ? toSavedBookmark(row) : null;
+};
+
+// Deletes the row first, then unlinks the locally stored thumbnail if there was one:
+// a failed unlink only leaves an unreachable orphan file behind.
+const deleteBookmark = async (id: string): Promise<boolean> => {
+    const [row] = await db
+        .delete(bookmarks)
+        .where(eq(bookmarks.id, id))
+        .returning({ thumbnailFile: bookmarks.thumbnailFile });
+
+    if (!row) {
+        return false;
+    }
+
+    if (row.thumbnailFile) {
+        await deleteThumbnail(row.thumbnailFile).catch((error: unknown) => {
+            // oxlint-disable-next-line no-console -- Server-side diagnostics are console's legitimate use.
+            console.warn("Thumbnail file deletion failed:", error);
+        });
+    }
+
+    return true;
+};
+
+export { bookmarkExists, deleteBookmark, getBookmarkImageUrls, listBookmarks, saveBookmark, setBookmarkArchived };

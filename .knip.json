@@ -1,8 +1,7 @@
 {
     "$schema": "https://unpkg.com/knip@6/schema.json",
     "drizzle": false,
-    "entry": ["src/components/ui/*.tsx"],
-    "ignore": ["drizzle.config.ts"],
+    "ignore": ["drizzle.config.ts", "src/components/ui/**"],
     "ignoreIssues": {
         "package.json": ["subpaths"]
     }

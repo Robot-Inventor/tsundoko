@@ -1,10 +1,9 @@
+import { type Bookmark, bookmarkMessages } from "../lib/bookmark";
+import { type ReactNode, useRef, useState } from "react";
 import { invalidBookmarkUrlMessage, maxBookmarkUrlLength, parseBookmarkUrl } from "../lib/bookmarkUrl";
-import { useRef, useState } from "react";
-import type { Bookmark } from "./BookmarkCard";
 import { Button } from "./ui/button";
 import { Input } from "./ui/Input";
 import { bookmarkClient } from "../lib/bookmarkClient";
-import { bookmarkMessages } from "../lib/bookmark";
 
 const formErrors = {
     duplicate: bookmarkMessages.duplicate,
@@ -73,7 +72,7 @@ interface BookmarkFormProps {
     onAdd: (bookmark: Bookmark) => void;
 }
 
-const BookmarkForm = ({ onAdd }: BookmarkFormProps): React.JSX.Element => {
+const BookmarkForm = ({ onAdd }: BookmarkFormProps): ReactNode => {
     const [input, setInput] = useState("");
     const [error, setError] = useState("");
     const [status, setStatus] = useState("");

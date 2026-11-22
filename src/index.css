@@ -134,11 +134,15 @@
     body {
         @apply bg-background text-foreground;
     }
-    button:not(:disabled),
-    [role="button"]:not(:disabled) {
-        cursor: pointer;
-    }
     html {
         @apply font-sans;
     }
+}
+
+/* Unlayered so it wins over component utilities (e.g. the registry's cursor-default on
+   menu items, which Base UI renders as div[role=menuitem]). */
+button:not(:disabled),
+[role="button"]:not(:disabled),
+[role="menuitem"] {
+    cursor: pointer;
 }

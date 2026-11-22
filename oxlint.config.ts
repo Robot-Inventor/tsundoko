@@ -1,3 +1,6 @@
 import { oxlintReactConfig } from "@robot-inventor/oxlint-config";
 
-export default oxlintReactConfig;
+export default {
+    ...oxlintReactConfig,
+    ignorePatterns: ["src/components/ui/**"]
+};

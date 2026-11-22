@@ -1,40 +1,76 @@
 import { Card, CardFooter, CardHeader } from "./ui/Card";
-import { GlobeIcon, ImageOffIcon } from "lucide-react";
-import type { SavedBookmark } from "../lib/bookmark";
-import { useState } from "react";
-
-interface Bookmark extends Omit<SavedBookmark, "addedAt"> {
-    addedAt: Date;
-}
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
+import { EllipsisVerticalIcon, GlobeIcon, ImageOffIcon } from "lucide-react";
+import { type ReactNode, useState } from "react";
+import type { Bookmark } from "../lib/bookmark";
+import { getBookmarkCardActions } from "./bookmarkCardActions";
 
 const dateFormat = new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" });
 
 // Mobile: Feedly/X-style media object (thumbnail left, cropped to card height); sm and up: full-width thumbnail on top.
-const thumbnailClass = "aspect-video w-2/5 shrink-0 self-stretch rounded-lg bg-muted sm:w-full sm:rounded-none";
+// h-full keeps the img stretched to the wrapper so wide screens keep the center crop; the
+// wrapper owns the rounding because overflow-hidden clips it from the children.
+const thumbnailClass = "aspect-video h-full w-full bg-muted object-cover";
 
-const BookmarkCard = ({ bookmark }: { bookmark: Bookmark }): React.JSX.Element => {
+interface BookmarkCardMenuProps {
+    archived: boolean;
+    bookmark: Bookmark;
+}
+
+const BookmarkCardMenu = ({ archived, bookmark }: BookmarkCardMenuProps): ReactNode => (
+    // Hover-only action menu (touch devices use the long-press drawer); the stretched title
+    // link sits underneath, so the trigger needs its own stacking level.
+    <DropdownMenu>
+        <DropdownMenuTrigger
+            aria-label={`「${bookmark.title}」のメニューを開く`}
+            // Top-left on the mobile thumbnail, top-right on the desktop thumbnail.
+            className="pointer-events-none absolute left-1.5 top-1.5 z-10 grid size-7 place-items-center rounded-full bg-black/50 text-white opacity-0 transition-[background-color,opacity] hover:bg-black/70 right-auto focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:focus-outline aria-expanded:pointer-events-auto aria-expanded:opacity-100 group-hover/card:pointer-events-auto group-hover/card:opacity-100 sm:left-auto sm:right-1.5 [@media(hover:none)]:hidden"
+        >
+            <EllipsisVerticalIcon aria-hidden="true" className="size-4" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+            {getBookmarkCardActions(archived, bookmark).map(({ icon: Icon, label, onSelect, variant }) => (
+                <DropdownMenuItem key={label} onClick={onSelect} variant={variant ?? "default"}>
+                    <Icon aria-hidden="true" />
+                    {label}
+                </DropdownMenuItem>
+            ))}
+        </DropdownMenuContent>
+    </DropdownMenu>
+);
+
+interface BookmarkCardProps {
+    archived: boolean;
+    bookmark: Bookmark;
+}
+
+const BookmarkCard = ({ archived, bookmark }: BookmarkCardProps): ReactNode => {
     const [thumbnailFailed, setThumbnailFailed] = useState(false);
     const [faviconFailed, setFaviconFailed] = useState(false);
     const hasThumbnail = bookmark.thumbnailFit === "top" || bookmark.thumbnailUrl !== null;
 
     return (
         <Card className="relative flex h-21 flex-row gap-3 overflow-visible rounded-none bg-transparent ring-0 sm:h-full sm:flex-col sm:gap-4 sm:overflow-hidden sm:rounded-xl sm:bg-card sm:ring-1 sm:ring-foreground/10">
-            {hasThumbnail && !thumbnailFailed ? (
-                <img
-                    alt=""
-                    className={`${thumbnailClass} object-cover${bookmark.thumbnailFit === "top" ? " object-top" : ""}`}
-                    decoding="async"
-                    loading="lazy"
-                    onError={() => {
-                        setThumbnailFailed(true);
-                    }}
-                    src={`/api/thumbnail?id=${bookmark.id}`}
-                />
-            ) : (
-                <div className={`${thumbnailClass} grid place-items-center text-muted-foreground`}>
-                    <ImageOffIcon aria-hidden="true" className="size-7" />
-                </div>
-            )}
+            <div className="relative w-2/5 shrink-0 self-stretch overflow-hidden rounded-lg sm:w-full sm:rounded-none">
+                {hasThumbnail && !thumbnailFailed ? (
+                    <img
+                        alt=""
+                        className={`${thumbnailClass}${bookmark.thumbnailFit === "top" ? " object-top" : ""}`}
+                        decoding="async"
+                        loading="lazy"
+                        onError={() => {
+                            setThumbnailFailed(true);
+                        }}
+                        src={`/api/thumbnail?id=${bookmark.id}`}
+                    />
+                ) : (
+                    <div className={`${thumbnailClass} grid place-items-center text-muted-foreground`}>
+                        <ImageOffIcon aria-hidden="true" className="size-7" />
+                    </div>
+                )}
+
+                <BookmarkCardMenu archived={archived} bookmark={bookmark} />
+            </div>
 
             <div className="flex min-w-0 flex-1 flex-col pr-3 sm:gap-4 sm:p-0">
                 <CardHeader className="px-0 sm:px-4">
@@ -85,4 +121,4 @@ const BookmarkCard = ({ bookmark }: { bookmark: Bookmark }): React.JSX.Element =
     );
 };
 
-export { type Bookmark, BookmarkCard };
+export { BookmarkCard };
