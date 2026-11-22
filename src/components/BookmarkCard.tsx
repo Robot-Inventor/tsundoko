@@ -52,6 +52,8 @@ const BookmarkCard = ({ archived, bookmark }: BookmarkCardProps): ReactNode => {
     // sm:border instead of the base ring: the grid item's overflow-clip cuts a ring painted
     // outside the card once it fills the row, and an inset ring would be covered by the
     // flush thumbnail; a real border sits in the card's own border box, which overflow-hidden never clips.
+    // The card spans its full cell on mobile (the grid is full-bleed there) and stays
+    // transparent; the swipe margins live on the wrapping swipe container.
     return (
         <Card className="relative flex h-21 flex-row gap-3 overflow-visible rounded-none bg-transparent ring-0 sm:h-full sm:flex-col sm:gap-4 sm:overflow-hidden sm:rounded-xl sm:bg-card sm:border sm:border-foreground/10">
             <div className="relative w-2/5 shrink-0 self-stretch overflow-hidden rounded-lg sm:w-full sm:rounded-none">
@@ -75,7 +77,7 @@ const BookmarkCard = ({ archived, bookmark }: BookmarkCardProps): ReactNode => {
                 <BookmarkCardMenu archived={archived} bookmark={bookmark} />
             </div>
 
-            <div className="flex min-w-0 flex-1 flex-col pr-3 sm:gap-4 sm:p-0">
+            <div className="flex min-w-0 flex-1 flex-col sm:gap-4">
                 <CardHeader className="px-0 sm:px-4">
                     <h2 className="font-heading text-base leading-snug font-semibold">
                         <a

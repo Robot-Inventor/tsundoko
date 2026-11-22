@@ -8,7 +8,7 @@ import { cn } from "../lib/utils";
 import { getBookmarkCardActions } from "./bookmarkCardActions";
 
 // A swipe reveals the colored background in proportion to the finger travel; crossing
-// 30% of the item width reveals the icon, releasing past it commits the action.
+// 30% of the row width reveals the icon, releasing past it commits the action.
 const swipeThresholdRatio = 0.3;
 const exitAnimationMs = 200;
 // Small movements are still taps and must keep opening the bookmark link.
@@ -249,10 +249,10 @@ const BookmarkListItem = ({ archived, bookmark }: BookmarkListItemProps): ReactN
 
             {/* pan-y keeps vertical scrolling with the browser; horizontal pans reach the handlers.
                 Native long-press UI must not steal the gesture from the drawer. */}
-            {/* h-full passes the grid-stretched li height down to the Card's sm:h-full,
-                so cards in one row keep an equal height regardless of title length. */}
+            {/* h-full passes the grid-stretched li height down to the Card's sm:h-full so one row's cards keep equal heights. */}
+            {/* Swipe margins ride inside the transform: 16px sides, half the row gap top and bottom. */}
             <div
-                className="relative h-full touch-pan-y select-none [-webkit-touch-callout:none]"
+                className="relative h-full touch-pan-y select-none [-webkit-touch-callout:none] max-sm:px-4 max-sm:py-3"
                 onClickCapture={swipe.onContentClickCapture}
                 onContextMenu={(event) => {
                     event.preventDefault();
