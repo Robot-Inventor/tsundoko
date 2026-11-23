@@ -1,9 +1,13 @@
 import { type Bookmark, bookmarkMessages } from "../lib/bookmark";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { type ReactNode, useRef, useState } from "react";
 import { invalidBookmarkUrlMessage, maxBookmarkUrlLength, parseBookmarkUrl } from "../lib/bookmarkUrl";
 import { Button } from "./ui/button";
 import { Input } from "./ui/Input";
+import { PlusIcon } from "lucide-react";
 import { bookmarkClient } from "../lib/bookmarkClient";
+import { cn } from "../lib/utils";
+import { useSearchContext } from "../hooks/useSearch";
 
 const formErrors = {
     duplicate: bookmarkMessages.duplicate,
@@ -12,7 +16,6 @@ const formErrors = {
     save: bookmarkMessages.saveFailed
 } as const;
 
-const formErrorMessages = Object.values(formErrors);
 const httpStatus = {
     badGateway: 502,
     badRequest: 400,
@@ -68,14 +71,13 @@ const requestBookmark = async (url: URL): Promise<AddBookmarkResult> => {
     }
 };
 
-interface BookmarkFormProps {
-    onAdd: (bookmark: Bookmark) => void;
+interface BookmarkUrlFormProps {
+    onAdded: (bookmark: Bookmark) => void;
 }
 
-const BookmarkForm = ({ onAdd }: BookmarkFormProps): ReactNode => {
+const BookmarkUrlForm = ({ onAdded }: BookmarkUrlFormProps): ReactNode => {
     const [input, setInput] = useState("");
     const [error, setError] = useState("");
-    const [status, setStatus] = useState("");
     const [adding, setAdding] = useState(false);
     const urlInput = useRef<HTMLInputElement>(null);
 
@@ -85,7 +87,6 @@ const BookmarkForm = ({ onAdd }: BookmarkFormProps): ReactNode => {
         }
 
         setError("");
-        setStatus("");
         const url = parseBookmarkUrl(input);
 
         if (!url) {
@@ -105,18 +106,13 @@ const BookmarkForm = ({ onAdd }: BookmarkFormProps): ReactNode => {
             return;
         }
 
-        onAdd(result.bookmark);
         setInput("");
-        setStatus("ブックマークを追加しました。");
+        onAdded(result.bookmark);
     };
-
-    const announcement = adding ? "ページの情報を取得しています。" : error || status;
 
     return (
         <form
-            action="/api/bookmarks"
-            className="mt-4 max-w-2xl"
-            method="post"
+            className="grid gap-2"
             noValidate
             onSubmit={(event) => {
                 event.preventDefault();
@@ -125,20 +121,18 @@ const BookmarkForm = ({ onAdd }: BookmarkFormProps): ReactNode => {
         >
             <div className="flex items-start gap-2">
                 <Input
-                    aria-describedby={error && "bookmark-url-error"}
+                    aria-describedby={error && "add-bookmark-error"}
                     aria-invalid={Boolean(error)}
                     aria-label="追加するページのURL"
                     autoCapitalize="none"
                     autoComplete="url"
                     autoCorrect="off"
                     className="h-10 flex-1"
-                    id="bookmark-url"
                     maxLength={maxBookmarkUrlLength}
                     name="url"
                     onChange={(event) => {
                         setInput(event.currentTarget.value);
                         setError("");
-                        setStatus("");
                     }}
                     placeholder="追加するURLを入力"
                     readOnly={adding}
@@ -152,20 +146,59 @@ const BookmarkForm = ({ onAdd }: BookmarkFormProps): ReactNode => {
                     {adding ? "取得中…" : "追加"}
                 </Button>
             </div>
-            <div className="mt-2 grid text-sm wrap-anywhere text-destructive [&>p]:col-start-1 [&>p]:row-start-1">
-                {/* Measure the tallest error at the current width before any error is shown. */}
-                {formErrorMessages.map((message) => (
-                    <p className="invisible" key={message}>
-                        {message}
-                    </p>
-                ))}
-                <p id="bookmark-url-error">{error}</p>
-            </div>
+            {error && (
+                <p className="text-sm wrap-anywhere text-destructive" id="add-bookmark-error" role="alert">
+                    {error}
+                </p>
+            )}
             <p aria-live="polite" className="sr-only">
-                {announcement}
+                {adding ? "ページの情報を取得しています。" : ""}
             </p>
         </form>
     );
 };
 
-export { BookmarkForm };
+interface AddBookmarkDialogProps {
+    onAdd: (bookmark: Bookmark) => void;
+}
+
+const AddBookmarkDialog = ({ onAdd }: AddBookmarkDialogProps): ReactNode => {
+    const search = useSearchContext();
+    const [open, setOpen] = useState(false);
+    const inactive = open || search.searchOpen;
+
+    return (
+        <Dialog onOpenChange={setOpen} open={open}>
+            <DialogTrigger render=<Button className="hidden md:inline-flex" />>
+                <PlusIcon aria-hidden="true" />
+                追加
+            </DialogTrigger>
+            <DialogTrigger
+                aria-label="ブックマークを追加"
+                inert={inactive}
+                render=<Button
+                    className={cn(
+                        "fixed right-6 bottom-6 z-30 size-14 rounded-full shadow-lg transition-[opacity,scale] duration-200 md:hidden",
+                        inactive && "scale-50 opacity-0"
+                    )}
+                    size="icon"
+                />
+            >
+                <PlusIcon aria-hidden="true" className="size-6" />
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>ブックマークを追加</DialogTitle>
+                </DialogHeader>
+                <BookmarkUrlForm
+                    onAdded={(bookmark) => {
+                        setOpen(false);
+                        onAdd(bookmark);
+                    }}
+                />
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+export { AddBookmarkDialog };

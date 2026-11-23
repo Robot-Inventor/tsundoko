@@ -1,5 +1,5 @@
 import { ArchiveIcon, HouseIcon, MenuIcon, SearchIcon, XIcon } from "lucide-react";
-import { Link, Outlet } from "@tanstack/react-router";
+import { Link, Outlet, useLocation } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { SearchContext, desktopLayout, useSearch } from "../hooks/useSearch";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "./ui/sheet";
@@ -31,6 +31,23 @@ const MainNavigation = ({ homeLinkRef, onNavigate }: MainNavigationProps): React
         </Link>
     </nav>
 );
+
+// The mobile header carries the page title; each page hides its own h1 on mobile so exactly one
+// h1 is visible per breakpoint.
+const MobilePageTitle = ({ searchOpen }: { searchOpen: boolean }): ReactNode => {
+    const { pathname } = useLocation();
+
+    return (
+        <h1
+            className={cn(
+                "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-base font-semibold md:hidden",
+                searchOpen && "hidden"
+            )}
+        >
+            {pathname.startsWith("/archive") ? "アーカイブ" : "ホーム"}
+        </h1>
+    );
+};
 
 const AppLayout = (): ReactNode => {
     const search = useSearch();
@@ -78,7 +95,8 @@ const AppLayout = (): ReactNode => {
                         />
                     </SheetContent>
                 </Sheet>
-                <span className={cn("font-semibold", search.searchOpen && "hidden md:inline")}>Tsundoko</span>
+                <span className="hidden font-semibold md:inline">Tsundoko</span>
+                <MobilePageTitle searchOpen={search.searchOpen} />
                 <Button
                     aria-label="検索を開く"
                     className={cn("ms-auto size-11 md:hidden", search.searchOpen && "hidden")}

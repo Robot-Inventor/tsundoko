@@ -1,5 +1,5 @@
+import { AddBookmarkDialog } from "./AddBookmarkDialog";
 import type { Bookmark } from "../lib/bookmark";
-import { BookmarkForm } from "./BookmarkForm";
 import { BookmarkList } from "./BookmarkList";
 import type { ReactNode } from "react";
 import { useBookmarkList } from "../hooks/useBookmarkList";
@@ -11,13 +11,17 @@ const HomePage = (): ReactNode => {
 
     return (
         <>
-            <h1 className="text-xl font-semibold">ホーム</h1>
-            <BookmarkForm
-                onAdd={(bookmark: Bookmark) => {
-                    search.clearSearch();
-                    list.addBookmark(bookmark);
-                }}
-            />
+            {/* The wrapper must stay rendered on mobile: AddBookmarkDialog's floating button lives here. */}
+            <div className="flex items-center justify-between gap-2">
+                {/* The mobile header carries the page title, so the in-page h1 shows on desktop only. */}
+                <h1 className="hidden text-xl font-semibold md:block">ホーム</h1>
+                <AddBookmarkDialog
+                    onAdd={(bookmark: Bookmark) => {
+                        search.clearSearch();
+                        list.addBookmark(bookmark);
+                    }}
+                />
+            </div>
             <BookmarkList
                 archived={false}
                 bookmarks={list.bookmarks}
