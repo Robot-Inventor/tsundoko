@@ -1,5 +1,7 @@
 # Tsundoko
 
+![Tsundoko](docs/readme_logo.svg)
+
 Lightweight, AI-first bookmarking app
 
 ## Development

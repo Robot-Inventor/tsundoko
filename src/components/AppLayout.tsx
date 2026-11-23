@@ -32,6 +32,10 @@ const MainNavigation = ({ homeLinkRef, onNavigate }: MainNavigationProps): React
     </nav>
 );
 
+const Logo = ({ className }: { className: string }): ReactNode => (
+    <img alt="Tsundoko" className={className} height={370} src="/logo.svg" width={1666} />
+);
+
 // The mobile header carries the page title; each page hides its own h1 on mobile so exactly one
 // h1 is visible per breakpoint.
 const MobilePageTitle = ({ searchOpen }: { searchOpen: boolean }): ReactNode => {
@@ -85,8 +89,10 @@ const AppLayout = (): ReactNode => {
                         <MenuIcon aria-hidden="true" />
                     </SheetTrigger>
                     <SheetContent
+                        className="pt-8"
                         finalFocus={() => (window.matchMedia(desktopLayout).matches ? desktopHomeLink.current : true)}
                     >
+                        <Logo className="mb-6 ms-6 block h-auto w-1/2" />
                         <SheetTitle>メニュー</SheetTitle>
                         <MainNavigation
                             onNavigate={() => {
@@ -95,7 +101,7 @@ const AppLayout = (): ReactNode => {
                         />
                     </SheetContent>
                 </Sheet>
-                <span className="hidden font-semibold md:inline">Tsundoko</span>
+                <Logo className="hidden h-auto w-32 md:block" />
                 <MobilePageTitle searchOpen={search.searchOpen} />
                 <Button
                     aria-label="検索を開く"
