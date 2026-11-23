@@ -1,5 +1,7 @@
 import type { BookmarkPreview } from "./bookmark";
 import { decodeBuffer } from "encoding-sniffer";
+import { extractArticleContent } from "./articleContent";
+import { isXPostUrl } from "./xPost";
 import ogs from "open-graph-scraper";
 import { parseBookmarkUrl } from "./bookmarkUrl";
 import { parseContentType } from "./mediaType";
@@ -116,13 +118,16 @@ const imageUrl = (value: string | undefined, pageUrl: URL): string | null => {
 };
 
 // `url` and `thumbnailFile` are filled by the save path, so the page fetch returns the rest only.
-type PreviewData = Omit<BookmarkPreview, "thumbnailFile" | "url">;
+type PreviewData = Omit<BookmarkPreview, "thumbnailFile" | "url"> & { content: string | null };
 
 const getPreview = async (url: URL): Promise<PreviewData> => {
     const { html, pageUrl } = await fetchHtml(url);
     const { result } = await ogs({ html, onlyGetOpenGraphInfo: ["image"] });
 
     return {
+        // X post pages have no article body: xeet renders the text into the title instead,
+        // so the expensive extraction is skipped rather than discarded afterwards.
+        content: isXPostUrl(url) ? null : await extractArticleContent(html),
         description:
             cleanText(result.ogDescription, maxDescriptionLength) ??
             cleanText(result.twitterDescription, maxDescriptionLength),

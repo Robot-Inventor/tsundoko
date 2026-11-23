@@ -4,6 +4,9 @@ const bookmarks = pgTable("bookmarks", {
     addedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     // Null for active bookmarks; a timestamp marks the bookmark as archived.
     archivedAt: timestamp({ withTimezone: true }),
+    // Article body as sanitized Markdown, searched but never sent to the client.
+    // Null when extraction failed or the page is an X post.
+    content: text(),
     description: text(),
     faviconUrl: text(),
     id: uuid().primaryKey().defaultRandom(),

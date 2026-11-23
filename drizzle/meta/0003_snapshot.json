@@ -1,0 +1,106 @@
+{
+    "id": "56563115-6310-48a0-81aa-dcf0e9c1f1fb",
+    "prevId": "cba3d0d8-b329-433b-b70a-48479c045df4",
+    "version": "7",
+    "dialect": "postgresql",
+    "tables": {
+        "public.bookmarks": {
+            "name": "bookmarks",
+            "schema": "",
+            "columns": {
+                "addedAt": {
+                    "name": "addedAt",
+                    "type": "timestamp with time zone",
+                    "primaryKey": false,
+                    "notNull": true,
+                    "default": "now()"
+                },
+                "archivedAt": {
+                    "name": "archivedAt",
+                    "type": "timestamp with time zone",
+                    "primaryKey": false,
+                    "notNull": false
+                },
+                "content": {
+                    "name": "content",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false
+                },
+                "description": {
+                    "name": "description",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false
+                },
+                "faviconUrl": {
+                    "name": "faviconUrl",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false
+                },
+                "id": {
+                    "name": "id",
+                    "type": "uuid",
+                    "primaryKey": true,
+                    "notNull": true,
+                    "default": "gen_random_uuid()"
+                },
+                "siteName": {
+                    "name": "siteName",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true
+                },
+                "thumbnailFile": {
+                    "name": "thumbnailFile",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false
+                },
+                "thumbnailUrl": {
+                    "name": "thumbnailUrl",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": false
+                },
+                "title": {
+                    "name": "title",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true
+                },
+                "url": {
+                    "name": "url",
+                    "type": "text",
+                    "primaryKey": false,
+                    "notNull": true
+                }
+            },
+            "indexes": {},
+            "foreignKeys": {},
+            "compositePrimaryKeys": {},
+            "uniqueConstraints": {
+                "bookmarks_url_unique": {
+                    "name": "bookmarks_url_unique",
+                    "nullsNotDistinct": false,
+                    "columns": ["url"]
+                }
+            },
+            "policies": {},
+            "checkConstraints": {},
+            "isRLSEnabled": false
+        }
+    },
+    "enums": {},
+    "schemas": {},
+    "sequences": {},
+    "roles": {},
+    "policies": {},
+    "views": {},
+    "_meta": {
+        "columns": {},
+        "schemas": {},
+        "tables": {}
+    }
+}

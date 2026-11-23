@@ -9,7 +9,23 @@ import { normalizeBookmarkUrl } from "../lib/bookmarkUrl";
 
 type BookmarkRow = typeof bookmarks.$inferSelect;
 
-const toSavedBookmark = (row: BookmarkRow): SavedBookmark => ({
+// Client-facing columns: `content` stays search-only and `archivedAt` never leaves the server.
+const bookmarkListItemColumns = {
+    addedAt: bookmarks.addedAt,
+    description: bookmarks.description,
+    faviconUrl: bookmarks.faviconUrl,
+    id: bookmarks.id,
+    siteName: bookmarks.siteName,
+    thumbnailFile: bookmarks.thumbnailFile,
+    thumbnailUrl: bookmarks.thumbnailUrl,
+    title: bookmarks.title,
+    url: bookmarks.url
+} as const;
+
+// `content` is excluded from list reads: it can be ~100 KB per row and is only used for search.
+type BookmarkListItem = Omit<BookmarkRow, "archivedAt" | "content">;
+
+const toSavedBookmark = (row: BookmarkListItem): SavedBookmark => ({
     addedAt: row.addedAt.toISOString(),
     description: row.description,
     faviconUrl: row.faviconUrl,
@@ -35,6 +51,7 @@ const listBookmarks = async (query: string, scope: BookmarkScope): Promise<Saved
         ? or(
               ilike(bookmarks.title, likePattern(query)),
               ilike(bookmarks.description, likePattern(query)),
+              ilike(bookmarks.content, likePattern(query)),
               ilike(bookmarks.siteName, likePattern(query)),
               ilike(bookmarks.url, likePattern(query))
           )
@@ -43,7 +60,7 @@ const listBookmarks = async (query: string, scope: BookmarkScope): Promise<Saved
     const scopeCondition = scope === "active" ? isNull(bookmarks.archivedAt) : isNotNull(bookmarks.archivedAt);
 
     const rows = await db
-        .select()
+        .select(bookmarkListItemColumns)
         .from(bookmarks)
         .where(and(searchCondition, scopeCondition))
         .orderBy(desc(bookmarks.addedAt), desc(bookmarks.id));
@@ -67,12 +84,16 @@ const getBookmarkImageUrls = async (
     return row ?? null;
 };
 
-const insertBookmark = async (bookmark: BookmarkPreview & { id: string }): Promise<SavedBookmark | null> => {
+// `content` is for search only and never reaches the client: `toSavedBookmark` omits it
+// from every list and mutation response.
+type BookmarkInsert = BookmarkPreview & { content: string | null; id: string };
+
+const insertBookmark = async (bookmark: BookmarkInsert): Promise<SavedBookmark | null> => {
     const [saved] = await db
         .insert(bookmarks)
         .values(bookmark)
         .onConflictDoNothing({ target: bookmarks.url })
-        .returning();
+        .returning(bookmarkListItemColumns);
 
     return saved ? toSavedBookmark(saved) : null;
 };
@@ -87,6 +108,7 @@ const saveBookmark = async (
     // A failed save only loses the rendered thumbnail; the OG fallback still applies.
     const thumbnailFile = xPost ? await saveThumbnail(id, xPost.png).catch(() => null) : null;
     const bookmark = {
+        content: preview?.content ?? null,
         description: preview?.description ?? null,
         faviconUrl: preview?.faviconUrl ?? null,
         siteName: xPost?.siteName ?? preview?.siteName ?? url.hostname,
@@ -94,13 +116,17 @@ const saveBookmark = async (
         thumbnailUrl: preview?.thumbnailUrl ?? null,
         title: xPost?.title ?? preview?.title ?? url.hostname,
         url: normalizeBookmarkUrl(url)
-    } as const satisfies BookmarkPreview;
+    } as const satisfies Omit<BookmarkInsert, "id">;
 
     return insertBookmark({ ...bookmark, id });
 };
 
 const setBookmarkArchived = async (id: string, archivedAt: Date | null): Promise<SavedBookmark | null> => {
-    const [row] = await db.update(bookmarks).set({ archivedAt }).where(eq(bookmarks.id, id)).returning();
+    const [row] = await db
+        .update(bookmarks)
+        .set({ archivedAt })
+        .where(eq(bookmarks.id, id))
+        .returning(bookmarkListItemColumns);
 
     return row ? toSavedBookmark(row) : null;
 };
