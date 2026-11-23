@@ -28,7 +28,7 @@ const previewRequest = type("string.json.parse").to({
     url: bookmarkUrl
 });
 
-const archiveRequest = type("string.json.parse").to({
+const archiveRequest = type({
     archivedAt: "string.date.parse | null"
 });
 
