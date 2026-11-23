@@ -1,9 +1,11 @@
 import { Drawer } from "@base-ui/react/drawer";
 import type { ReactNode } from "react";
+import { overlayBackdropClass } from "../../lib/overlay";
 import { cn } from "../../lib/utils";
 
-// The backdrop and the panel must finish exiting together: the portal unmounts
-// when the panel's transition ends, so a longer backdrop fade would be cut off.
+// The panel must keep exiting in step with the shared overlay backdrop: the
+// portal unmounts when the panel's transition ends, so a longer backdrop fade
+// would be cut off.
 const sheetTransition = "duration-[450ms] ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none";
 
 const Sheet = (props: Omit<Drawer.Root.Props, "swipeDirection">): ReactNode => (
@@ -22,13 +24,13 @@ const SheetContent = ({
     ...props
 }: Omit<Drawer.Popup.Props, "className"> & { className?: string }): ReactNode => (
     <Drawer.Portal>
-        {/* Every dim state lives in the background alpha, never in `opacity`:
-            Chromium drops backdrop-filter while an element's opacity is below 1. */}
+        {/* The swipe-linked dimming overrides the shared base dim through cn's
+            tailwind-merge, so the backdrop tracks the panel while swiping. */}
         <Drawer.Backdrop
             data-slot="sheet-overlay"
             className={cn(
-                "fixed inset-0 z-50 min-h-dvh bg-black/[calc(10%*(1-var(--drawer-swipe-progress)))] transition-[background-color] data-starting-style:bg-black/0 data-ending-style:bg-black/0 data-swiping:duration-0 supports-backdrop-filter:backdrop-blur-xs",
-                sheetTransition
+                overlayBackdropClass,
+                "min-h-dvh bg-black/[calc(10%*(1-var(--drawer-swipe-progress)))] data-swiping:duration-0"
             )}
         />
         <Drawer.Viewport data-slot="sheet-viewport" className="fixed inset-0 z-50 flex items-stretch justify-start">
