@@ -77,7 +77,7 @@
     "oxfmt": "^0.79.0",
     "oxlint": "^1.94.0",
     "tailwindcss": "^4.3.5",
-    "tsrs": "^7.1.0-beta.tsrs3",
+    "tsrs": "^7.1.0-beta.tsrs4",
     "vite": "^8.3.8"
   }
 }
