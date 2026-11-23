@@ -1,6 +1,7 @@
 import type { BookmarkPreview } from "./bookmark";
 import { decodeBuffer } from "encoding-sniffer";
 import { extractArticleContent } from "./articleContent";
+import { httpStatus } from "./httpStatus";
 import { isXPostUrl } from "./xPost";
 import ogs from "open-graph-scraper";
 import { parseBookmarkUrl } from "./bookmarkUrl";
@@ -12,15 +13,13 @@ const maxHtmlBytes = 2_097_152;
 const maxDescriptionLength = 1000;
 const maxSiteNameLength = 150;
 const maxTitleLength = 300;
-const redirectStatuses = new Set(
-    Object.values({
-        found: 302,
-        movedPermanently: 301,
-        permanentRedirect: 308,
-        seeOther: 303,
-        temporaryRedirect: 307
-    })
-);
+const redirectStatuses = new Set<number>([
+    httpStatus.found,
+    httpStatus.movedPermanently,
+    httpStatus.permanentRedirect,
+    httpStatus.seeOther,
+    httpStatus.temporaryRedirect
+]);
 
 const readHtml = async (body: ReadableStream<Uint8Array>, charset: string | null): Promise<string> => {
     const chunks: Uint8Array[] = [];

@@ -1,3 +1,5 @@
+import { httpStatus } from "./httpStatus";
+
 const bookmarkMessages = {
     actionFailed: "操作を反映できませんでした。",
     duplicate: "このURLはすでに追加されています。",
@@ -32,4 +34,5 @@ interface Bookmark extends Omit<SavedBookmark, "addedAt"> {
 
 type BookmarkScope = "active" | "archived";
 
-export { type Bookmark, type BookmarkPreview, type BookmarkScope, type SavedBookmark, bookmarkMessages };
+// Re-exported so bookmark modules can use shared status codes without adding another import dependency.
+export { type Bookmark, type BookmarkPreview, type BookmarkScope, type SavedBookmark, bookmarkMessages, httpStatus };

@@ -1,4 +1,4 @@
-import { type Bookmark, bookmarkMessages } from "../lib/bookmark";
+import { type Bookmark, bookmarkMessages, httpStatus } from "../lib/bookmark";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { type ReactNode, useRef, useState } from "react";
 import { invalidBookmarkUrlMessage, maxBookmarkUrlLength, parseBookmarkUrl } from "../lib/bookmarkUrl";
@@ -14,12 +14,6 @@ const formErrors = {
     fetch: bookmarkMessages.fetchFailed,
     invalid: invalidBookmarkUrlMessage,
     save: bookmarkMessages.saveFailed
-} as const;
-
-const httpStatus = {
-    badGateway: 502,
-    badRequest: 400,
-    conflict: 409
 } as const;
 
 type AddBookmarkResult = { bookmark: Bookmark } | { error: string };

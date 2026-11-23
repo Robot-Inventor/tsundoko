@@ -1,5 +1,6 @@
 import { type Context, Hono } from "hono";
 import { getBookmarkImageUrls } from "./db/bookmarks";
+import { httpStatus } from "./lib/httpStatus";
 import { parseContentType } from "./lib/mediaType";
 import { readThumbnail } from "./lib/thumbnailStore";
 import { type } from "arktype";
@@ -9,11 +10,6 @@ const fetchTimeout = 8000;
 const maxImageBytes = 10_485_760;
 // Thumbnails and favicons are stable per page, so letting the browser cache them for a day keeps reloads cheap.
 const imageCacheControl = "public, max-age=86400";
-
-const httpStatus = {
-    badGateway: 502,
-    notFound: 404
-} as const;
 
 // The proxy is keyed by bookmark id, so only saved bookmarks' images can be fetched.
 const bookmarkId = type("string.uuid");

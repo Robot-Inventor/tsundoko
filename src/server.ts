@@ -1,14 +1,10 @@
 import { Hono } from "hono";
 import { apiPort } from "./apiPort";
 import { bookmarkApi } from "./bookmarkApi";
+import { httpStatus } from "./lib/httpStatus";
 import { imageApi } from "./imageApi";
 import { readFile } from "node:fs/promises";
 import { serveStatic } from "@hono/bun";
-
-const httpStatus = {
-    internalServerError: 500,
-    notFound: 404
-} as const;
 
 const app = new Hono();
 

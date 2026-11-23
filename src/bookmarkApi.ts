@@ -1,4 +1,4 @@
-import { type BookmarkScope, bookmarkMessages } from "./lib/bookmark";
+import { type BookmarkScope, bookmarkMessages, httpStatus } from "./lib/bookmark";
 import { bookmarkExists, deleteBookmark, listBookmarks, saveBookmark, setBookmarkArchived } from "./db/bookmarks";
 import { bookmarkUrl, invalidBookmarkUrlMessage, normalizeBookmarkUrl } from "./lib/bookmarkUrl";
 import { isXPostUrl, renderXPost } from "./lib/xPost";
@@ -10,19 +10,6 @@ import { type } from "arktype";
 import { validator } from "hono/validator";
 
 const maxRequestBytes = 16_384;
-
-const httpStatus = {
-    badGateway: 502,
-    badRequest: 400,
-    conflict: 409,
-    created: 201,
-    internalServerError: 500,
-    noContent: 204,
-    notFound: 404,
-    ok: 200,
-    payloadTooLarge: 413,
-    unsupportedMediaType: 415
-} as const;
 
 const previewRequest = type("string.json.parse").to({
     url: bookmarkUrl
