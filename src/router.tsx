@@ -1,21 +1,43 @@
+import { brand, getPageTitle, pages } from "./lib/page-title";
 import { createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
 import { AppLayout } from "./components/AppLayout";
 import { ArchivePage } from "./components/ArchivePage";
 import { HomePage } from "./components/HomePage";
 
 const rootRoute = createRootRoute({
-    component: AppLayout
+    component: AppLayout,
+    head: () => ({
+        meta: [
+            {
+                title: brand
+            }
+        ]
+    })
 });
 
 const homeRoute = createRoute({
     component: HomePage,
     getParentRoute: () => rootRoute,
+    head: () => ({
+        meta: [
+            {
+                title: getPageTitle(pages["/"].label)
+            }
+        ]
+    }),
     path: "/"
 });
 
 const archiveRoute = createRoute({
     component: ArchivePage,
     getParentRoute: () => rootRoute,
+    head: () => ({
+        meta: [
+            {
+                title: getPageTitle(pages["/archive"].label)
+            }
+        ]
+    }),
     path: "/archive"
 });
 

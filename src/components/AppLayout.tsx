@@ -1,11 +1,12 @@
 import { ArchiveIcon, HouseIcon, MenuIcon, SearchIcon, XIcon } from "lucide-react";
-import { Link, Outlet, useLocation } from "@tanstack/react-router";
+import { HeadContent, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { SearchContext, desktopLayout, useSearch } from "../hooks/useSearch";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { Button } from "./ui/button";
 import { SearchBar } from "./SearchBar";
 import { cn } from "../lib/utils";
+import { getPage } from "../lib/page-title";
 
 const navLinkClass =
     "flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold focus-visible:focus-outline data-[status=active]:bg-sidebar-accent data-[status=active]:text-sidebar-accent-foreground";
@@ -48,7 +49,7 @@ const MobilePageTitle = ({ searchOpen }: { searchOpen: boolean }): ReactNode => 
                 searchOpen && "hidden"
             )}
         >
-            {pathname.startsWith("/archive") ? "アーカイブ" : "ホーム"}
+            {getPage(pathname).label}
         </h1>
     );
 };
@@ -76,6 +77,7 @@ const AppLayout = (): ReactNode => {
 
     return (
         <>
+            <HeadContent />
             <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-background px-3 md:px-4">
                 <Sheet onOpenChange={setMenuOpen} open={menuOpen}>
                     <SheetTrigger
