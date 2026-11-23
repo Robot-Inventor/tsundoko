@@ -1,6 +1,7 @@
 import { type ReactNode, useLayoutEffect } from "react";
 import { SearchIcon, XIcon } from "lucide-react";
 import { Input } from "./ui/Input";
+import { useLocation } from "@tanstack/react-router";
 
 interface SearchBarProps {
     className?: string;
@@ -19,6 +20,9 @@ const SearchBar = ({
     onSearchTextChange,
     searchText
 }: SearchBarProps): ReactNode => {
+    const { pathname } = useLocation();
+    const label = pathname.startsWith("/archive") ? "アーカイブを検索" : "ブックマークを検索";
+
     // Focusing on mount is intended: the bar only mounts on an explicit user action.
     // A layout effect keeps the focus call inside that action, which iOS requires to open the keyboard.
     useLayoutEffect(() => {
@@ -43,7 +47,7 @@ const SearchBar = ({
                     className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
                 />
                 <Input
-                    aria-label="ブックマークを検索"
+                    aria-label={label}
                     autoCapitalize="none"
                     autoComplete="off"
                     autoCorrect="off"
@@ -64,7 +68,7 @@ const SearchBar = ({
                             event.currentTarget.blur();
                         }
                     }}
-                    placeholder="ブックマークを検索"
+                    placeholder={label}
                     ref={inputRef}
                     spellCheck={false}
                     type="search"
