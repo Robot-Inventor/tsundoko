@@ -8,10 +8,10 @@ import { Skeleton } from "./ui/skeleton";
 // Rows are full-bleed on mobile so the swipe gesture, the sliding card, and the reveal
 // background span the screen edges. The vertical half of the row gap rides on the cards
 // themselves (BookmarkListItem's max-sm:py-3), so the base gap is horizontal-only;
-// max-sm:mt-3 plus the cards' top padding strip keeps the first row 24px below the form,
-// and max-sm:-mb-3 cancels the last row's bottom strip.
+// max-sm:-mt-3 cancels the first row's top padding strip and max-sm:-mb-3 the last
+// row's bottom strip, so the list starts and ends flush with the card edges.
 const bookmarkGrid =
-    "mt-6 max-sm:mt-3 max-sm:-mb-3 grid max-sm:-mx-4 grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-x-6 sm:gap-4";
+    "mt-6 max-sm:-mt-3 max-sm:-mb-3 grid max-sm:-mx-4 grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-x-6 sm:gap-4";
 
 const skeletonCount = 6;
 
@@ -63,7 +63,9 @@ const BookmarkList = ({
     return (
         <>
             {loadState === "error" && (
-                <div className="mt-3 flex items-center gap-2">
+                // max-sm:mb-3 offsets the grid's max-sm:-mt-3, which would otherwise seat
+                // the first card flush against this banner's bottom edge.
+                <div className="mt-3 max-sm:mb-3 flex items-center gap-2">
                     <p className="text-sm text-muted-foreground" role="alert">
                         {bookmarkMessages.loadFailed}
                     </p>
