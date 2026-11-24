@@ -44,8 +44,8 @@ const addSubnets = (
     }
 };
 
-// Bun's BlockList answers IPv4 checks incorrectly once an IPv6 subnet shares the list, so the two
-// families get separate instances.
+// Adding ::ffff:0:0/96 to the same BlockList makes IPv4 checks match unrelated addresses on Bun
+// 1.4.5, so each family gets its own instance.
 const blockedIPv4 = new BlockList();
 const blockedIPv6 = new BlockList();
 
