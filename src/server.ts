@@ -9,6 +9,17 @@ import { httpStatus } from "./lib/httpStatus";
 import { imageApi } from "./imageApi";
 import { manifestApi } from "./manifestApi";
 
+const isProduction = process.env["NODE_ENV"] === "production";
+
+// A container deployment opens the port as soon as the process starts, so pending migrations are
+// applied first and a failure keeps the server from serving against an outdated schema. Development
+// applies them with `bun run migrate:apply` instead.
+if (isProduction) {
+    const { runMigrations } = await import("./db/migrate");
+
+    await runMigrations();
+}
+
 const app = new Hono<AuthEnv>();
 
 // Every response opts in to the color-scheme hint. The manifest is served per theme, and the
@@ -43,8 +54,10 @@ app.get("/api/*", (context) => context.json({ error: "Not found" }, httpStatus.n
 app.get("*", serveAppAssets);
 app.get("*", serveAppHtml);
 
+// A container needs every interface for the platform's proxy to reach the port. Local development
+// stays on the loopback so the API is not exposed to the local network.
 export default {
     fetch: app.fetch,
-    hostname: "127.0.0.1",
+    hostname: isProduction ? "0.0.0.0" : "127.0.0.1",
     port: apiPort
 };
