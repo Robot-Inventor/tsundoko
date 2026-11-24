@@ -1,0 +1,48 @@
+import { emailTaken, needsSetup, signupAllowed } from "./lib/signupPolicy";
+import { Hono } from "hono";
+import { createSignupToken } from "./lib/signupToken";
+import { env } from "./env";
+import { httpStatus } from "./lib/httpStatus";
+import { type } from "arktype";
+
+const signupRequest = type({
+    email: type("string.trim").to("string.email"),
+    name: type("string.trim").to("string >= 1")
+});
+
+const authApi = new Hono()
+    .get("/api/auth/status", async (context) => {
+        context.header("Cache-Control", "no-store");
+
+        return context.json(
+            {
+                needsSetup: await needsSetup(),
+                signupEnabled: env.ENABLE_SIGNUP
+            },
+            httpStatus.ok
+        );
+    })
+    .post("/api/auth/signup-context", async (context) => {
+        context.header("Cache-Control", "no-store");
+
+        const parsed = signupRequest(await context.req.json().catch(() => null));
+
+        if (parsed instanceof type.errors) {
+            return context.json({ error: "メールアドレスとユーザー名を入力してください。" }, httpStatus.badRequest);
+        }
+
+        if (!(await signupAllowed())) {
+            return context.json({ error: "現在は新規サインアップを受け付けていません。" }, httpStatus.forbidden);
+        }
+
+        const email = parsed.email.toLowerCase();
+        const { name } = parsed;
+
+        if (await emailTaken(email)) {
+            return context.json({ error: "このメールアドレスはすでに登録されています。" }, httpStatus.conflict);
+        }
+
+        return context.json({ token: createSignupToken({ email, name }) }, httpStatus.ok);
+    });
+
+export { authApi };

@@ -1,3 +1,4 @@
+import { AccountProvider, MobileAccountMenu, SidebarAccountMenu, useAccountState } from "./AccountMenu";
 import { ArchiveIcon, HouseIcon, MenuIcon, SearchIcon, XIcon } from "lucide-react";
 import { HeadContent, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -119,10 +120,36 @@ const MobileSearchToggle = ({ search }: { search: UseSearchResult }): ReactNode 
     );
 };
 
+const HeaderSearch = ({ search }: { search: UseSearchResult }): ReactNode => (
+    <>
+        <MobileSearchToggle search={search} />
+        {/* Centered on the viewport instead of the space next to the logo; w-full prevents shrink-to-fit
+            sizing from collapsing the absolutely positioned bar to the input's intrinsic width. */}
+        <div className="absolute left-1/2 top-1/2 hidden w-full max-w-xl -translate-x-1/2 -translate-y-1/2 md:block">
+            <SearchBar
+                inputRef={search.desktopSearchInput}
+                onSearch={search.runSearch}
+                onSearchTextChange={search.setSearchText}
+                searchText={search.searchText}
+            />
+        </div>
+        <MobileSearch search={search} />
+    </>
+);
+
 const AppLayout = (): ReactNode => {
-    const search = useSearch();
+    const { pathname } = useLocation();
+    // Settings has no bookmark list, so it must not offer a search box or its keyboard shortcuts.
+    const showsSearch = !pathname.startsWith("/settings");
+    const search = useSearch(showsSearch);
     const [menuOpen, setMenuOpen] = useState(false);
     const desktopHomeLink = useRef<HTMLAnchorElement>(null);
+    const accountState = useAccountState();
+    const { account } = accountState;
+
+    const closeMenu = (): void => {
+        setMenuOpen(false);
+    };
 
     useEffect(() => {
         // An open modal must release focus and scroll lock when the desktop navigation takes over.
@@ -141,7 +168,7 @@ const AppLayout = (): ReactNode => {
     }, []);
 
     return (
-        <>
+        <AccountProvider value={accountState}>
             <HeadContent />
             <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-background px-3 md:px-4">
                 <Sheet onOpenChange={setMenuOpen} open={menuOpen}>
@@ -163,34 +190,27 @@ const AppLayout = (): ReactNode => {
                         className="pt-8"
                         finalFocus={() => (window.matchMedia(desktopLayout).matches ? desktopHomeLink.current : true)}
                     >
-                        <Logo className="mb-6 ms-6 block h-auto w-1/2" />
+                        <div className="mb-6 flex items-center justify-between gap-3 ps-6 pe-3">
+                            <Logo className="block h-auto w-1/2" />
+                            {account && <MobileAccountMenu account={account} onNavigate={closeMenu} />}
+                        </div>
                         <SheetTitle>メニュー</SheetTitle>
-                        <MainNavigation
-                            onNavigate={() => {
-                                setMenuOpen(false);
-                            }}
-                        />
+                        <MainNavigation onNavigate={closeMenu} />
                     </SheetContent>
                 </Sheet>
                 <Logo className="hidden h-auto w-32 md:block" />
                 <MobilePageTitle searchOpen={search.searchOpen} />
-                <MobileSearchToggle search={search} />
-                {/* Centered on the viewport instead of the space next to the logo; w-full prevents shrink-to-fit
-                    sizing from collapsing the absolutely positioned bar to the input's intrinsic width. */}
-                <div className="absolute left-1/2 top-1/2 hidden w-full max-w-xl -translate-x-1/2 -translate-y-1/2 md:block">
-                    <SearchBar
-                        inputRef={search.desktopSearchInput}
-                        onSearch={search.runSearch}
-                        onSearchTextChange={search.setSearchText}
-                        searchText={search.searchText}
-                    />
-                </div>
-                <MobileSearch search={search} />
+                {showsSearch && <HeaderSearch search={search} />}
             </header>
 
             <div className="flex min-h-[calc(100dvh-3.5rem)]">
-                <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-56 shrink-0 overflow-y-auto border-e bg-sidebar text-sidebar-foreground md:block">
+                <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-56 shrink-0 flex-col overflow-y-auto border-e bg-sidebar text-sidebar-foreground md:flex">
                     <MainNavigation homeLinkRef={desktopHomeLink} />
+                    {account && (
+                        <div className="mt-auto border-t p-3">
+                            <SidebarAccountMenu account={account} />
+                        </div>
+                    )}
                 </aside>
                 <main className="min-w-0 flex-1 p-4 md:p-6">
                     <SearchContext value={search}>
@@ -198,7 +218,7 @@ const AppLayout = (): ReactNode => {
                     </SearchContext>
                 </main>
             </div>
-        </>
+        </AccountProvider>
     );
 };
 

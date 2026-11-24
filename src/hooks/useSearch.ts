@@ -15,7 +15,7 @@ interface UseSearchResult {
     setSearchText: (value: string) => void;
 }
 
-const useSearch = (): UseSearchResult => {
+const useSearch = (searchEnabled: boolean): UseSearchResult => {
     const [searchOpen, setSearchOpen] = useState(false);
     const [query, setQuery] = useState("");
     const [searchText, setSearchText] = useState("");
@@ -70,8 +70,10 @@ const useSearch = (): UseSearchResult => {
                 (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
 
             const modifier = event.ctrlKey || event.metaKey;
-            const isSearchShortcut = modifier && !event.altKey && !event.shiftKey && event.code === "KeyK";
-            const isSlashShortcut = event.key === "/" && !modifier && !event.altKey && !typing;
+            const isSearchShortcut =
+                searchEnabled && modifier && !event.altKey && !event.shiftKey && event.code === "KeyK";
+
+            const isSlashShortcut = searchEnabled && event.key === "/" && !modifier && !event.altKey && !typing;
 
             if (isSearchShortcut) {
                 event.preventDefault();
@@ -98,7 +100,7 @@ const useSearch = (): UseSearchResult => {
             window.removeEventListener("keydown", onKeyDown);
             desktop.removeEventListener("change", closeOnDesktop);
         };
-    }, [closeSearch, focusSearch]);
+    }, [closeSearch, focusSearch, searchEnabled]);
 
     return {
         clearSearch,
@@ -108,7 +110,7 @@ const useSearch = (): UseSearchResult => {
         openSearch,
         query,
         runSearch,
-        searchOpen,
+        searchOpen: searchEnabled && searchOpen,
         searchText,
         setSearchText
     };

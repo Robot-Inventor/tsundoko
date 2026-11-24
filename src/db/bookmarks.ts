@@ -23,7 +23,7 @@ const bookmarkListItemColumns = {
 } as const;
 
 // `content` is excluded from list reads: it can be ~100 KB per row and is only used for search.
-type BookmarkListItem = Omit<BookmarkRow, "archivedAt" | "content">;
+type BookmarkListItem = Omit<BookmarkRow, "archivedAt" | "content" | "userId">;
 
 const toSavedBookmark = (row: BookmarkListItem): SavedBookmark => ({
     addedAt: row.addedAt.toISOString(),
@@ -37,8 +37,11 @@ const toSavedBookmark = (row: BookmarkListItem): SavedBookmark => ({
     url: row.url
 });
 
-const bookmarkExists = async (url: string): Promise<boolean> => {
-    const existing = await db.select({ id: bookmarks.id }).from(bookmarks).where(eq(bookmarks.url, url));
+const bookmarkExists = async (url: string, userId: string): Promise<boolean> => {
+    const existing = await db
+        .select({ id: bookmarks.id })
+        .from(bookmarks)
+        .where(and(eq(bookmarks.url, url), eq(bookmarks.userId, userId)));
 
     return Boolean(existing.length);
 };
@@ -46,7 +49,7 @@ const bookmarkExists = async (url: string): Promise<boolean> => {
 // `%` and `_` are LIKE wildcards and `\` escapes them, so all three must be escaped for a literal match.
 const likePattern = (query: string): string => `%${query.replace(/[\\%_]/gu, "\\$&")}%`;
 
-const listBookmarks = async (query: string, scope: BookmarkScope): Promise<SavedBookmark[]> => {
+const listBookmarks = async (query: string, scope: BookmarkScope, userId: string): Promise<SavedBookmark[]> => {
     const searchCondition = query
         ? or(
               ilike(bookmarks.title, likePattern(query)),
@@ -62,14 +65,15 @@ const listBookmarks = async (query: string, scope: BookmarkScope): Promise<Saved
     const rows = await db
         .select(bookmarkListItemColumns)
         .from(bookmarks)
-        .where(and(searchCondition, scopeCondition))
+        .where(and(eq(bookmarks.userId, userId), searchCondition, scopeCondition))
         .orderBy(desc(bookmarks.addedAt), desc(bookmarks.id));
 
     return rows.map(toSavedBookmark);
 };
 
 const getBookmarkImageUrls = async (
-    id: string
+    id: string,
+    userId: string
 ): Promise<Pick<BookmarkRow, "faviconUrl" | "thumbnailFile" | "thumbnailUrl" | "url"> | null> => {
     const [row] = await db
         .select({
@@ -79,30 +83,33 @@ const getBookmarkImageUrls = async (
             url: bookmarks.url
         })
         .from(bookmarks)
-        .where(eq(bookmarks.id, id));
+        .where(and(eq(bookmarks.id, id), eq(bookmarks.userId, userId)));
 
     return row ?? null;
 };
 
 // `content` is for search only and never reaches the client: `toSavedBookmark` omits it
 // from every list and mutation response.
-type BookmarkInsert = BookmarkPreview & { content: string | null; id: string };
+type BookmarkInsert = BookmarkPreview & { content: string | null; id: string; userId: string };
 
 const insertBookmark = async (bookmark: BookmarkInsert): Promise<SavedBookmark | null> => {
     const [saved] = await db
         .insert(bookmarks)
         .values(bookmark)
-        .onConflictDoNothing({ target: bookmarks.url })
+        .onConflictDoNothing({ target: [bookmarks.userId, bookmarks.url] })
         .returning(bookmarkListItemColumns);
 
     return saved ? toSavedBookmark(saved) : null;
 };
 
-const saveBookmark = async (
-    url: URL,
-    xPost: XPostThumbnail | null,
-    preview: PreviewData | null
-): Promise<SavedBookmark | null> => {
+interface SaveBookmarkInput {
+    preview: PreviewData | null;
+    url: URL;
+    userId: string;
+    xPost: XPostThumbnail | null;
+}
+
+const saveBookmark = async ({ preview, url, userId, xPost }: SaveBookmarkInput): Promise<SavedBookmark | null> => {
     const id = crypto.randomUUID();
     // Saving the file before the row keeps the stored path from outliving an actual file.
     // A failed save only loses the rendered thumbnail; the OG fallback still applies.
@@ -116,16 +123,20 @@ const saveBookmark = async (
         thumbnailUrl: preview?.thumbnailUrl ?? null,
         title: xPost?.title ?? preview?.title ?? url.hostname,
         url: normalizeBookmarkUrl(url)
-    } as const satisfies Omit<BookmarkInsert, "id">;
+    } as const satisfies Omit<BookmarkInsert, "id" | "userId">;
 
-    return insertBookmark({ ...bookmark, id });
+    return insertBookmark({ ...bookmark, id, userId });
 };
 
-const setBookmarkArchived = async (id: string, archivedAt: Date | null): Promise<SavedBookmark | null> => {
+const setBookmarkArchived = async (
+    id: string,
+    archivedAt: Date | null,
+    userId: string
+): Promise<SavedBookmark | null> => {
     const [row] = await db
         .update(bookmarks)
         .set({ archivedAt })
-        .where(eq(bookmarks.id, id))
+        .where(and(eq(bookmarks.id, id), eq(bookmarks.userId, userId)))
         .returning(bookmarkListItemColumns);
 
     return row ? toSavedBookmark(row) : null;
@@ -133,10 +144,10 @@ const setBookmarkArchived = async (id: string, archivedAt: Date | null): Promise
 
 // Deletes the row first, then unlinks the locally stored thumbnail if there was one:
 // a failed unlink only leaves an unreachable orphan file behind.
-const deleteBookmark = async (id: string): Promise<boolean> => {
+const deleteBookmark = async (id: string, userId: string): Promise<boolean> => {
     const [row] = await db
         .delete(bookmarks)
-        .where(eq(bookmarks.id, id))
+        .where(and(eq(bookmarks.id, id), eq(bookmarks.userId, userId)))
         .returning({ thumbnailFile: bookmarks.thumbnailFile });
 
     if (!row) {

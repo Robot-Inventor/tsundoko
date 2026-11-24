@@ -1,0 +1,1 @@
+ALTER TABLE "passkey" ADD COLUMN "last_used_at" timestamp;
