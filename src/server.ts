@@ -1,5 +1,5 @@
 import { type AuthEnv, requireAuth } from "./authMiddleware";
-import { serveAppAssets, serveAppHtml } from "./spaStatic";
+import { serveAppAssets, serveAppHtml, serveShareGate } from "./spaStatic";
 import { Hono } from "hono";
 import { accountApi } from "./accountApi";
 import { apiPort } from "./apiPort";
@@ -17,6 +17,8 @@ app.use("*", async (context, next) => {
     await next();
     context.header("accept-ch", "Sec-CH-Prefers-Color-Scheme");
 });
+
+app.use("*", serveShareGate);
 
 app.get("/api/health", (context) => context.json({ ok: true }));
 app.route("/", manifestApi);

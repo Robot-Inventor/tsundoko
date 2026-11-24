@@ -1,7 +1,43 @@
-import { type SharedContent, extractSharedUrls } from "./shareTarget";
+import {
+    type SharedContent,
+    extractSharedUrls,
+    isExternalReferrer,
+    isSharePath,
+    needsShareConfirmation
+} from "./shareTarget";
 import { describe, expect, it } from "vitest";
 
 const hrefs = (content: SharedContent): string[] => extractSharedUrls(content).map((url) => url.href);
+
+describe("share gate", () => {
+    it("recognises the share path regardless of case and trailing slashes", () => {
+        expect(isSharePath("/share")).toBe(true);
+        expect(isSharePath("/Share/")).toBe(true);
+        expect(isSharePath("/share///")).toBe(true);
+        expect(isSharePath("/archive")).toBe(false);
+    });
+
+    it("asks only for an unmarked cross-site navigation", () => {
+        expect(needsShareConfirmation("cross-site", false)).toBe(true);
+        expect(needsShareConfirmation("cross-site", true)).toBe(false);
+        expect(needsShareConfirmation("none", false)).toBe(false);
+        expect(needsShareConfirmation("", false)).toBe(false);
+    });
+});
+
+describe("isExternalReferrer", () => {
+    it("treats an absent referrer as a share target launch", () => {
+        expect(isExternalReferrer("", "https://tsundoko.example")).toBe(false);
+    });
+
+    it("trusts a same-origin referrer", () => {
+        expect(isExternalReferrer("https://tsundoko.example/archive", "https://tsundoko.example")).toBe(false);
+    });
+
+    it("flags a cross-origin referrer", () => {
+        expect(isExternalReferrer("https://elsewhere.example/page", "https://tsundoko.example")).toBe(true);
+    });
+});
 
 describe("extractSharedUrls", () => {
     it("uses the url parameter", () => {

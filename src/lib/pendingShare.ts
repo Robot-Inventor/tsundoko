@@ -1,13 +1,20 @@
-import { type SharedContent, sharedContent } from "./shareTarget";
+import { sharedContent } from "./shareTarget";
 import { type } from "arktype";
 
 const pendingShareKey = "tsundoko:pending-share";
 
-const savePendingShare = (content: SharedContent): void => {
-    sessionStorage.setItem(pendingShareKey, JSON.stringify(content));
+const pendingShare = type({
+    content: sharedContent,
+    requiresConfirmation: "boolean"
+});
+
+type PendingShare = typeof pendingShare.infer;
+
+const savePendingShare = (pending: PendingShare): void => {
+    sessionStorage.setItem(pendingShareKey, JSON.stringify(pending));
 };
 
-const takePendingShare = (): SharedContent | null => {
+const takePendingShare = (): PendingShare | null => {
     const stored = sessionStorage.getItem(pendingShareKey);
 
     if (stored === null) {
@@ -17,7 +24,7 @@ const takePendingShare = (): SharedContent | null => {
     sessionStorage.removeItem(pendingShareKey);
 
     try {
-        const parsed = sharedContent(JSON.parse(stored));
+        const parsed = pendingShare(JSON.parse(stored));
 
         return parsed instanceof type.errors ? null : parsed;
     } catch {

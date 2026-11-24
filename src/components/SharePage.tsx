@@ -1,8 +1,10 @@
 // The share outcome is a set of counters: zero is where they start, one is their step.
 // oxlint-disable no-magic-numbers
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { notifyError, notifyInfo, notifySuccess } from "../lib/appToast";
 import { useLoaderData, useNavigate } from "@tanstack/react-router";
+import { Button } from "./ui/button";
 import { LoaderCircleIcon } from "lucide-react";
 import { requestBookmark } from "../lib/addBookmark";
 
@@ -33,14 +35,72 @@ const reportOutcome = (outcome: ShareOutcome): void => {
     }
 };
 
+interface ShareConfirmationProps {
+    onCancel: () => void;
+    onConfirm: () => void;
+    urls: string[];
+}
+
+// A share target launch adds without asking. A link from another site opens the same route but
+// has a referrer, so the user confirms the URLs before anything is saved.
+const ShareConfirmation = ({ onCancel, onConfirm, urls }: ShareConfirmationProps): ReactNode => (
+    <Dialog
+        onOpenChange={(open) => {
+            if (!open) {
+                onCancel();
+            }
+        }}
+        open
+    >
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>ブックマークを追加</DialogTitle>
+                <DialogDescription>{String(urls.length)}件のブックマークを追加しますか？</DialogDescription>
+            </DialogHeader>
+            <ul className="max-h-60 space-y-1 overflow-y-auto">
+                {urls.map((url) => (
+                    <li className="wrap-anywhere" key={url}>
+                        {url}
+                    </li>
+                ))}
+            </ul>
+            <DialogFooter className="flex-row justify-end">
+                <Button onClick={onCancel} type="button" variant="outline">
+                    キャンセル
+                </Button>
+                <Button onClick={onConfirm} type="button">
+                    追加
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+);
+
 const SharePage = (): ReactNode => {
-    const urls = useLoaderData({ from: "/share" });
+    const { requiresConfirmation, urls } = useLoaderData({ from: "/share" });
     const navigate = useNavigate();
+    const [confirmed, setConfirmed] = useState(!requiresConfirmation);
     const [done, setDone] = useState(0);
     const started = useRef(false);
+    const answered = useRef(false);
+    const waitsForConfirmation = requiresConfirmation && urls.length > 0 && !confirmed;
+
+    const cancel = (): void => {
+        if (answered.current) {
+            return;
+        }
+
+        answered.current = true;
+        void navigate({ replace: true, to: "/" });
+    };
+
+    const confirm = (): void => {
+        answered.current = true;
+        setConfirmed(true);
+    };
 
     useEffect(() => {
-        if (started.current) {
+        if (started.current || waitsForConfirmation) {
             return;
         }
 
@@ -83,7 +143,11 @@ const SharePage = (): ReactNode => {
 
             reportOutcome(outcome);
         })();
-    }, [navigate, urls]);
+    }, [navigate, urls, waitsForConfirmation]);
+
+    if (waitsForConfirmation) {
+        return <ShareConfirmation onCancel={cancel} onConfirm={confirm} urls={urls} />;
+    }
 
     if (!urls.length) {
         return null;

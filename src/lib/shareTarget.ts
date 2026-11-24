@@ -7,7 +7,40 @@ const sharedContent = type({
     "url?": "string"
 });
 
+const shareContentFields = ["text", "title", "url"] as const satisfies ReadonlyArray<keyof SharedContent>;
+
+const sharePath = "/share";
+
+const isSharePath = (path: string): boolean => path.replace(/\/+$/u, "").toLowerCase() === sharePath;
+
+const needsShareConfirmation = (site: string | undefined, marked: boolean): boolean => site === "cross-site" && !marked;
+
+const pickSharedContent = (source: Record<string, unknown>): SharedContent => {
+    const content: SharedContent = {};
+
+    for (const key of shareContentFields) {
+        const value = source[key];
+
+        if (typeof value === "string") {
+            content[key] = value;
+        }
+    }
+
+    return content;
+};
+
 type SharedContent = typeof sharedContent.infer;
+
+interface ShareRequest {
+    requiresConfirmation: boolean;
+    urls: string[];
+}
+
+// A share target launch is a browser-initiated navigation, so it has no referrer. A link from
+// another site does; a same-origin referrer is trusted. A cross-origin page can suppress the
+// referrer, which this check cannot see.
+const isExternalReferrer = (referrer: string, origin: string): boolean =>
+    Boolean(referrer) && new URL(referrer).origin !== origin;
 
 const urlInText = /https?:\/\/[^\s<>"'`]+/giu;
 
@@ -63,4 +96,13 @@ const extractSharedUrls = ({ text, title, url }: SharedContent): URL[] => {
     });
 };
 
-export { extractSharedUrls, sharedContent, type SharedContent };
+export {
+    extractSharedUrls,
+    isExternalReferrer,
+    isSharePath,
+    needsShareConfirmation,
+    pickSharedContent,
+    sharedContent,
+    type SharedContent,
+    type ShareRequest
+};

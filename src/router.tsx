@@ -1,5 +1,11 @@
 // oxlint-disable import/max-dependencies -- The route tree lives in one module.
-import { type SharedContent, extractSharedUrls } from "./lib/shareTarget";
+import {
+    type ShareRequest,
+    type SharedContent,
+    extractSharedUrls,
+    isExternalReferrer,
+    pickSharedContent
+} from "./lib/shareTarget";
 import { brand, getPageTitle, pages } from "./lib/page-title";
 import { createRootRoute, createRoute, createRouter, redirect } from "@tanstack/react-router";
 import { savePendingShare, takePendingShare } from "./lib/pendingShare";
@@ -74,20 +80,24 @@ const requireSignupAvailable = async (): Promise<AuthLoaderData> => {
 };
 
 // A share target delivers its payload as query parameters. Only strings are kept; anything
-// else is ignored rather than failing the whole share.
-const shareSearch = (search: Record<string, unknown>): SharedContent => {
-    const content: SharedContent = {};
+// else is ignored rather than failing the whole share. The server adds "confirm" when the
+// navigation came from another site (Sec-Fetch-Site), which cannot be suppressed like a referrer.
+interface ShareSearch extends SharedContent {
+    confirm?: string;
+}
 
-    for (const key of ["text", "title", "url"] as const) {
-        const value = search[key];
+const shareSearch = (search: Record<string, unknown>): ShareSearch => {
+    const content: ShareSearch = pickSharedContent(search);
 
-        if (typeof value === "string") {
-            content[key] = value;
-        }
+    if (search["confirm"] === "1") {
+        content.confirm = "1";
     }
 
     return content;
 };
+
+const requiresShareConfirmation = (search: ShareSearch): boolean =>
+    search.confirm === "1" || isExternalReferrer(document.referrer, window.location.origin);
 
 const shareRoute = createRoute({
     beforeLoad: async ({ search }): Promise<void> => {
@@ -99,8 +109,12 @@ const shareRoute = createRoute({
 
         // The login route cannot carry the shared text in its URL, so hand the payload over
         // through session storage and read it back when the share route runs after sign-in.
+        // The confirmation decision has to travel with it: after sign-in the referrer is gone.
         if (Object.keys(search).length) {
-            savePendingShare(search);
+            savePendingShare({
+                content: pickSharedContent(search),
+                requiresConfirmation: requiresShareConfirmation(search)
+            });
         }
 
         if (state.needsSetup) {
@@ -118,10 +132,20 @@ const shareRoute = createRoute({
     },
     component: SharePage,
     getParentRoute: () => rootRoute,
-    loader: ({ deps }): string[] => {
-        const content = Object.keys(deps).length ? deps : (takePendingShare() ?? {});
+    loader: ({ deps }): ShareRequest => {
+        if (Object.keys(deps).length) {
+            return {
+                requiresConfirmation: requiresShareConfirmation(deps),
+                urls: extractSharedUrls(deps).map((url) => url.href)
+            };
+        }
 
-        return extractSharedUrls(content).map((url) => url.href);
+        const pending = takePendingShare();
+
+        return {
+            requiresConfirmation: pending?.requiresConfirmation ?? false,
+            urls: extractSharedUrls(pending?.content ?? {}).map((url) => url.href)
+        };
     },
     loaderDeps: ({ search }) => search,
     path: "/share",
