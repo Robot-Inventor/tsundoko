@@ -9,7 +9,7 @@ import { validator } from "hono/validator";
 const fetchTimeout = 8000;
 const maxImageBytes = 10_485_760;
 // Thumbnails and favicons are stable per page, so letting the browser cache them for a day keeps reloads cheap.
-const imageCacheControl = "public, max-age=86400";
+const imageCacheControl = "private, max-age=86400";
 
 // The proxy is keyed by bookmark id, so only saved bookmarks' images can be fetched.
 const bookmarkId = type("string.uuid");
@@ -89,8 +89,8 @@ const serveImage = async (context: Context, imageUrl: string | null): Promise<Re
     }
 };
 
-const getFaviconUrl = async (id: string | null): Promise<string | null> => {
-    const bookmark = id ? await getBookmarkImageUrls(id) : null;
+const getFaviconUrl = async (id: string | null, userId: string): Promise<string | null> => {
+    const bookmark = id ? await getBookmarkImageUrls(id, userId) : null;
 
     if (!bookmark) {
         return null;
@@ -106,10 +106,10 @@ const getFaviconUrl = async (id: string | null): Promise<string | null> => {
     return stored ?? googleFaviconUrl.href;
 };
 
-const imageApi = new Hono()
+const imageApi = new Hono<{ Variables: { userId: string } }>()
     .get("/api/thumbnail", imageIdQuery, async (context) => {
         const id = context.req.valid("query");
-        const bookmark = id ? await getBookmarkImageUrls(id) : null;
+        const bookmark = id ? await getBookmarkImageUrls(id, context.get("userId")) : null;
         const stored = bookmark?.thumbnailFile ? await readThumbnail(bookmark.thumbnailFile) : null;
 
         if (stored) {
@@ -122,7 +122,7 @@ const imageApi = new Hono()
         return serveImage(context, bookmark?.thumbnailUrl ?? null);
     })
     .get("/api/favicon", imageIdQuery, async (context) => {
-        const faviconUrl = await getFaviconUrl(context.req.valid("query"));
+        const faviconUrl = await getFaviconUrl(context.req.valid("query"), context.get("userId"));
 
         return serveImage(context, faviconUrl);
     });

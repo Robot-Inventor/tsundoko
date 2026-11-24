@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "verification_initial_guard_idx" ON "verification" USING btree ("identifier") WHERE "verification"."identifier" = 'initial-signup-guard';

@@ -1,14 +1,24 @@
+import { type AuthEnv, requireAuth } from "./authMiddleware";
 import { Hono } from "hono";
 import { apiPort } from "./apiPort";
+import { auth } from "./lib/auth";
+import { authApi } from "./authApi";
 import { bookmarkApi } from "./bookmarkApi";
 import { httpStatus } from "./lib/httpStatus";
 import { imageApi } from "./imageApi";
 import { readFile } from "node:fs/promises";
 import { serveStatic } from "@hono/bun";
 
-const app = new Hono();
+const app = new Hono<AuthEnv>();
 
 app.get("/api/health", (context) => context.json({ ok: true }));
+app.route("/", authApi);
+app.on(["POST", "GET"], "/api/auth/*", (context) => auth.handler(context.req.raw));
+
+app.use("/api/bookmarks", requireAuth);
+app.use("/api/bookmarks/*", requireAuth);
+app.use("/api/thumbnail", requireAuth);
+app.use("/api/favicon", requireAuth);
 app.route("/", bookmarkApi);
 app.route("/", imageApi);
 

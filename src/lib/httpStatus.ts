@@ -3,6 +3,7 @@ const httpStatus = {
     badRequest: 400,
     conflict: 409,
     created: 201,
+    forbidden: 403,
     found: 302,
     internalServerError: 500,
     movedPermanently: 301,
@@ -13,6 +14,7 @@ const httpStatus = {
     permanentRedirect: 308,
     seeOther: 303,
     temporaryRedirect: 307,
+    unauthorized: 401,
     unsupportedMediaType: 415
 } as const;
 

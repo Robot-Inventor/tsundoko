@@ -1,11 +1,14 @@
 import { brand, getPageTitle, pages } from "./lib/page-title";
-import { createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
-import { AppLayout } from "./components/AppLayout";
+import { createRootRoute, createRoute, createRouter, redirect } from "@tanstack/react-router";
 import { ArchivePage } from "./components/ArchivePage";
 import { HomePage } from "./components/HomePage";
+import { LoginPage } from "./components/LoginPage";
+import { RootComponent } from "./components/RootComponent";
+import { SignupPage } from "./components/SignupPage";
+import { getAuthState } from "./lib/authClient";
 
 const rootRoute = createRootRoute({
-    component: AppLayout,
+    component: RootComponent,
     head: () => ({
         meta: [
             {
@@ -15,7 +18,58 @@ const rootRoute = createRootRoute({
     })
 });
 
+const requireSignedIn = async (): Promise<void> => {
+    const state = await getAuthState();
+
+    if (!state.signedIn) {
+        // oxlint-disable-next-line typescript/only-throw-error -- TanStack Router redirects are thrown by design.
+        throw redirect({
+            to: state.needsSetup ? "/signup" : "/login"
+        });
+    }
+};
+
+interface AuthLoaderData {
+    needsSetup: boolean;
+    signupEnabled: boolean;
+    signedIn: boolean;
+}
+
+const requireGuest = async (): Promise<AuthLoaderData> => {
+    const state = await getAuthState();
+
+    if (state.signedIn) {
+        // oxlint-disable-next-line typescript/only-throw-error -- TanStack Router redirects are thrown by design.
+        throw redirect({
+            to: "/"
+        });
+    }
+
+    return state;
+};
+
+const requireSignupAvailable = async (): Promise<AuthLoaderData> => {
+    const state = await getAuthState();
+
+    if (state.signedIn) {
+        // oxlint-disable-next-line typescript/only-throw-error -- TanStack Router redirects are thrown by design.
+        throw redirect({
+            to: "/"
+        });
+    }
+
+    if (!state.needsSetup && !state.signupEnabled) {
+        // oxlint-disable-next-line typescript/only-throw-error -- TanStack Router redirects are thrown by design.
+        throw redirect({
+            to: "/login"
+        });
+    }
+
+    return state;
+};
+
 const homeRoute = createRoute({
+    beforeLoad: requireSignedIn,
     component: HomePage,
     getParentRoute: () => rootRoute,
     head: () => ({
@@ -29,6 +83,7 @@ const homeRoute = createRoute({
 });
 
 const archiveRoute = createRoute({
+    beforeLoad: requireSignedIn,
     component: ArchivePage,
     getParentRoute: () => rootRoute,
     head: () => ({
@@ -41,7 +96,37 @@ const archiveRoute = createRoute({
     path: "/archive"
 });
 
-const routeTree = rootRoute.addChildren([archiveRoute, homeRoute]);
+const loginRoute = createRoute({
+    beforeLoad: requireGuest,
+    component: LoginPage,
+    getParentRoute: () => rootRoute,
+    head: () => ({
+        meta: [
+            {
+                title: getPageTitle("ログイン")
+            }
+        ]
+    }),
+    loader: (): Promise<AuthLoaderData> => getAuthState(),
+    path: "/login"
+});
+
+const signupRoute = createRoute({
+    beforeLoad: requireSignupAvailable,
+    component: SignupPage,
+    getParentRoute: () => rootRoute,
+    head: () => ({
+        meta: [
+            {
+                title: getPageTitle("新規登録")
+            }
+        ]
+    }),
+    loader: (): Promise<AuthLoaderData> => getAuthState(),
+    path: "/signup"
+});
+
+const routeTree = rootRoute.addChildren([archiveRoute, homeRoute, loginRoute, signupRoute]);
 
 const router = createRouter({
     routeTree

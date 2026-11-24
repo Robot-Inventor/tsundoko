@@ -1,8 +1,9 @@
-import { ArchiveIcon, HouseIcon, MenuIcon, SearchIcon, XIcon } from "lucide-react";
-import { HeadContent, Link, Outlet, useLocation } from "@tanstack/react-router";
+import { ArchiveIcon, HouseIcon, LogOutIcon, MenuIcon, SearchIcon, XIcon } from "lucide-react";
+import { HeadContent, Link, Outlet, useLocation, useRouter } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SearchContext, type UseSearchResult, desktopLayout, useSearch } from "../hooks/useSearch";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "./ui/sheet";
+import { authClient, clearAuthState } from "../lib/authClient";
 import { Button } from "./ui/button";
 import { SearchBar } from "./SearchBar";
 import { cn } from "../lib/utils";
@@ -32,6 +33,31 @@ const MainNavigation = ({ homeLinkRef, onNavigate }: MainNavigationProps): React
         </Link>
     </nav>
 );
+
+const LogoutButton = ({ onNavigate }: { onNavigate?: () => void }): ReactNode => {
+    const router = useRouter();
+
+    const logout = async (): Promise<void> => {
+        await authClient.signOut();
+        clearAuthState();
+        await router.invalidate();
+        await router.navigate({ to: "/login" });
+    };
+
+    return (
+        <Button
+            className={cn(navLinkClass, "w-full")}
+            onClick={() => {
+                onNavigate?.();
+                void logout();
+            }}
+            variant="ghost"
+        >
+            <LogOutIcon aria-hidden="true" className="size-4" />
+            ログアウト
+        </Button>
+    );
+};
 
 const Logo = ({ className }: { className: string }): ReactNode => (
     <img alt="Tsundoko" className={className} height={370} src="/logo.svg" width={1666} />
@@ -170,6 +196,13 @@ const AppLayout = (): ReactNode => {
                                 setMenuOpen(false);
                             }}
                         />
+                        <div className="px-3 py-2">
+                            <LogoutButton
+                                onNavigate={() => {
+                                    setMenuOpen(false);
+                                }}
+                            />
+                        </div>
                     </SheetContent>
                 </Sheet>
                 <Logo className="hidden h-auto w-32 md:block" />
@@ -191,6 +224,9 @@ const AppLayout = (): ReactNode => {
             <div className="flex min-h-[calc(100dvh-3.5rem)]">
                 <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-56 shrink-0 overflow-y-auto border-e bg-sidebar text-sidebar-foreground md:block">
                     <MainNavigation homeLinkRef={desktopHomeLink} />
+                    <div className="px-3 py-2">
+                        <LogoutButton />
+                    </div>
                 </aside>
                 <main className="min-w-0 flex-1 p-4 md:p-6">
                     <SearchContext value={search}>

@@ -56,13 +56,13 @@ const archivePayload = validator("json", (value, context) => {
     return parsed;
 });
 
-const bookmarkApi = new Hono()
+const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
     .get("/api/bookmarks", listQuery, async (context) => {
         context.header("Cache-Control", "no-store");
         const query = context.req.valid("query");
 
         try {
-            return context.json(await listBookmarks(query.q, query.scope), httpStatus.ok);
+            return context.json(await listBookmarks(query.q, query.scope, context.get("userId")), httpStatus.ok);
         } catch {
             return context.json({ error: bookmarkMessages.loadFailed }, httpStatus.internalServerError);
         }
@@ -87,7 +87,7 @@ const bookmarkApi = new Hono()
             }
 
             try {
-                if (await bookmarkExists(normalizeBookmarkUrl(input.url))) {
+                if (await bookmarkExists(normalizeBookmarkUrl(input.url), context.get("userId"))) {
                     return context.json({ error: bookmarkMessages.duplicate }, httpStatus.conflict);
                 }
             } catch {
@@ -114,7 +114,12 @@ const bookmarkApi = new Hono()
             }
 
             try {
-                const saved = await saveBookmark(input.url, xPost, preview);
+                const saved = await saveBookmark({
+                    preview,
+                    url: input.url,
+                    userId: context.get("userId"),
+                    xPost
+                });
 
                 return saved
                     ? context.json(saved, httpStatus.created)
@@ -138,7 +143,7 @@ const bookmarkApi = new Hono()
             const { archivedAt } = context.req.valid("json");
 
             try {
-                const updated = await setBookmarkArchived(id, archivedAt);
+                const updated = await setBookmarkArchived(id, archivedAt, context.get("userId"));
 
                 return updated
                     ? context.json(updated, httpStatus.ok)
@@ -153,7 +158,7 @@ const bookmarkApi = new Hono()
         const { id } = context.req.valid("param");
 
         try {
-            const deleted = await deleteBookmark(id);
+            const deleted = await deleteBookmark(id, context.get("userId"));
 
             return deleted
                 ? context.body(null, httpStatus.noContent)
