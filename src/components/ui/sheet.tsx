@@ -1,12 +1,7 @@
 import { Drawer } from "@base-ui/react/drawer";
 import type { ReactNode } from "react";
-import { overlayBackdropClass } from "../../lib/overlay";
+import { overlayBackdropClass, overlayTransition } from "../../lib/overlay";
 import { cn } from "../../lib/utils";
-
-// The panel must keep exiting in step with the shared overlay backdrop: the
-// portal unmounts when the panel's transition ends, so a longer backdrop fade
-// would be cut off.
-const sheetTransition = "duration-[450ms] ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none";
 
 const Sheet = (props: Omit<Drawer.Root.Props, "swipeDirection">): ReactNode => (
     // "left" is the swipe direction that dismisses: the start-anchored sheet exits
@@ -38,7 +33,7 @@ const SheetContent = ({
                 data-slot="sheet-content"
                 className={cn(
                     "flex h-full w-3/4 max-w-xs flex-col pt-14 overflow-y-auto overscroll-contain touch-auto border-e bg-popover bg-clip-padding text-sm text-popover-foreground shadow-lg outline-none will-change-transform [transform:translateX(var(--drawer-swipe-movement-x))] transition-transform data-swiping:select-none data-starting-style:[transform:translateX(-100%)] data-ending-style:[transform:translateX(-100%)]",
-                    sheetTransition,
+                    overlayTransition,
                     className
                 )}
                 {...props}
