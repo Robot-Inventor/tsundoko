@@ -4,6 +4,7 @@ import { ArchivePage } from "./components/ArchivePage";
 import { HomePage } from "./components/HomePage";
 import { LoginPage } from "./components/LoginPage";
 import { RootComponent } from "./components/RootComponent";
+import { SettingsPage } from "./components/SettingsPage";
 import { SignupPage } from "./components/SignupPage";
 import { getAuthState } from "./lib/authClient";
 
@@ -96,6 +97,20 @@ const archiveRoute = createRoute({
     path: "/archive"
 });
 
+const settingsRoute = createRoute({
+    beforeLoad: requireSignedIn,
+    component: SettingsPage,
+    getParentRoute: () => rootRoute,
+    head: () => ({
+        meta: [
+            {
+                title: getPageTitle(pages["/settings"].label)
+            }
+        ]
+    }),
+    path: "/settings"
+});
+
 const loginRoute = createRoute({
     beforeLoad: requireGuest,
     component: LoginPage,
@@ -126,7 +141,7 @@ const signupRoute = createRoute({
     path: "/signup"
 });
 
-const routeTree = rootRoute.addChildren([archiveRoute, homeRoute, loginRoute, signupRoute]);
+const routeTree = rootRoute.addChildren([archiveRoute, homeRoute, loginRoute, settingsRoute, signupRoute]);
 
 const router = createRouter({
     routeTree

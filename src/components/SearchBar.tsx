@@ -1,7 +1,7 @@
 import { type ReactNode, useLayoutEffect } from "react";
 import { SearchIcon, XIcon } from "lucide-react";
 import { Input } from "./ui/Input";
-import { getPage } from "../lib/page-title";
+import { getSearchLabel } from "../lib/page-title";
 import { useLocation } from "@tanstack/react-router";
 
 interface SearchBarProps {
@@ -22,7 +22,7 @@ const SearchBar = ({
     searchText
 }: SearchBarProps): ReactNode => {
     const { pathname } = useLocation();
-    const label = getPage(pathname).searchLabel;
+    const label = getSearchLabel(pathname);
 
     // A layout effect keeps focus inside the tap or keystroke that opened the bar, which iOS
     // requires to open the keyboard. The mobile bar stays mounted, so the same effect blurs on close.

@@ -1,9 +1,9 @@
-import { ArchiveIcon, HouseIcon, LogOutIcon, MenuIcon, SearchIcon, XIcon } from "lucide-react";
-import { HeadContent, Link, Outlet, useLocation, useRouter } from "@tanstack/react-router";
+import { ArchiveIcon, HouseIcon, MenuIcon, SearchIcon, XIcon } from "lucide-react";
+import { HeadContent, Link, Outlet, useLocation } from "@tanstack/react-router";
+import { MobileAccountMenu, SidebarAccountMenu, useAccount } from "./AccountMenu";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SearchContext, type UseSearchResult, desktopLayout, useSearch } from "../hooks/useSearch";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "./ui/sheet";
-import { authClient, clearAuthState } from "../lib/authClient";
 import { Button } from "./ui/button";
 import { SearchBar } from "./SearchBar";
 import { cn } from "../lib/utils";
@@ -33,31 +33,6 @@ const MainNavigation = ({ homeLinkRef, onNavigate }: MainNavigationProps): React
         </Link>
     </nav>
 );
-
-const LogoutButton = ({ onNavigate }: { onNavigate?: () => void }): ReactNode => {
-    const router = useRouter();
-
-    const logout = async (): Promise<void> => {
-        await authClient.signOut();
-        clearAuthState();
-        await router.invalidate();
-        await router.navigate({ to: "/login" });
-    };
-
-    return (
-        <Button
-            className={cn(navLinkClass, "w-full")}
-            onClick={() => {
-                onNavigate?.();
-                void logout();
-            }}
-            variant="ghost"
-        >
-            <LogOutIcon aria-hidden="true" className="size-4" />
-            ログアウト
-        </Button>
-    );
-};
 
 const Logo = ({ className }: { className: string }): ReactNode => (
     <img alt="Tsundoko" className={className} height={370} src="/logo.svg" width={1666} />
@@ -145,10 +120,35 @@ const MobileSearchToggle = ({ search }: { search: UseSearchResult }): ReactNode 
     );
 };
 
+const HeaderSearch = ({ search }: { search: UseSearchResult }): ReactNode => (
+    <>
+        <MobileSearchToggle search={search} />
+        {/* Centered on the viewport instead of the space next to the logo; w-full prevents shrink-to-fit
+            sizing from collapsing the absolutely positioned bar to the input's intrinsic width. */}
+        <div className="absolute left-1/2 top-1/2 hidden w-full max-w-xl -translate-x-1/2 -translate-y-1/2 md:block">
+            <SearchBar
+                inputRef={search.desktopSearchInput}
+                onSearch={search.runSearch}
+                onSearchTextChange={search.setSearchText}
+                searchText={search.searchText}
+            />
+        </div>
+        <MobileSearch search={search} />
+    </>
+);
+
 const AppLayout = (): ReactNode => {
-    const search = useSearch();
+    const { pathname } = useLocation();
+    // Settings has no bookmark list, so it must not offer a search box or its keyboard shortcuts.
+    const showsSearch = !pathname.startsWith("/settings");
+    const search = useSearch(showsSearch);
     const [menuOpen, setMenuOpen] = useState(false);
     const desktopHomeLink = useRef<HTMLAnchorElement>(null);
+    const account = useAccount();
+
+    const closeMenu = (): void => {
+        setMenuOpen(false);
+    };
 
     useEffect(() => {
         // An open modal must release focus and scroll lock when the desktop navigation takes over.
@@ -189,44 +189,27 @@ const AppLayout = (): ReactNode => {
                         className="pt-8"
                         finalFocus={() => (window.matchMedia(desktopLayout).matches ? desktopHomeLink.current : true)}
                     >
-                        <Logo className="mb-6 ms-6 block h-auto w-1/2" />
-                        <SheetTitle>メニュー</SheetTitle>
-                        <MainNavigation
-                            onNavigate={() => {
-                                setMenuOpen(false);
-                            }}
-                        />
-                        <div className="px-3 py-2">
-                            <LogoutButton
-                                onNavigate={() => {
-                                    setMenuOpen(false);
-                                }}
-                            />
+                        <div className="mb-6 flex items-center justify-between gap-3 ps-6 pe-3">
+                            <Logo className="block h-auto w-1/2" />
+                            {account && <MobileAccountMenu account={account} onNavigate={closeMenu} />}
                         </div>
+                        <SheetTitle>メニュー</SheetTitle>
+                        <MainNavigation onNavigate={closeMenu} />
                     </SheetContent>
                 </Sheet>
                 <Logo className="hidden h-auto w-32 md:block" />
                 <MobilePageTitle searchOpen={search.searchOpen} />
-                <MobileSearchToggle search={search} />
-                {/* Centered on the viewport instead of the space next to the logo; w-full prevents shrink-to-fit
-                    sizing from collapsing the absolutely positioned bar to the input's intrinsic width. */}
-                <div className="absolute left-1/2 top-1/2 hidden w-full max-w-xl -translate-x-1/2 -translate-y-1/2 md:block">
-                    <SearchBar
-                        inputRef={search.desktopSearchInput}
-                        onSearch={search.runSearch}
-                        onSearchTextChange={search.setSearchText}
-                        searchText={search.searchText}
-                    />
-                </div>
-                <MobileSearch search={search} />
+                {showsSearch && <HeaderSearch search={search} />}
             </header>
 
             <div className="flex min-h-[calc(100dvh-3.5rem)]">
-                <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-56 shrink-0 overflow-y-auto border-e bg-sidebar text-sidebar-foreground md:block">
+                <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-56 shrink-0 flex-col overflow-y-auto border-e bg-sidebar text-sidebar-foreground md:flex">
                     <MainNavigation homeLinkRef={desktopHomeLink} />
-                    <div className="px-3 py-2">
-                        <LogoutButton />
-                    </div>
+                    {account && (
+                        <div className="mt-auto border-t p-3">
+                            <SidebarAccountMenu account={account} />
+                        </div>
+                    )}
                 </aside>
                 <main className="min-w-0 flex-1 p-4 md:p-6">
                     <SearchContext value={search}>
