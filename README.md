@@ -25,8 +25,8 @@ Run `bun run embeddings:backfill` to embed bookmarks saved while the feature was
 
 ## Deployment
 
-Run `bun run build` to produce `dist/`, then start the server to serve the built UI and the API together from one process on port 3300. The app needs PostgreSQL and the environment variables above.
+Run `bun run migrate:apply` to apply the latest migrations, and run `bun run build` to produce `dist/`. Then `bun run start` starts the server to serve the built UI and the API together from one process on port 3300. The app needs PostgreSQL and the environment variables above.
 
 On first launch with no accounts, the app asks you to create the first account with an email address, a display name, and a passkey. Later signups are only offered when `ENABLE_SIGNUP=true`.
 
-Keep the `data/` directory across restarts to retain the thumbnail images.
+Keep the `data/` directory across restarts to retain the thumbnail images. Health checks are available at `/api/health`.
