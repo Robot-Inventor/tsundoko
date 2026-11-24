@@ -1,7 +1,7 @@
 import { type BookmarkActionKind, requestBookmarkAction } from "../lib/bookmarkActions";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "./ui/drawer";
 import { type ReactNode, useRef, useState } from "react";
-import { exitAnimationMs, restingOffsetPx } from "../lib/swipe";
+import { exitAnimationMs, restingOffsetPx, touchPointerType } from "../lib/swipe";
 import type { Bookmark } from "../lib/bookmark";
 import { BookmarkCard } from "./BookmarkCard";
 import { SwipeReveal } from "./SwipeReveal";
@@ -14,7 +14,6 @@ const swipeThresholdRatio = 0.3;
 // Small movements are still taps and must keep opening the bookmark link.
 const dragActivationPx = 8;
 const longPressDurationMs = 500;
-const touchPointerType = "touch";
 
 const clampOffset = (offset: number, width: number): number => Math.min(Math.max(offset, -width), width);
 

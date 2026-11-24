@@ -139,6 +139,18 @@
     }
 }
 
+/* Below md, horizontal pans drive the row and menu gestures, so the browser must not claim them
+   as scroll gestures. Vertical scroll and pinch zoom stay native, and a zoomed page takes the pans
+   back because reading it sideways matters more than the gesture. */
+@media (width < 48rem) {
+    html {
+        touch-action: pan-y pinch-zoom;
+    }
+    html[data-zoomed="true"] {
+        touch-action: auto;
+    }
+}
+
 /* Unlayered so it wins over component utilities (e.g. the registry's cursor-default on
    menu items, which Base UI renders as div[role=menuitem]). */
 button:not(:disabled),
