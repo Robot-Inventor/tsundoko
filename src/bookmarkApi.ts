@@ -14,8 +14,10 @@ import { validator } from "hono/validator";
 
 const maxRequestBytes = 16_384;
 const bookmarkSaveLimit = 30;
+const bookmarkListLimit = 60;
 
 const bookmarkSaveRateLimit = createRateLimit({ limit: bookmarkSaveLimit });
+const bookmarkListRateLimit = createRateLimit({ limit: bookmarkListLimit });
 
 const previewRequest = type("string.json.parse").to({
     url: bookmarkUrl
@@ -63,7 +65,7 @@ const archivePayload = validator("json", (value, context) => {
 });
 
 const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
-    .get("/api/bookmarks", listQuery, async (context) => {
+    .get("/api/bookmarks", bookmarkListRateLimit, listQuery, async (context) => {
         context.header("Cache-Control", "no-store");
         const query = context.req.valid("query");
 

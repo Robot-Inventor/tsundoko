@@ -29,7 +29,7 @@ const embeddingInput = ({ content, description, title }: EmbeddingSource): strin
 
 // Search and save both treat an unavailable embedding as "no vector": the caller falls back to
 // keyword search, or stores the bookmark with a NULL embedding so it can be backfilled later.
-const embed = async (text: string): Promise<number[] | null> => {
+const embed = async (text: string, key: string): Promise<number[] | null> => {
     const apiKey = env.EMBEDDING_API_KEY;
 
     if (!apiKey) {
@@ -39,7 +39,7 @@ const embed = async (text: string): Promise<number[] | null> => {
     try {
         // Provider docs usually show the base URL with a trailing slash; avoid a double slash.
         const endpoint = `${env.EMBEDDING_BASE_URL.replace(/\/+$/u, "")}/embeddings`;
-        const response = await runOutbound("embedding", () =>
+        const response = await runOutbound(key, () =>
             fetch(endpoint, {
                 body: JSON.stringify({ input: text, model: env.EMBEDDING_MODEL }),
                 headers: {

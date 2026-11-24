@@ -1,6 +1,7 @@
 import { type Context, Hono } from "hono";
-import { OutboundBusyError, runOutbound } from "./lib/outboundLimit";
-import { createRateLimiter, rateLimitMessage } from "./lib/rateLimit";
+import { OutboundBusyError, runImageOutbound } from "./lib/outboundLimit";
+import type { AuthEnv } from "./authMiddleware";
+import { createRateLimit } from "./lib/rateLimit";
 import { getBookmarkImageUrls } from "./db/bookmarks";
 import { httpStatus } from "./lib/httpStatus";
 import { parseContentType } from "./lib/mediaType";
@@ -10,11 +11,11 @@ import { validator } from "hono/validator";
 
 const fetchTimeout = 8000;
 const maxImageBytes = 10_485_760;
-const imageRequestLimit = 300;
+const imageRequestLimit = 1000;
 // Thumbnails and favicons are stable per page, so letting the browser cache them for a day keeps reloads cheap.
 const imageCacheControl = "private, max-age=86400";
 
-const imageRateLimiter = createRateLimiter({ limit: imageRequestLimit });
+const imageRateLimit = createRateLimit({ limit: imageRequestLimit });
 
 // The proxy is keyed by bookmark id, so only saved bookmarks' images can be fetched.
 const bookmarkId = type("string.uuid");
@@ -53,10 +54,7 @@ const readImage = async (body: ReadableStream<Uint8Array>): Promise<Uint8Array<A
     return bytes;
 };
 
-const serveImage = async (
-    context: Context<{ Variables: { userId: string } }>,
-    imageUrl: string | null
-): Promise<Response> => {
+const serveImage = async (context: Context<AuthEnv>, imageUrl: string | null): Promise<Response> => {
     // Error responses must not be cached by the browser, unlike successful ones.
     context.header("Cache-Control", "no-store");
 
@@ -64,18 +62,10 @@ const serveImage = async (
         return context.body(null, httpStatus.notFound);
     }
 
-    const quota = imageRateLimiter(context.get("userId"));
-
-    if (!quota.allowed) {
-        context.header("Retry-After", String(quota.retryAfterSeconds));
-
-        return context.json({ error: rateLimitMessage }, httpStatus.tooManyRequests);
-    }
-
     try {
         // The slot stays held until the body has been read: the 10 MiB buffer is the expensive part,
         // not just the connection.
-        return await runOutbound(context.get("userId"), async () => {
+        return await runImageOutbound(context.get("userId"), async () => {
             const response = await fetch(imageUrl, {
                 credentials: "omit",
                 headers: {
@@ -132,8 +122,8 @@ const getFaviconUrl = async (id: string | null, userId: string): Promise<string 
     return stored ?? googleFaviconUrl.href;
 };
 
-const imageApi = new Hono<{ Variables: { userId: string } }>()
-    .get("/api/thumbnail", imageIdQuery, async (context) => {
+const imageApi = new Hono<AuthEnv>()
+    .get("/api/thumbnail", imageRateLimit, imageIdQuery, async (context) => {
         const id = context.req.valid("query");
         const bookmark = id ? await getBookmarkImageUrls(id, context.get("userId")) : null;
         const stored = bookmark?.thumbnailFile ? await readThumbnail(bookmark.thumbnailFile) : null;
@@ -147,7 +137,7 @@ const imageApi = new Hono<{ Variables: { userId: string } }>()
 
         return serveImage(context, bookmark?.thumbnailUrl ?? null);
     })
-    .get("/api/favicon", imageIdQuery, async (context) => {
+    .get("/api/favicon", imageRateLimit, imageIdQuery, async (context) => {
         const faviconUrl = await getFaviconUrl(context.req.valid("query"), context.get("userId"));
 
         return serveImage(context, faviconUrl);

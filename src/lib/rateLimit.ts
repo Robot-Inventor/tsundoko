@@ -69,4 +69,4 @@ const createRateLimit = (options: RateLimitOptions): MiddlewareHandler<AuthEnv> 
     });
 };
 
-export { createRateLimit, createRateLimiter, rateLimitMessage };
+export { createRateLimit };
