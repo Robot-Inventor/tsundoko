@@ -1,4 +1,4 @@
-import { emailTaken, needsSetup, signupAllowed } from "./lib/signupPolicy";
+import { needsSetup, signupAllowed } from "./lib/signupPolicy";
 import { Hono } from "hono";
 import { auth } from "./lib/auth";
 import { createSignupToken } from "./lib/signupToken";
@@ -39,10 +39,9 @@ const authApi = new Hono()
         const email = parsed.email.toLowerCase();
         const { name } = parsed;
 
-        if (await emailTaken(email)) {
-            return context.json({ error: "このメールアドレスはすでに登録されています。" }, httpStatus.conflict);
-        }
-
+        // A duplicate address is only rejected after passkey verification
+        // (createSignupUser re-checks inside the transaction). Reporting it here would let an
+        // unauthenticated caller enumerate registered addresses through the status code.
         return context.json({ token: createSignupToken({ email, name }) }, httpStatus.ok);
     })
     .on(["POST", "GET"], "/api/auth/*", (context) => auth.handler(context.req.raw));
