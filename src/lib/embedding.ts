@@ -1,5 +1,6 @@
 import { embeddingDimensions } from "../db/schema";
 import { env } from "../env";
+import { runOutbound } from "./outboundLimit";
 import { type } from "arktype";
 
 const requestTimeoutMs = 3000;
@@ -38,15 +39,17 @@ const embed = async (text: string): Promise<number[] | null> => {
     try {
         // Provider docs usually show the base URL with a trailing slash; avoid a double slash.
         const endpoint = `${env.EMBEDDING_BASE_URL.replace(/\/+$/u, "")}/embeddings`;
-        const response = await fetch(endpoint, {
-            body: JSON.stringify({ input: text, model: env.EMBEDDING_MODEL }),
-            headers: {
-                authorization: `Bearer ${apiKey}`,
-                "content-type": "application/json"
-            },
-            method: "POST",
-            signal: AbortSignal.timeout(requestTimeoutMs)
-        });
+        const response = await runOutbound("embedding", () =>
+            fetch(endpoint, {
+                body: JSON.stringify({ input: text, model: env.EMBEDDING_MODEL }),
+                headers: {
+                    authorization: `Bearer ${apiKey}`,
+                    "content-type": "application/json"
+                },
+                method: "POST",
+                signal: AbortSignal.timeout(requestTimeoutMs)
+            })
+        );
 
         // oxlint-disable-next-line no-magic-numbers -- 200 is the only success status for this endpoint.
         if (response.status !== 200) {

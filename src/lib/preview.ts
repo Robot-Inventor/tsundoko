@@ -6,7 +6,6 @@ import { isXPostUrl } from "./xPost";
 import ogs from "open-graph-scraper";
 import { parseBookmarkUrl } from "./bookmarkUrl";
 import { parseContentType } from "./mediaType";
-import { runOutbound } from "./outboundLimit";
 
 const maxRedirects = 5;
 const fetchTimeout = 8000;
@@ -124,27 +123,25 @@ const imageUrl = (value: string | undefined, pageUrl: URL): string | null => {
 // `url` and `thumbnailFile` are filled by the save path, so the page fetch returns the rest only.
 type PreviewData = Omit<BookmarkPreview, "thumbnailFile" | "url"> & { content: string | null };
 
-const getPreview = async (url: URL): Promise<PreviewData> =>
-    runOutbound(async () => {
-        const { html, pageUrl } = await fetchHtml(url);
-        const { result } = await ogs({ html, onlyGetOpenGraphInfo: ["image"] });
+const getPreview = async (url: URL): Promise<PreviewData> => {
+    const { html, pageUrl } = await fetchHtml(url);
+    const { result } = await ogs({ html, onlyGetOpenGraphInfo: ["image"] });
 
-        return {
-            // X post pages have no article body: xeet renders the text into the title instead,
-            // so the expensive extraction is skipped rather than discarded afterwards.
-            content: isXPostUrl(url) ? null : await extractArticleContent(html),
-            description:
-                cleanText(result.ogDescription, maxDescriptionLength) ??
-                cleanText(result.twitterDescription, maxDescriptionLength),
-            faviconUrl: imageUrl(result.favicon, pageUrl),
-            siteName: cleanText(result.ogSiteName, maxSiteNameLength) ?? pageUrl.hostname,
-            thumbnailUrl:
-                imageUrl(result.ogImage?.[0]?.url, pageUrl) ?? imageUrl(result.twitterImage?.[0]?.url, pageUrl),
-            title:
-                cleanText(result.ogTitle, maxTitleLength) ??
-                cleanText(result.twitterTitle, maxTitleLength) ??
-                pageUrl.hostname
-        };
-    });
+    return {
+        // X post pages have no article body: xeet renders the text into the title instead,
+        // so the expensive extraction is skipped rather than discarded afterwards.
+        content: isXPostUrl(url) ? null : await extractArticleContent(html),
+        description:
+            cleanText(result.ogDescription, maxDescriptionLength) ??
+            cleanText(result.twitterDescription, maxDescriptionLength),
+        faviconUrl: imageUrl(result.favicon, pageUrl),
+        siteName: cleanText(result.ogSiteName, maxSiteNameLength) ?? pageUrl.hostname,
+        thumbnailUrl: imageUrl(result.ogImage?.[0]?.url, pageUrl) ?? imageUrl(result.twitterImage?.[0]?.url, pageUrl),
+        title:
+            cleanText(result.ogTitle, maxTitleLength) ??
+            cleanText(result.twitterTitle, maxTitleLength) ??
+            pageUrl.hostname
+    };
+};
 
 export { type PreviewData, getPreview };

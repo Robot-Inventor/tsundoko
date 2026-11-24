@@ -8,6 +8,7 @@ import { bodyLimit } from "hono/body-limit";
 import { createRateLimit } from "./lib/rateLimit";
 import { getPreview } from "./lib/preview";
 import { parseContentType } from "./lib/mediaType";
+import { runOutbound } from "./lib/outboundLimit";
 import { type } from "arktype";
 import { validator } from "hono/validator";
 
@@ -104,15 +105,17 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
             // either one succeeding is enough to save the bookmark, and the OG result fills the rest.
             const [xPost, preview] = await Promise.all([
                 isXPostUrl(input.url)
-                    ? renderXPost(input.url).catch((error: unknown) => {
-                          // The OG fallback keeps this non-fatal, but the signal matters for diagnosis.
-                          // oxlint-disable-next-line no-console -- Server-side diagnostics are console's legitimate use.
-                          console.warn("X post thumbnail rendering failed:", error);
+                    ? runOutbound(context.get("userId"), () =>
+                          renderXPost(input.url).catch((error: unknown) => {
+                              // The OG fallback keeps this non-fatal, but the signal matters for diagnosis.
+                              // oxlint-disable-next-line no-console -- Server-side diagnostics are console's legitimate use.
+                              console.warn("X post thumbnail rendering failed:", error);
 
-                          return null;
-                      })
+                              return null;
+                          })
+                      )
                     : null,
-                getPreview(input.url).catch(() => null)
+                runOutbound(context.get("userId"), () => getPreview(input.url).catch(() => null))
             ]);
 
             if (!preview && !xPost) {

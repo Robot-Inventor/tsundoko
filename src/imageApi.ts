@@ -75,7 +75,7 @@ const serveImage = async (
     try {
         // The slot stays held until the body has been read: the 10 MiB buffer is the expensive part,
         // not just the connection.
-        return await runOutbound(async () => {
+        return await runOutbound(context.get("userId"), async () => {
             const response = await fetch(imageUrl, {
                 credentials: "omit",
                 headers: {
