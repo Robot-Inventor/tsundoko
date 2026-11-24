@@ -11,12 +11,25 @@ import {
 } from "./ui/dropdown-menu";
 import { EllipsisVerticalIcon, LogOutIcon, SettingsIcon } from "lucide-react";
 import { Link, useRouter } from "@tanstack/react-router";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, createContext, useCallback, useContext, useEffect, useState } from "react";
 import { authClient, clearAuthState } from "../lib/authClient";
 import { Button } from "./ui/button";
+import { notifyError } from "../lib/appToast";
 
-const useAccount = (): Account | null => {
+interface AccountContextValue {
+    account: Account | null;
+    // True when the last fetch failed, so the settings page can offer a retry instead of loading forever.
+    failed: boolean;
+    // Settings calls this after saving so the sidebar avatar and name change without a reload.
+    refresh: () => void;
+}
+
+const AccountContext = createContext<AccountContextValue | null>(null);
+
+const useAccountState = (): AccountContextValue => {
     const [account, setAccount] = useState<Account | null>(null);
+    const [failed, setFailed] = useState(false);
+    const [reload, setReload] = useState(false);
 
     useEffect(() => {
         const request = {
@@ -27,20 +40,75 @@ const useAccount = (): Account | null => {
             try {
                 const response = await meClient.api.me.$get();
 
-                if (response.ok && !request.cancelled) {
+                if (request.cancelled) {
+                    return;
+                }
+
+                if (response.ok) {
                     setAccount(await response.json());
+                    setFailed(false);
+                } else {
+                    setFailed(true);
                 }
             } catch {
-                // The account row is optional chrome; when it cannot load, leave it out instead of blocking the layout.
+                if (!request.cancelled) {
+                    // The sidebar row is optional chrome, but settings needs to know it failed.
+                    setFailed(true);
+                }
             }
         })();
 
         return (): void => {
             request.cancelled = true;
         };
+    }, [reload]);
+
+    // Settings saves through this so the sidebar picks up a new name or avatar without a reload.
+    const refresh = useCallback((): void => {
+        setReload((value) => !value);
     }, []);
 
-    return account;
+    return {
+        account,
+        failed,
+        refresh
+    };
+};
+
+const AccountProvider = ({ children, value }: { children: ReactNode; value: AccountContextValue }): ReactNode => (
+    <AccountContext value={value}>{children}</AccountContext>
+);
+
+const useAccountContext = (): AccountContextValue => {
+    const value = useContext(AccountContext);
+
+    if (!value) {
+        throw new Error("AccountProvider is missing");
+    }
+
+    return value;
+};
+
+// Settings sends the user here when a sensitive change needs a sign-in newer than the editing window.
+// Signing out first means the login page accepts the redirect instead of bouncing back to the app.
+const useRelogin = (): (() => Promise<void>) => {
+    const router = useRouter();
+
+    return useCallback(async (): Promise<void> => {
+        try {
+            await authClient.signOut();
+            clearAuthState();
+            // Same reason as login: invalidating would rerun this page's guard and lose the redirect.
+            await router.navigate({
+                search: {
+                    redirect: "/settings"
+                },
+                to: "/login"
+            });
+        } catch {
+            notifyError("再ログインできませんでした。");
+        }
+    }, [router]);
 };
 
 const AccountAvatar = ({ account }: { account: Account }): ReactNode => (
@@ -133,4 +201,4 @@ const MobileAccountMenu = ({ account, onNavigate }: { account: Account; onNaviga
     </DropdownMenu>
 );
 
-export { MobileAccountMenu, SidebarAccountMenu, useAccount };
+export { AccountProvider, MobileAccountMenu, SidebarAccountMenu, useAccountContext, useAccountState, useRelogin };

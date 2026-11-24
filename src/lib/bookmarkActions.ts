@@ -1,16 +1,11 @@
 import { type Bookmark, type BookmarkScope, bookmarkMessages } from "./bookmark";
-import { type ToastManager, Toast as ToastPrimitive } from "@base-ui/react/toast";
+import { appToastManager, notifyError, toastTimeoutMs } from "./appToast";
 import { bookmarkClient } from "./bookmarkClient";
 import { useSyncExternalStore } from "react";
 
-// The toast and the pending-commit timer share one duration: the action is sent to the
-// server exactly when the toast disappears, so "元に戻す" only cancels the request.
-const actionToastTimeoutMs = 5000;
-
+// The undo toast is shared by every action, so it needs a fixed id; errors dedupe under their own.
 const actionToastId = "bookmark-action";
 const errorToastId = "bookmark-action-error";
-
-const actionToastManager: ToastManager = ToastPrimitive.createToastManager();
 
 type BookmarkActionKind = "archive" | "unarchive" | "delete";
 
@@ -130,7 +125,7 @@ const commitAction = async (id: string, action: PendingBookmarkAction): Promise<
         toastOwner = null;
         // Base UI pauses its auto-dismiss while hovered; timeout: 0 makes the commit timer
         // the only automatic clock. A user-initiated close has its own onClose path below.
-        actionToastManager.close(actionToastId);
+        appToastManager.close(actionToastId);
     }
 
     const response = await sendActionRequest(action).catch(() => null);
@@ -145,10 +140,7 @@ const commitAction = async (id: string, action: PendingBookmarkAction): Promise<
         const next = new Map(snapshot);
         next.delete(id);
         replaceSnapshot(next);
-        actionToastManager.add({
-            id: errorToastId,
-            title: bookmarkMessages.actionFailed
-        });
+        notifyError(bookmarkMessages.actionFailed, errorToastId);
     }
     // On success the entry stays: it keeps hiding the stale copy in already-loaded lists.
 };
@@ -167,7 +159,7 @@ const undoBookmarkAction = (id: string): void => {
 
     if (toastOwner === action) {
         toastOwner = null;
-        actionToastManager.close(actionToastId);
+        appToastManager.close(actionToastId);
     }
 };
 
@@ -183,14 +175,14 @@ const requestBookmarkAction = (kind: BookmarkActionKind, bookmark: Bookmark): vo
         kind,
         timer: window.setTimeout(() => {
             void commitAction(bookmark.id, action);
-        }, actionToastTimeoutMs)
+        }, toastTimeoutMs)
     };
 
     const next = new Map(snapshot);
     next.set(bookmark.id, action);
     replaceSnapshot(next);
 
-    actionToastManager.add({
+    appToastManager.add({
         actionProps: {
             children: "元に戻す",
             onClick: () => {
@@ -218,11 +210,4 @@ const requestBookmarkAction = (kind: BookmarkActionKind, bookmark: Bookmark): vo
     toastOwner = action;
 };
 
-export {
-    actionToastTimeoutMs,
-    actionToastManager,
-    type BookmarkActionKind,
-    applyPendingActions,
-    requestBookmarkAction,
-    usePendingBookmarkActions
-};
+export { type BookmarkActionKind, applyPendingActions, requestBookmarkAction, usePendingBookmarkActions };

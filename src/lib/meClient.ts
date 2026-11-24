@@ -1,6 +1,6 @@
-import type { Account, MeApi } from "../meApi";
+import type { Account, AccountApi } from "../accountApi";
 import { hc } from "hono/client";
 
-const meClient = hc<MeApi>("/");
+const meClient = hc<AccountApi>("/");
 
 export { type Account, meClient };

@@ -119,8 +119,7 @@ const SignupPage = (): ReactNode => {
 
         const result = await authClient.passkey.addPasskey({
             context: token.token,
-            createSession: true,
-            name: "パスキー"
+            createSession: true
         });
 
         if (result.error) {

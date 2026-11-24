@@ -43,6 +43,13 @@
             "when": 1795496799661,
             "tag": "0005_lively_thena",
             "breakpoints": true
+        },
+        {
+            "idx": 6,
+            "version": "7",
+            "when": 1795503751028,
+            "tag": "0006_glossy_vertigo",
+            "breakpoints": true
         }
     ]
 }

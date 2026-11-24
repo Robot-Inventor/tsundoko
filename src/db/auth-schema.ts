@@ -93,7 +93,9 @@ export const passkey = pgTable(
         backedUp: boolean("backed_up").notNull(),
         transports: text("transports"),
         createdAt: timestamp("created_at"),
-        aaguid: text("aaguid")
+        aaguid: text("aaguid"),
+        // Set on every successful sign-in with this passkey; null means it has not been used yet.
+        lastUsedAt: timestamp("last_used_at")
     },
     (table) => [index("passkey_userId_idx").on(table.userId), index("passkey_credentialID_idx").on(table.credentialID)]
 );

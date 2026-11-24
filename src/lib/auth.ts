@@ -1,5 +1,6 @@
 import { account, passkey as passkeys, session, user, verification } from "../db/auth-schema";
 import { createSignupUser, resolveSignupUser, verifySignup } from "./signupUser";
+import { authHooks } from "./authHooks";
 import { betterAuth } from "better-auth";
 import { db } from "../db";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
@@ -23,10 +24,17 @@ const auth = betterAuth({
     emailAndPassword: {
         enabled: false
     },
+    hooks: authHooks,
     plugins: [
         passkey({
             registration: {
                 afterVerification: async (contextData) => {
+                    // Only the signup flow carries a signup token. A signed-in user adding a passkey
+                    // from settings has none, so the plugin's normal registration path must run.
+                    if (!contextData.context) {
+                        return;
+                    }
+
                     const signup = verifySignup(contextData.ctx.body, contextData.context);
                     const adapter = await getCurrentAdapter(contextData.ctx.context.adapter);
 

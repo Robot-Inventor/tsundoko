@@ -1,6 +1,6 @@
+import { AccountProvider, MobileAccountMenu, SidebarAccountMenu, useAccountState } from "./AccountMenu";
 import { ArchiveIcon, HouseIcon, MenuIcon, SearchIcon, XIcon } from "lucide-react";
 import { HeadContent, Link, Outlet, useLocation } from "@tanstack/react-router";
-import { MobileAccountMenu, SidebarAccountMenu, useAccount } from "./AccountMenu";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SearchContext, type UseSearchResult, desktopLayout, useSearch } from "../hooks/useSearch";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "./ui/sheet";
@@ -144,7 +144,8 @@ const AppLayout = (): ReactNode => {
     const search = useSearch(showsSearch);
     const [menuOpen, setMenuOpen] = useState(false);
     const desktopHomeLink = useRef<HTMLAnchorElement>(null);
-    const account = useAccount();
+    const accountState = useAccountState();
+    const { account } = accountState;
 
     const closeMenu = (): void => {
         setMenuOpen(false);
@@ -167,7 +168,7 @@ const AppLayout = (): ReactNode => {
     }, []);
 
     return (
-        <>
+        <AccountProvider value={accountState}>
             <HeadContent />
             <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-background px-3 md:px-4">
                 <Sheet onOpenChange={setMenuOpen} open={menuOpen}>
@@ -217,7 +218,7 @@ const AppLayout = (): ReactNode => {
                     </SearchContext>
                 </main>
             </div>
-        </>
+        </AccountProvider>
     );
 };
 

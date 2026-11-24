@@ -123,7 +123,18 @@ const loginRoute = createRoute({
         ]
     }),
     loader: (): Promise<AuthLoaderData> => getAuthState(),
-    path: "/login"
+    path: "/login",
+    // Only the settings page asks to return after signing in; keeping the union closed means no
+    // user-supplied value ever reaches navigate().
+    validateSearch: (search: Record<string, unknown>): { redirect?: "/settings" } => {
+        if (search["redirect"] === "/settings") {
+            return {
+                redirect: "/settings"
+            };
+        }
+
+        return {};
+    }
 });
 
 const signupRoute = createRoute({

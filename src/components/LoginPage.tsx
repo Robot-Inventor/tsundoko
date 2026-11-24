@@ -1,10 +1,11 @@
-import { Link, useLoaderData, useRouter } from "@tanstack/react-router";
+import { Link, useLoaderData, useRouter, useSearch } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { authClient, clearAuthState } from "../lib/authClient";
 import { Button } from "./ui/button";
 
 const LoginPage = (): ReactNode => {
     const { needsSetup, signupEnabled } = useLoaderData({ from: "/login" });
+    const { redirect } = useSearch({ from: "/login" });
     const router = useRouter();
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
@@ -23,9 +24,10 @@ const LoginPage = (): ReactNode => {
         }
 
         clearAuthState();
-        await router.invalidate();
+        // Navigating first lets the target route's guard read the fresh session; invalidating here
+        // would run the login route's guest guard and drop the redirect before it is used.
         await router.navigate({
-            to: "/"
+            to: redirect ?? "/"
         });
 
         setBusy(false);

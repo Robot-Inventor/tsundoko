@@ -1,5 +1,5 @@
 import { type Bookmark, bookmarkMessages, httpStatus } from "../lib/bookmark";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { type ReactNode, useRef, useState } from "react";
 import { invalidBookmarkUrlMessage, maxBookmarkUrlLength, parseBookmarkUrl } from "../lib/bookmarkUrl";
 import { Button } from "./ui/button";
@@ -15,6 +15,8 @@ const formErrors = {
     invalid: invalidBookmarkUrlMessage,
     save: bookmarkMessages.saveFailed
 } as const;
+
+const errorId = "add-bookmark-error";
 
 type AddBookmarkResult = { bookmark: Bookmark } | { error: string };
 
@@ -67,9 +69,10 @@ const requestBookmark = async (url: URL): Promise<AddBookmarkResult> => {
 
 interface BookmarkUrlFormProps {
     onAdded: (bookmark: Bookmark) => void;
+    onCancel: () => void;
 }
 
-const BookmarkUrlForm = ({ onAdded }: BookmarkUrlFormProps): ReactNode => {
+const BookmarkUrlForm = ({ onAdded, onCancel }: BookmarkUrlFormProps): ReactNode => {
     const [input, setInput] = useState("");
     const [error, setError] = useState("");
     const [adding, setAdding] = useState(false);
@@ -106,48 +109,50 @@ const BookmarkUrlForm = ({ onAdded }: BookmarkUrlFormProps): ReactNode => {
 
     return (
         <form
-            className="grid gap-2"
+            className="space-y-4"
             noValidate
             onSubmit={(event) => {
                 event.preventDefault();
                 void addBookmark();
             }}
         >
-            <div className="flex items-start gap-2">
-                <Input
-                    aria-describedby={error && "add-bookmark-error"}
-                    aria-invalid={Boolean(error)}
-                    aria-label="追加するページのURL"
-                    autoCapitalize="none"
-                    autoComplete="url"
-                    autoCorrect="off"
-                    className="h-10 flex-1"
-                    maxLength={maxBookmarkUrlLength}
-                    name="url"
-                    onChange={(event) => {
-                        setInput(event.currentTarget.value);
-                        setError("");
-                    }}
-                    placeholder="追加するURLを入力"
-                    readOnly={adding}
-                    ref={urlInput}
-                    required
-                    spellCheck={false}
-                    type="url"
-                    value={input}
-                />
-                <Button className="h-10 w-20 shrink-0 px-2" disabled={adding} type="submit">
-                    {adding ? "取得中…" : "追加"}
-                </Button>
-            </div>
-            {error && (
-                <p className="text-sm wrap-anywhere text-destructive" id="add-bookmark-error" role="alert">
+            <Input
+                aria-describedby={error ? errorId : ""}
+                aria-invalid={Boolean(error)}
+                aria-label="追加するページのURL"
+                autoCapitalize="none"
+                autoComplete="url"
+                autoCorrect="off"
+                maxLength={maxBookmarkUrlLength}
+                name="url"
+                onChange={(event) => {
+                    setInput(event.currentTarget.value);
+                    setError("");
+                }}
+                placeholder="追加するURLを入力"
+                readOnly={adding}
+                ref={urlInput}
+                required
+                spellCheck={false}
+                type="url"
+                value={input}
+            />
+            {error ? (
+                <p className="text-sm wrap-anywhere text-destructive" id={errorId} role="alert">
                     {error}
                 </p>
-            )}
+            ) : null}
             <p aria-live="polite" className="sr-only">
                 {adding ? "ページの情報を取得しています。" : ""}
             </p>
+            <DialogFooter className="flex-row justify-end">
+                <Button onClick={onCancel} type="button" variant="outline">
+                    キャンセル
+                </Button>
+                <Button disabled={adding} type="submit">
+                    {adding ? "取得中…" : "追加"}
+                </Button>
+            </DialogFooter>
         </form>
     );
 };
@@ -188,6 +193,9 @@ const AddBookmarkDialog = ({ onAdd }: AddBookmarkDialogProps): ReactNode => {
                     onAdded={(bookmark) => {
                         setOpen(false);
                         onAdd(bookmark);
+                    }}
+                    onCancel={() => {
+                        setOpen(false);
                     }}
                 />
             </DialogContent>
