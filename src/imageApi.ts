@@ -11,7 +11,7 @@ import { validator } from "hono/validator";
 
 const fetchTimeout = 8000;
 const maxImageBytes = 10_485_760;
-const imageRequestLimit = 1000;
+const imageRequestLimit = 5000;
 // Thumbnails and favicons are stable per page, so letting the browser cache them for a day keeps reloads cheap.
 const imageCacheControl = "private, max-age=86400";
 
@@ -124,6 +124,8 @@ const getFaviconUrl = async (id: string | null, userId: string): Promise<string 
 
 const imageApi = new Hono<AuthEnv>()
     .get("/api/thumbnail", imageRateLimit, imageIdQuery, async (context) => {
+        context.header("Cache-Control", "no-store");
+
         const id = context.req.valid("query");
         const bookmark = id ? await getBookmarkImageUrls(id, context.get("userId")) : null;
 
@@ -146,7 +148,7 @@ const imageApi = new Hono<AuthEnv>()
                     return context.body(null, httpStatus.serviceUnavailable);
                 }
 
-                return context.body(null, httpStatus.badGateway);
+                throw error;
             }
         }
 

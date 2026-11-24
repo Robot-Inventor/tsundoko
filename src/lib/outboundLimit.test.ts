@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const maxConcurrentOutboundFetches = 8;
 const maxConcurrentPerKey = 4;
+const maxConcurrentImagePerKey = 8;
 const taskDurationMs = 50;
 
 type Gate = (key: string, task: () => Promise<void>) => Promise<void>;
@@ -53,6 +54,18 @@ describe("outbound limit", () => {
         await expect(runImageOutbound("image-user", () => Promise.resolve("image"))).resolves.toBe("image");
 
         await Promise.all(saves);
+    });
+
+    it("caps one user's share of the image pool", async () => {
+        const blockers = Array.from({ length: maxConcurrentImagePerKey }, () => runImageOutbound("user-a", wait));
+
+        await expect(runImageOutbound("user-a", () => Promise.resolve("surplus"))).rejects.toBeInstanceOf(
+            OutboundBusyError
+        );
+
+        await expect(runImageOutbound("user-b", () => Promise.resolve("other"))).resolves.toBe("other");
+
+        await Promise.all(blockers);
     });
 
     it("bounds stored thumbnail reads with their own pool", async () => {
