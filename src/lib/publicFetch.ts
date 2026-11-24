@@ -16,9 +16,21 @@ interface FetchOptions extends RequestInit {
 const stripBrackets = (hostname: string): string =>
     hostname.startsWith("[") && hostname.endsWith("]") ? hostname.slice(bracketOffset, -bracketOffset) : hostname;
 
+interface LookupAddress {
+    address: string;
+    family: number;
+}
+
+type AddressLookup = (hostname: string) => Promise<LookupAddress[]>;
+
+const defaultLookup: AddressLookup = (hostname) => lookup(hostname, { all: true, order: "verbatim" });
+
 // Resolve and validate before connecting. If any resolved address is private, the whole hostname is
 // rejected, so round-robin DNS cannot alternate a public and an internal answer.
-const resolvePublicAddresses = async (hostname: string): Promise<string[]> => {
+const resolvePublicAddresses = async (
+    hostname: string,
+    lookupAddresses: AddressLookup = defaultLookup
+): Promise<string[]> => {
     const literal = stripBrackets(hostname);
 
     if (isIP(literal)) {
@@ -29,7 +41,7 @@ const resolvePublicAddresses = async (hostname: string): Promise<string[]> => {
         return [literal];
     }
 
-    const addresses = await lookup(hostname, { all: true, order: "verbatim" });
+    const addresses = await lookupAddresses(hostname);
     const [first] = addresses;
 
     if (!first || addresses.some((entry) => !isPublicAddress(entry.address))) {
@@ -87,8 +99,12 @@ const fetchFirstReachableAddress = async (url: URL, addresses: string[], init: R
     }
 };
 
-const publicFetch = async (url: URL, init: RequestInit = {}): Promise<Response> => {
-    const addresses = await resolvePublicAddresses(url.hostname);
+const publicFetch = async (
+    url: URL,
+    init: RequestInit = {},
+    resolve: AddressLookup = defaultLookup
+): Promise<Response> => {
+    const addresses = await resolvePublicAddresses(url.hostname, resolve);
 
     return fetchFirstReachableAddress(url, addresses, init);
 };

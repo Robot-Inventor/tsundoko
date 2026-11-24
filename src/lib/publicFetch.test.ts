@@ -2,18 +2,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { publicFetch } from "./publicFetch";
 
 const resolvedAddress = "93.184.216.34";
+const loopbackAddress = "127.0.0.1";
 const ipv4Family = 4;
 const okStatus = 200;
 
-vi.mock("node:dns/promises", (): { lookup: () => Promise<Array<{ address: string; family: number }>> } => ({
-    lookup: () =>
-        Promise.resolve([
-            {
-                address: resolvedAddress,
-                family: ipv4Family
-            }
-        ])
-}));
+const resolveTo =
+    (addresses: Array<{ address: string; family: number }>) =>
+    (): Promise<Array<{ address: string; family: number }>> =>
+        Promise.resolve(addresses);
 
 afterEach(() => {
     vi.unstubAllGlobals();
@@ -27,11 +23,20 @@ describe("publicFetch", () => {
 
         vi.stubGlobal("fetch", fetchMock);
 
-        await publicFetch(new URL("https://example.com/path"), {
-            headers: {
-                accept: "text/html"
-            }
-        });
+        await publicFetch(
+            new URL("https://example.com/path"),
+            {
+                headers: {
+                    accept: "text/html"
+                }
+            },
+            resolveTo([
+                {
+                    address: resolvedAddress,
+                    family: ipv4Family
+                }
+            ])
+        );
 
         const [call] = fetchMock.mock.calls;
         const [target, options] = call;
@@ -42,5 +47,37 @@ describe("publicFetch", () => {
 
         expect(target.href).toBe(`https://${resolvedAddress}/path`);
         expect(new Headers(options?.headers).get("host")).toBe("example.com");
+        expect(options).toMatchObject({
+            proxy: false,
+            redirect: "manual",
+            tls: {
+                serverName: "example.com"
+            }
+        });
+    });
+
+    it("rejects a hostname when any resolved address is private", async () => {
+        const fetchMock = vi.fn(() => Promise.resolve(new Response("ok", { status: okStatus })));
+
+        vi.stubGlobal("fetch", fetchMock);
+
+        await expect(
+            publicFetch(
+                new URL("https://example.com/"),
+                {},
+                resolveTo([
+                    {
+                        address: resolvedAddress,
+                        family: ipv4Family
+                    },
+                    {
+                        address: loopbackAddress,
+                        family: ipv4Family
+                    }
+                ])
+            )
+        ).rejects.toThrow();
+
+        expect(fetchMock).not.toHaveBeenCalled();
     });
 });
