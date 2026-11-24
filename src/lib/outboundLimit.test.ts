@@ -1,4 +1,4 @@
-import { OutboundBusyError, runOutbound } from "./outboundLimit";
+import { OutboundBusyError, runImageOutbound, runOutbound } from "./outboundLimit";
 import { describe, expect, it } from "vitest";
 
 const maxConcurrentOutboundFetches = 8;
@@ -40,6 +40,15 @@ describe("outbound limit", () => {
         await expect(runOutbound("user-b", () => Promise.resolve("other"))).resolves.toBe("other");
 
         await Promise.all(blockers);
+    });
+
+    it("keeps image capacity independent from a full save pool", async () => {
+        const saves = fillProcess();
+
+        await expect(runOutbound("saturated", () => Promise.resolve("save"))).rejects.toBeInstanceOf(OutboundBusyError);
+        await expect(runImageOutbound("image-user", () => Promise.resolve("image"))).resolves.toBe("image");
+
+        await Promise.all(saves);
     });
 
     it("releases the slot when the task throws", async () => {

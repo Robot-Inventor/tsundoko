@@ -1,5 +1,5 @@
 import { type Context, Hono } from "hono";
-import { OutboundBusyError, runImageOutbound } from "./lib/outboundLimit";
+import { OutboundBusyError, runImageOutbound, runThumbnailRead } from "./lib/outboundLimit";
 import type { AuthEnv } from "./authMiddleware";
 import { createRateLimit } from "./lib/rateLimit";
 import { getBookmarkImageUrls } from "./db/bookmarks";
@@ -126,13 +126,28 @@ const imageApi = new Hono<AuthEnv>()
     .get("/api/thumbnail", imageRateLimit, imageIdQuery, async (context) => {
         const id = context.req.valid("query");
         const bookmark = id ? await getBookmarkImageUrls(id, context.get("userId")) : null;
-        const stored = bookmark?.thumbnailFile ? await readThumbnail(bookmark.thumbnailFile) : null;
 
-        if (stored) {
-            context.header("content-type", "image/png");
-            context.header("Cache-Control", imageCacheControl);
+        if (bookmark?.thumbnailFile) {
+            const { thumbnailFile } = bookmark;
 
-            return context.body(stored);
+            try {
+                const stored = await runThumbnailRead(context.get("userId"), () => readThumbnail(thumbnailFile));
+
+                if (stored) {
+                    context.header("content-type", "image/png");
+                    context.header("Cache-Control", imageCacheControl);
+
+                    return context.body(stored);
+                }
+            } catch (error) {
+                if (error instanceof OutboundBusyError) {
+                    context.header("Retry-After", "1");
+
+                    return context.body(null, httpStatus.serviceUnavailable);
+                }
+
+                return context.body(null, httpStatus.badGateway);
+            }
         }
 
         return serveImage(context, bookmark?.thumbnailUrl ?? null);

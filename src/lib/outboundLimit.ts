@@ -53,8 +53,10 @@ const createGate = (maxConcurrent: number, maxPerKey: number) => {
 };
 
 // Saves, previews and embeddings share a small pool. Images get their own pool with room for the
-// browser's parallel subresource requests, so loading a bookmark list cannot starve saving.
+// browser's parallel subresource requests, so loading a bookmark list cannot starve saving. Stored
+// thumbnails are read from disk, so they also get a separate small gate to bound buffered bytes.
 const runOutbound = createGate(maxConcurrentOutboundFetches, maxConcurrentPerKey);
 const runImageOutbound = createGate(maxConcurrentImageFetches, maxConcurrentImagePerKey);
+const runThumbnailRead = createGate(maxConcurrentImageFetches, maxConcurrentPerKey);
 
-export { OutboundBusyError, runImageOutbound, runOutbound };
+export { OutboundBusyError, runImageOutbound, runOutbound, runThumbnailRead };
