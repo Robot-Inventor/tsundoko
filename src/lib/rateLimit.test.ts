@@ -40,6 +40,7 @@ describe("per-user rate limit", () => {
 
         expect(limited.status).toBe(tooManyRequests);
         expect(limited.headers.get("retry-after")).toBe("60");
+        expect(limited.headers.get("cache-control")).toBe("no-store");
     });
 
     it("keeps other users unaffected", async () => {

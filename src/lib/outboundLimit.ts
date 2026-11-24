@@ -2,9 +2,9 @@
 const maxConcurrentOutboundFetches = 8;
 const maxConcurrentPerKey = 4;
 const maxConcurrentImageFetches = 16;
-const maxConcurrentImagePerKey = 8;
+const maxConcurrentImagePerKey = 16;
 const maxConcurrentThumbnailReads = 8;
-const maxConcurrentThumbnailReadsPerKey = 4;
+const maxConcurrentThumbnailReadsPerKey = 8;
 
 class OutboundBusyError extends Error {}
 
