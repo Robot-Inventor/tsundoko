@@ -1,6 +1,4 @@
 const maxConcurrentOutboundFetches = 8;
-const maxConcurrentPerUser = 1;
-const noActiveRequests = 0;
 const acquireTimeoutMs = 5000;
 const slot = 1;
 const absentIndex = -1;
@@ -9,8 +7,9 @@ interface Waiter {
     resolve: () => void;
 }
 
-// Bound how many outbound requests one process makes at once, and how long a request may wait for
-// a slot. A full queue fails fast instead of hanging the handler indefinitely.
+// Bound how many outbound operations one process runs at once, and how long a request may wait for
+// a slot. A full queue fails fast instead of hanging the handler indefinitely. The limit is per
+// process; running several replicas multiplies it.
 const createSemaphore = (maxConcurrent: number, waitMs: number) => {
     let active = 0;
     const waiting: Waiter[] = [];
@@ -71,30 +70,4 @@ const createSemaphore = (maxConcurrent: number, waitMs: number) => {
 
 const runOutbound = createSemaphore(maxConcurrentOutboundFetches, acquireTimeoutMs);
 
-const activePerUser = new Map<string, number>();
-
-// One user cannot occupy the whole outbound budget. This is a separate, immediate gate: a second
-// concurrent request from the same user is rejected rather than queued behind the global limit.
-const runOutboundFor = async <T>(userId: string, task: () => Promise<T>): Promise<T> => {
-    const active = activePerUser.get(userId) ?? noActiveRequests;
-
-    if (active >= maxConcurrentPerUser) {
-        throw new Error("Too many outbound requests for this user");
-    }
-
-    activePerUser.set(userId, active + slot);
-
-    try {
-        return await runOutbound(task);
-    } finally {
-        const remaining = (activePerUser.get(userId) ?? slot) - slot;
-
-        if (remaining) {
-            activePerUser.set(userId, remaining);
-        } else {
-            activePerUser.delete(userId);
-        }
-    }
-};
-
-export { runOutbound, runOutboundFor };
+export { runOutbound };

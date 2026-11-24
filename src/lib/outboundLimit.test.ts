@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runOutbound, runOutboundFor } from "./outboundLimit";
+import { runOutbound } from "./outboundLimit";
 
 const maxConcurrentOutboundFetches = 8;
 const extraTasks = 4;
@@ -27,19 +27,11 @@ describe("outbound limit", () => {
 
         await Promise.all(Array.from({ length: maxConcurrentOutboundFetches + extraTasks }, () => runOutbound(task)));
 
-        expect(peak).toBeLessThanOrEqual(maxConcurrentOutboundFetches);
+        expect(peak).toBe(maxConcurrentOutboundFetches);
     });
 
     it("releases the slot when the task throws", async () => {
         await expect(runOutbound(() => Promise.reject(new Error("boom")))).rejects.toThrow("boom");
         await expect(runOutbound(() => Promise.resolve("ok"))).resolves.toBe("ok");
-    });
-
-    it("rejects a second concurrent request from the same user", async () => {
-        const first = runOutboundFor("user-a", wait);
-
-        await expect(runOutboundFor("user-a", () => Promise.resolve("second"))).rejects.toThrow();
-        await expect(runOutboundFor("user-b", () => Promise.resolve("other"))).resolves.toBe("other");
-        await expect(first).resolves.toBeUndefined();
     });
 });

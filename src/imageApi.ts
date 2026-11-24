@@ -4,7 +4,7 @@ import { getBookmarkImageUrls } from "./db/bookmarks";
 import { httpStatus } from "./lib/httpStatus";
 import { parseContentType } from "./lib/mediaType";
 import { readThumbnail } from "./lib/thumbnailStore";
-import { runOutboundFor } from "./lib/outboundLimit";
+import { runOutbound } from "./lib/outboundLimit";
 import { type } from "arktype";
 import { validator } from "hono/validator";
 
@@ -75,7 +75,7 @@ const serveImage = async (
     try {
         // The slot stays held until the body has been read: the 10 MiB buffer is the expensive part,
         // not just the connection.
-        return await runOutboundFor(context.get("userId"), async () => {
+        return await runOutbound(async () => {
             const response = await fetch(imageUrl, {
                 credentials: "omit",
                 headers: {
