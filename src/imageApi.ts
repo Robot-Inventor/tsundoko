@@ -1,13 +1,16 @@
 import { type Context, Hono } from "hono";
 import { getBookmarkImageUrls } from "./db/bookmarks";
 import { httpStatus } from "./lib/httpStatus";
+import { parseBookmarkUrl } from "./lib/bookmarkUrl";
 import { parseContentType } from "./lib/mediaType";
+import { publicFetch } from "./lib/publicFetch";
 import { readThumbnail } from "./lib/thumbnailStore";
 import { type } from "arktype";
 import { validator } from "hono/validator";
 
 const fetchTimeout = 8000;
 const maxImageBytes = 10_485_760;
+const maxRedirects = 5;
 // Thumbnails and favicons are stable per page, so letting the browser cache them for a day keeps reloads cheap.
 const imageCacheControl = "private, max-age=86400";
 
@@ -48,6 +51,47 @@ const readImage = async (body: ReadableStream<Uint8Array>): Promise<Uint8Array<A
     return bytes;
 };
 
+const redirectStatuses = new Set<number>([
+    httpStatus.found,
+    httpStatus.movedPermanently,
+    httpStatus.permanentRedirect,
+    httpStatus.seeOther,
+    httpStatus.temporaryRedirect
+]);
+
+// Every hop goes through publicFetch, so a redirect cannot move a previously safe URL onto an
+// internal address. The hop limit also stops redirect loops.
+const fetchImage = async (imageUrl: URL, redirectsRemaining = maxRedirects): Promise<Response> => {
+    const response = await publicFetch(imageUrl, {
+        credentials: "omit",
+        headers: {
+            accept: "image/*"
+        },
+        signal: AbortSignal.timeout(fetchTimeout)
+    });
+
+    if (!redirectStatuses.has(response.status)) {
+        return response;
+    }
+
+    await response.body?.cancel();
+
+    const location = response.headers.get("location");
+
+    if (!location || !redirectsRemaining) {
+        throw new Error("Image redirect could not be followed");
+    }
+
+    const destination = parseBookmarkUrl(new URL(location, imageUrl).href);
+
+    if (!destination) {
+        throw new Error("Unsupported image redirect URL");
+    }
+
+    // oxlint-disable-next-line no-magic-numbers -- Consume a single hop without resetting the deadline.
+    return fetchImage(destination, redirectsRemaining - 1);
+};
+
 const serveImage = async (context: Context, imageUrl: string | null): Promise<Response> => {
     // Error responses must not be cached by the browser, unlike successful ones.
     context.header("Cache-Control", "no-store");
@@ -56,15 +100,14 @@ const serveImage = async (context: Context, imageUrl: string | null): Promise<Re
         return context.body(null, httpStatus.notFound);
     }
 
+    const url = parseBookmarkUrl(imageUrl);
+
+    if (!url) {
+        return context.body(null, httpStatus.badGateway);
+    }
+
     try {
-        const response = await fetch(imageUrl, {
-            credentials: "omit",
-            headers: {
-                accept: "image/*"
-            },
-            redirect: "follow",
-            signal: AbortSignal.timeout(fetchTimeout)
-        });
+        const response = await fetchImage(url);
 
         const contentType = parseContentType(response.headers.get("content-type"));
         // Browsers execute scripts in SVG loaded as a document, so serving it from the app origin would allow

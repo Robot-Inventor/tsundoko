@@ -6,6 +6,7 @@ import { isXPostUrl } from "./xPost";
 import ogs from "open-graph-scraper";
 import { parseBookmarkUrl } from "./bookmarkUrl";
 import { parseContentType } from "./mediaType";
+import { publicFetch } from "./publicFetch";
 
 const maxRedirects = 5;
 const fetchTimeout = 8000;
@@ -54,13 +55,12 @@ const fetchHtml = async (
     signal = AbortSignal.timeout(fetchTimeout),
     redirectsRemaining = maxRedirects
 ): Promise<HtmlPage> => {
-    const response = await fetch(pageUrl, {
+    const response = await publicFetch(pageUrl, {
         credentials: "omit",
         headers: {
             accept: "text/html, application/xhtml+xml",
             "user-agent": userAgent
         },
-        redirect: "manual",
         signal
     });
 
