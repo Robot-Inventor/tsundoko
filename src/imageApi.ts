@@ -61,13 +61,13 @@ const redirectStatuses = new Set<number>([
 
 // Every hop goes through publicFetch, so a redirect cannot move a previously safe URL onto an
 // internal address. The hop limit also stops redirect loops.
-const fetchImage = async (imageUrl: URL, redirectsRemaining = maxRedirects): Promise<Response> => {
+const fetchImage = async (imageUrl: URL, signal: AbortSignal, redirectsRemaining = maxRedirects): Promise<Response> => {
     const response = await publicFetch(imageUrl, {
         credentials: "omit",
         headers: {
             accept: "image/*"
         },
-        signal: AbortSignal.timeout(fetchTimeout)
+        signal
     });
 
     if (!redirectStatuses.has(response.status)) {
@@ -89,7 +89,7 @@ const fetchImage = async (imageUrl: URL, redirectsRemaining = maxRedirects): Pro
     }
 
     // oxlint-disable-next-line no-magic-numbers -- Consume a single hop without resetting the deadline.
-    return fetchImage(destination, redirectsRemaining - 1);
+    return fetchImage(destination, signal, redirectsRemaining - 1);
 };
 
 const serveImage = async (context: Context, imageUrl: string | null): Promise<Response> => {
@@ -107,7 +107,8 @@ const serveImage = async (context: Context, imageUrl: string | null): Promise<Re
     }
 
     try {
-        const response = await fetchImage(url);
+        // One deadline covers every hop; a redirect chain cannot extend the request indefinitely.
+        const response = await fetchImage(url, AbortSignal.timeout(fetchTimeout));
 
         const contentType = parseContentType(response.headers.get("content-type"));
         // Browsers execute scripts in SVG loaded as a document, so serving it from the app origin would allow

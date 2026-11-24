@@ -20,10 +20,16 @@ const blockedIPv4Subnets = [
 
 // ::/96 covers the deprecated IPv4-compatible form (including :: and ::1), and ::ffff:0:0/96 the
 // IPv4-mapped form, so ::ffff:127.0.0.1 cannot smuggle a loopback address past the IPv4 rules.
+// fec0::/10 is the deprecated site-local range. NAT64 (64:ff9b::/96, 64:ff9b:1::/48) and 6to4
+// (2002::/16) embed IPv4 addresses, so they are rejected as a class rather than parsed.
 const blockedIPv6Subnets = [
     ["::", "96"],
     ["::ffff:0:0", "96"],
+    ["64:ff9b::", "96"],
+    ["64:ff9b:1::", "48"],
+    ["2002::", "16"],
     ["fc00::", "7"],
+    ["fec0::", "10"],
     ["fe80::", "10"],
     ["ff00::", "8"]
 ] as const;
@@ -38,6 +44,8 @@ const addSubnets = (
     }
 };
 
+// Bun's BlockList answers IPv4 checks incorrectly once an IPv6 subnet shares the list, so the two
+// families get separate instances.
 const blockedIPv4 = new BlockList();
 const blockedIPv6 = new BlockList();
 
