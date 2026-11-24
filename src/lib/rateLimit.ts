@@ -11,7 +11,7 @@ interface RateLimitOptions {
     limit: number;
 }
 
-interface Window {
+interface RateLimitWindow {
     count: number;
     resetAt: number;
 }
@@ -24,9 +24,10 @@ interface RateLimitResult {
 // A fixed window per user is enough here: the goal is to bound outbound work, not to smooth bursts
 // precisely. Each route that spends server resources gets its own limiter.
 const createRateLimiter = ({ limit }: RateLimitOptions) => {
-    const windows = new Map<string, Window>();
+    const windows = new Map<string, RateLimitWindow>();
 
-    return (key: string, now = Date.now()): RateLimitResult => {
+    return (key: string): RateLimitResult => {
+        const now = Date.now();
         const current = windows.get(key);
         const window =
             !current || now >= current.resetAt
@@ -60,6 +61,7 @@ const createRateLimit = (options: RateLimitOptions): MiddlewareHandler<AuthEnv> 
         const result = take(context.get("userId"));
 
         if (!result.allowed) {
+            context.header("Cache-Control", "no-store");
             context.header("Retry-After", String(result.retryAfterSeconds));
 
             return context.json({ error: rateLimitMessage }, httpStatus.tooManyRequests);

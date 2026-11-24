@@ -1,26 +1,30 @@
-import { OutboundBusyError, runImageOutbound, runOutbound } from "./outboundLimit";
+import { OutboundBusyError, runImageOutbound, runOutbound, runThumbnailRead } from "./outboundLimit";
 import { describe, expect, it } from "vitest";
 
 const maxConcurrentOutboundFetches = 8;
 const maxConcurrentPerKey = 4;
 const taskDurationMs = 50;
 
+type Gate = (key: string, task: () => Promise<void>) => Promise<void>;
+
 const wait = async (): Promise<void> =>
     new Promise((resolve) => {
         setTimeout(resolve, taskDurationMs);
     });
 
-const fillProcess = (): Array<Promise<void>> => {
+const fillGate = (gate: Gate, prefix: string): Array<Promise<void>> => {
     const running: Array<Promise<void>> = [];
 
     for (let index = 0; index < maxConcurrentOutboundFetches;) {
         // oxlint-disable-next-line no-magic-numbers -- Advancing the loop index by one is self-evident.
         index += 1;
-        running.push(runOutbound(`user-${String(index)}`, wait));
+        running.push(gate(`${prefix}${String(index)}`, wait));
     }
 
     return running;
 };
+
+const fillProcess = (): Array<Promise<void>> => fillGate(runOutbound, "user-");
 
 describe("outbound limit", () => {
     it("admits up to the process limit and rejects the next request", async () => {
@@ -49,6 +53,15 @@ describe("outbound limit", () => {
         await expect(runImageOutbound("image-user", () => Promise.resolve("image"))).resolves.toBe("image");
 
         await Promise.all(saves);
+    });
+
+    it("bounds stored thumbnail reads with their own pool", async () => {
+        const reads = fillGate(runThumbnailRead, "read-");
+
+        await expect(runThumbnailRead("overflow", () => Promise.resolve())).rejects.toBeInstanceOf(OutboundBusyError);
+        await expect(runOutbound("save", () => Promise.resolve("save"))).resolves.toBe("save");
+
+        await Promise.all(reads);
     });
 
     it("releases the slot when the task throws", async () => {

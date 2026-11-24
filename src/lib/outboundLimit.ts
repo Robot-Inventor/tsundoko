@@ -3,6 +3,8 @@ const maxConcurrentOutboundFetches = 8;
 const maxConcurrentPerKey = 4;
 const maxConcurrentImageFetches = 16;
 const maxConcurrentImagePerKey = 8;
+const maxConcurrentThumbnailReads = 8;
+const maxConcurrentThumbnailReadsPerKey = 4;
 
 class OutboundBusyError extends Error {}
 
@@ -57,6 +59,6 @@ const createGate = (maxConcurrent: number, maxPerKey: number) => {
 // thumbnails are read from disk, so they also get a separate small gate to bound buffered bytes.
 const runOutbound = createGate(maxConcurrentOutboundFetches, maxConcurrentPerKey);
 const runImageOutbound = createGate(maxConcurrentImageFetches, maxConcurrentImagePerKey);
-const runThumbnailRead = createGate(maxConcurrentImageFetches, maxConcurrentPerKey);
+const runThumbnailRead = createGate(maxConcurrentThumbnailReads, maxConcurrentThumbnailReadsPerKey);
 
 export { OutboundBusyError, runImageOutbound, runOutbound, runThumbnailRead };
