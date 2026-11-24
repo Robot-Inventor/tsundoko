@@ -6,8 +6,7 @@ import { responseHeaders } from "./responseHeaders";
 const contentSecurityPolicy =
     "default-src 'self'; img-src 'self' data: https://gravatar.com https://secure.gravatar.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'";
 
-const buildApp = (): Hono =>
-    new Hono().use("*", responseHeaders).get("/", (context) => context.text("ok"));
+const buildApp = (): Hono => new Hono().use("*", responseHeaders).get("/", (context) => context.text("ok"));
 
 describe("response headers", () => {
     it("sets the security policy on a plain HTTP response without HSTS", async () => {
