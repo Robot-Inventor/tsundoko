@@ -1,5 +1,9 @@
-import { pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { index, pgTable, text, timestamp, uniqueIndex, uuid, vector } from "drizzle-orm/pg-core";
 import { user } from "./auth-schema";
+
+// Fixed by the migration. Changing it means adding a migration that recreates the column and
+// re-embedding every bookmark, because vectors from different models cannot be mixed.
+const embeddingDimensions = 1536;
 
 const bookmarks = pgTable(
     "bookmarks",
@@ -11,6 +15,8 @@ const bookmarks = pgTable(
         // Null when extraction failed or the page is an X post.
         content: text(),
         description: text(),
+        // Null when the embedding request failed or semantic search is off; those rows stay keyword-only.
+        embedding: vector({ dimensions: embeddingDimensions }),
         faviconUrl: text(),
         id: uuid().primaryKey().defaultRandom(),
         siteName: text().notNull(),
@@ -23,8 +29,11 @@ const bookmarks = pgTable(
             .notNull()
             .references(() => user.id, { onDelete: "cascade" })
     },
-    (table) => [uniqueIndex("bookmarks_user_id_url_idx").on(table.userId, table.url)]
+    (table) => [
+        uniqueIndex("bookmarks_user_id_url_idx").on(table.userId, table.url),
+        index("bookmarks_embedding_idx").using("hnsw", table.embedding.op("vector_cosine_ops"))
+    ]
 );
 
 export * from "./auth-schema";
-export { bookmarks };
+export { bookmarks, embeddingDimensions };

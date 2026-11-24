@@ -1,12 +1,7 @@
+import { type TestDatabase, containerTimeoutMs, startTestDatabase } from "./testDatabase";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { readFile, readdir } from "node:fs/promises";
 import { user, verification } from "./auth-schema";
-import { PostgreSqlContainer } from "@testcontainers/postgresql";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
 
-const migrationDirectory = new URL("../../drizzle/", import.meta.url);
-const containerTimeoutMs = 120_000;
 const oneBookmark = 1;
 const noBookmarks = 0;
 const guardIdentifier = "initial-signup-guard";
@@ -14,14 +9,9 @@ const guardIdentifier = "initial-signup-guard";
 const userId = "user-a";
 const otherUserId = "user-b";
 
-interface TestSetup {
-    client: ReturnType<typeof postgres>;
-    database: ReturnType<typeof drizzle>;
-}
+const state: { current?: TestDatabase } = {};
 
-const state: { current?: TestSetup } = {};
-
-const getSetup = (): TestSetup => {
+const getSetup = (): TestDatabase => {
     if (!state.current) {
         throw new Error("テスト用データベースが起動していません。");
     }
@@ -29,28 +19,10 @@ const getSetup = (): TestSetup => {
     return state.current;
 };
 
-const applyMigrations = async (client: ReturnType<typeof postgres>): Promise<void> => {
-    const files = (await readdir(migrationDirectory)).filter((name) => name.endsWith(".sql")).sort();
-    const statements = await Promise.all(
-        files.map(async (file) => {
-            const sql = await readFile(new URL(file, migrationDirectory), "utf8");
-
-            return sql.split("--> statement-breakpoint").filter((statement) => statement.trim());
-        })
-    );
-
-    await statements.flat().reduce(async (previous, statement) => {
-        await previous;
-        await client.unsafe(statement);
-    }, Promise.resolve());
-};
-
 beforeAll(async () => {
-    const container = await new PostgreSqlContainer("postgres:16-alpine").start();
-    const client = postgres(container.getConnectionUri());
-    const database = drizzle(client);
+    const setup = await startTestDatabase();
+    const { database } = setup;
 
-    await applyMigrations(client);
     await database.insert(user).values([
         {
             createdAt: new Date(),
@@ -70,13 +42,12 @@ beforeAll(async () => {
 
     process.env.BETTER_AUTH_SECRET = "test-secret-at-least-thirty-two-characters";
     process.env.BETTER_AUTH_URL = "http://localhost:3300";
-    process.env.DATABASE_URL = container.getConnectionUri();
+    process.env.DATABASE_URL = setup.connectionUri;
+    // Keep saves off the network even when the developer's own .env enables semantic search.
+    delete process.env.EMBEDDING_API_KEY;
     process.env.ENABLE_SIGNUP = "false";
 
-    state.current = {
-        client,
-        database
-    };
+    state.current = setup;
 
     vi.resetModules();
 }, containerTimeoutMs);

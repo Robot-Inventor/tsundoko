@@ -1,6 +1,7 @@
 import type { BookmarkPreview, BookmarkScope, SavedBookmark } from "../lib/bookmark";
-import { and, desc, eq, ilike, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, cosineDistance, desc, eq, ilike, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { deleteThumbnail, saveThumbnail } from "../lib/thumbnailStore";
+import { embed, embeddingInput } from "../lib/embedding";
 import type { PreviewData } from "../lib/preview";
 import type { XPostThumbnail } from "../lib/xPost";
 import { bookmarks } from "./schema";
@@ -22,8 +23,8 @@ const bookmarkListItemColumns = {
     url: bookmarks.url
 } as const;
 
-// `content` is excluded from list reads: it can be ~100 KB per row and is only used for search.
-type BookmarkListItem = Omit<BookmarkRow, "archivedAt" | "content" | "userId">;
+// `content` and `embedding` are excluded from list reads: they are search-only internals.
+type BookmarkListItem = Omit<BookmarkRow, "archivedAt" | "content" | "embedding" | "userId">;
 
 const toSavedBookmark = (row: BookmarkListItem): SavedBookmark => ({
     addedAt: row.addedAt.toISOString(),
@@ -49,6 +50,10 @@ const bookmarkExists = async (url: string, userId: string): Promise<boolean> => 
 // `%` and `_` are LIKE wildcards and `\` escapes them, so all three must be escaped for a literal match.
 const likePattern = (query: string): string => `%${query.replace(/[\\%_]/gu, "\\$&")}%`;
 
+// Semantic results are appended below the keyword matches; this bounds how far the list grows
+// when a query matches none of the stored text but is still near everything in the embedding space.
+const vectorResultLimit = 20;
+
 const listBookmarks = async (query: string, scope: BookmarkScope, userId: string): Promise<SavedBookmark[]> => {
     const searchCondition = query
         ? or(
@@ -62,13 +67,38 @@ const listBookmarks = async (query: string, scope: BookmarkScope, userId: string
 
     const scopeCondition = scope === "active" ? isNull(bookmarks.archivedAt) : isNotNull(bookmarks.archivedAt);
 
-    const rows = await db
+    // The embedding round trip runs alongside the keyword query instead of after it.
+    const embeddingRequest = query ? embed(query) : Promise.resolve(null);
+
+    const keywordRows = await db
         .select(bookmarkListItemColumns)
         .from(bookmarks)
         .where(and(eq(bookmarks.userId, userId), searchCondition, scopeCondition))
         .orderBy(desc(bookmarks.addedAt), desc(bookmarks.id));
 
-    return rows.map(toSavedBookmark);
+    const queryEmbedding = await embeddingRequest;
+
+    if (!queryEmbedding) {
+        return keywordRows.map(toSavedBookmark);
+    }
+
+    // Keyword matches keep their position; the vector pass is deduplicated against them below.
+    // The HNSW index is shared across users and pgvector filters after the index scan, so a user
+    // whose rows fall outside the candidate set can receive fewer results. That is acceptable for
+    // this app's small, mostly single-user deployments.
+    const vectorRows = await db
+        .select(bookmarkListItemColumns)
+        .from(bookmarks)
+        .where(and(eq(bookmarks.userId, userId), scopeCondition, isNotNull(bookmarks.embedding)))
+        .orderBy(cosineDistance(bookmarks.embedding, queryEmbedding))
+        .limit(vectorResultLimit);
+
+    const keywordIds = new Set(keywordRows.map((row) => row.id));
+
+    return [
+        ...keywordRows.map(toSavedBookmark),
+        ...vectorRows.filter((row) => !keywordIds.has(row.id)).map(toSavedBookmark)
+    ];
 };
 
 const getBookmarkImageUrls = async (
@@ -90,7 +120,12 @@ const getBookmarkImageUrls = async (
 
 // `content` is for search only and never reaches the client: `toSavedBookmark` omits it
 // from every list and mutation response.
-type BookmarkInsert = BookmarkPreview & { content: string | null; id: string; userId: string };
+type BookmarkInsert = BookmarkPreview & {
+    content: string | null;
+    embedding: number[] | null;
+    id: string;
+    userId: string;
+};
 
 const insertBookmark = async (bookmark: BookmarkInsert): Promise<SavedBookmark | null> => {
     const [saved] = await db
@@ -123,9 +158,13 @@ const saveBookmark = async ({ preview, url, userId, xPost }: SaveBookmarkInput):
         thumbnailUrl: preview?.thumbnailUrl ?? null,
         title: xPost?.title ?? preview?.title ?? url.hostname,
         url: normalizeBookmarkUrl(url)
-    } as const satisfies Omit<BookmarkInsert, "id" | "userId">;
+    } as const satisfies Omit<BookmarkInsert, "embedding" | "id" | "userId">;
 
-    return insertBookmark({ ...bookmark, id, userId });
+    // Embedding failures must not cost the user the bookmark itself: a NULL embedding still saves,
+    // and the row keeps working through keyword search.
+    const embedding = await embed(embeddingInput(bookmark));
+
+    return insertBookmark({ ...bookmark, embedding, id, userId });
 };
 
 const setBookmarkArchived = async (
