@@ -10,8 +10,12 @@ const notifyError = (title: string, id?: string): void => {
     appToastManager.add({ id, title, type: "error" });
 };
 
+const notifyInfo = (title: string): void => {
+    appToastManager.add({ title, type: "info" });
+};
+
 const notifySuccess = (title: string): void => {
     appToastManager.add({ title, type: "success" });
 };
 
-export { appToastManager, notifyError, notifySuccess, toastTimeoutMs };
+export { appToastManager, notifyError, notifyInfo, notifySuccess, toastTimeoutMs };

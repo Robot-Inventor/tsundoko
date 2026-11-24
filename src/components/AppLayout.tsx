@@ -46,7 +46,7 @@ const MobilePageTitle = ({ searchOpen }: { searchOpen: boolean }): ReactNode => 
     return (
         <h1
             className={cn(
-                "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-base font-semibold transition-opacity duration-200 md:hidden motion-reduce:transition-none",
+                "absolute left-1/2 top-[calc(env(safe-area-inset-top)_+_1.75rem)] -translate-x-1/2 -translate-y-1/2 text-base font-semibold transition-opacity duration-200 md:hidden motion-reduce:transition-none",
                 searchOpen && "opacity-0"
             )}
             inert={searchOpen}
@@ -62,7 +62,7 @@ const MobilePageTitle = ({ searchOpen }: { searchOpen: boolean }): ReactNode => 
 const MobileSearch = ({ search }: { search: UseSearchResult }): ReactNode => (
     <div
         className={cn(
-            "absolute inset-y-0 start-4 end-16 flex items-center transition-[opacity,translate,scale] duration-200 ease-out md:hidden motion-reduce:transition-none",
+            "absolute start-4 end-16 top-[env(safe-area-inset-top)] bottom-0 flex items-center transition-[opacity,translate,scale] duration-200 ease-out md:hidden motion-reduce:transition-none",
             search.searchOpen ? "translate-y-0 scale-100 opacity-100" : "-translate-y-1 scale-95 opacity-0"
         )}
         inert={!search.searchOpen}
@@ -125,7 +125,7 @@ const HeaderSearch = ({ search }: { search: UseSearchResult }): ReactNode => (
         <MobileSearchToggle search={search} />
         {/* Centered on the viewport instead of the space next to the logo; w-full prevents shrink-to-fit
             sizing from collapsing the absolutely positioned bar to the input's intrinsic width. */}
-        <div className="absolute left-1/2 top-1/2 hidden w-full max-w-xl -translate-x-1/2 -translate-y-1/2 md:block">
+        <div className="absolute left-1/2 top-[calc(env(safe-area-inset-top)_+_1.75rem)] hidden w-full max-w-xl -translate-x-1/2 -translate-y-1/2 md:block">
             <SearchBar
                 inputRef={search.desktopSearchInput}
                 onSearch={search.runSearch}
@@ -170,7 +170,7 @@ const AppLayout = (): ReactNode => {
     return (
         <AccountProvider value={accountState}>
             <HeadContent />
-            <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-background px-3 md:px-4">
+            <header className="sticky top-0 z-20 flex h-[calc(3.5rem_+_env(safe-area-inset-top))] items-center gap-2 border-b bg-background px-3 pt-[env(safe-area-inset-top)] md:px-4">
                 <Sheet onOpenChange={setMenuOpen} open={menuOpen}>
                     <SheetTrigger
                         aria-label="メニューを開く"
@@ -187,7 +187,7 @@ const AppLayout = (): ReactNode => {
                         <MenuIcon aria-hidden="true" />
                     </SheetTrigger>
                     <SheetContent
-                        className="pt-8"
+                        className="pt-[calc(2rem_+_env(safe-area-inset-top))]"
                         finalFocus={() => (window.matchMedia(desktopLayout).matches ? desktopHomeLink.current : true)}
                     >
                         <div className="mb-6 flex items-center justify-between gap-3 ps-6 pe-3">
@@ -203,8 +203,8 @@ const AppLayout = (): ReactNode => {
                 {showsSearch && <HeaderSearch search={search} />}
             </header>
 
-            <div className="flex min-h-[calc(100dvh-3.5rem)]">
-                <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-56 shrink-0 flex-col overflow-y-auto border-e bg-sidebar text-sidebar-foreground md:flex">
+            <div className="flex min-h-[calc(100dvh_-_3.5rem_-_env(safe-area-inset-top))]">
+                <aside className="sticky top-[calc(3.5rem_+_env(safe-area-inset-top))] hidden h-[calc(100dvh_-_3.5rem_-_env(safe-area-inset-top))] w-56 shrink-0 flex-col overflow-y-auto border-e bg-sidebar text-sidebar-foreground md:flex">
                     <MainNavigation homeLinkRef={desktopHomeLink} />
                     {account && (
                         <div className="mt-auto border-t p-3">
@@ -212,7 +212,7 @@ const AppLayout = (): ReactNode => {
                         </div>
                     )}
                 </aside>
-                <main className="min-w-0 flex-1 p-4 md:p-6">
+                <main className="min-w-0 flex-1 p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))] md:p-6 md:pb-6">
                     <SearchContext value={search}>
                         <Outlet />
                     </SearchContext>

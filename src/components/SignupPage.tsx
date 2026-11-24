@@ -3,6 +3,7 @@ import { type ReactNode, useState } from "react";
 import { authClient, clearAuthState } from "../lib/authClient";
 import { Button } from "./ui/button";
 import { Input } from "./ui/Input";
+import { hasPendingShare } from "../lib/pendingShare";
 import { type } from "arktype";
 
 const errorResponse = type({ error: "string" });
@@ -130,9 +131,8 @@ const SignupPage = (): ReactNode => {
         }
 
         clearAuthState();
-        await router.invalidate();
         await router.navigate({
-            to: "/"
+            to: hasPendingShare() ? "/share" : "/"
         });
 
         setBusy(false);

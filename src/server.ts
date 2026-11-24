@@ -1,19 +1,28 @@
 import { type AuthEnv, requireAuth } from "./authMiddleware";
-import { serveAppAssets, serveAppHtml } from "./spaStatic";
+import { serveAppAssets, serveAppHtml, serveShareGate } from "./spaStatic";
 import { Hono } from "hono";
 import { accountApi } from "./accountApi";
 import { apiPort } from "./apiPort";
-import { auth } from "./lib/auth";
 import { authApi } from "./authApi";
 import { bookmarkApi } from "./bookmarkApi";
 import { httpStatus } from "./lib/httpStatus";
 import { imageApi } from "./imageApi";
+import { manifestApi } from "./manifestApi";
 
 const app = new Hono<AuthEnv>();
 
+// Every response opts in to the color-scheme hint. The manifest is served per theme, and the
+// manifest request that follows a document load only carries the hint after this opt-in.
+app.use("*", async (context, next) => {
+    await next();
+    context.header("accept-ch", "Sec-CH-Prefers-Color-Scheme");
+});
+
+app.use("*", serveShareGate);
+
 app.get("/api/health", (context) => context.json({ ok: true }));
+app.route("/", manifestApi);
 app.route("/", authApi);
-app.on(["POST", "GET"], "/api/auth/*", (context) => auth.handler(context.req.raw));
 
 app.use("/api/bookmarks", requireAuth);
 app.use("/api/bookmarks/*", requireAuth);

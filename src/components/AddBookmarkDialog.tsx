@@ -1,11 +1,11 @@
-import { type Bookmark, bookmarkMessages, httpStatus } from "../lib/bookmark";
+import { type AddBookmarkFailure, requestBookmark } from "../lib/addBookmark";
+import { type Bookmark, bookmarkMessages } from "../lib/bookmark";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { type ReactNode, useRef, useState } from "react";
 import { invalidBookmarkUrlMessage, maxBookmarkUrlLength, parseBookmarkUrl } from "../lib/bookmarkUrl";
 import { Button } from "./ui/button";
 import { Input } from "./ui/Input";
 import { PlusIcon } from "lucide-react";
-import { bookmarkClient } from "../lib/bookmarkClient";
 import { cn } from "../lib/utils";
 import { useSearchContext } from "../hooks/useSearch";
 
@@ -14,58 +14,9 @@ const formErrors = {
     fetch: bookmarkMessages.fetchFailed,
     invalid: invalidBookmarkUrlMessage,
     save: bookmarkMessages.saveFailed
-} as const;
+} as const satisfies Record<AddBookmarkFailure, string>;
 
 const errorId = "add-bookmark-error";
-
-type AddBookmarkResult = { bookmark: Bookmark } | { error: string };
-
-const requestBookmark = async (url: URL): Promise<AddBookmarkResult> => {
-    try {
-        const response = await bookmarkClient.api.bookmarks.$post({
-            json: {
-                url: url.href
-            }
-        });
-
-        if (response.ok) {
-            const saved = await response.json();
-
-            return {
-                bookmark: {
-                    ...saved,
-                    addedAt: new Date(saved.addedAt)
-                }
-            };
-        }
-
-        if (response.status === httpStatus.conflict) {
-            return {
-                error: formErrors.duplicate
-            };
-        }
-
-        if (response.status === httpStatus.badRequest) {
-            return {
-                error: formErrors.invalid
-            };
-        }
-
-        if (response.status === httpStatus.badGateway) {
-            return {
-                error: formErrors.fetch
-            };
-        }
-
-        return {
-            error: formErrors.save
-        };
-    } catch {
-        return {
-            error: formErrors.save
-        };
-    }
-};
 
 interface BookmarkUrlFormProps {
     onAdded: (bookmark: Bookmark) => void;
@@ -97,8 +48,8 @@ const BookmarkUrlForm = ({ onAdded, onCancel }: BookmarkUrlFormProps): ReactNode
         const result = await requestBookmark(url);
         setAdding(false);
 
-        if ("error" in result) {
-            setError(result.error);
+        if ("failure" in result) {
+            setError(formErrors[result.failure]);
 
             return;
         }
@@ -177,7 +128,7 @@ const AddBookmarkDialog = ({ onAdd }: AddBookmarkDialogProps): ReactNode => {
                 inert={inactive}
                 render=<Button
                     className={cn(
-                        "fixed right-6 bottom-6 z-30 size-14 rounded-full shadow-lg transition-[opacity,scale] duration-200 md:hidden",
+                        "fixed right-6 bottom-[calc(1.5rem_+_env(safe-area-inset-bottom))] z-30 size-14 rounded-full shadow-lg transition-[opacity,scale] duration-200 md:hidden",
                         inactive && "scale-50 opacity-0"
                     )}
                     size="icon"
