@@ -1,5 +1,6 @@
 import { emailTaken, needsSetup, signupAllowed } from "./lib/signupPolicy";
 import { Hono } from "hono";
+import { auth } from "./lib/auth";
 import { createSignupToken } from "./lib/signupToken";
 import { env } from "./env";
 import { httpStatus } from "./lib/httpStatus";
@@ -43,6 +44,7 @@ const authApi = new Hono()
         }
 
         return context.json({ token: createSignupToken({ email, name }) }, httpStatus.ok);
-    });
+    })
+    .on(["POST", "GET"], "/api/auth/*", (context) => auth.handler(context.req.raw));
 
 export { authApi };
