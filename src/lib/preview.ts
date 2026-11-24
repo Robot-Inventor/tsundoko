@@ -9,6 +9,9 @@ import { parseContentType } from "./mediaType";
 
 const maxRedirects = 5;
 const fetchTimeout = 8000;
+const userAgent =
+    "Mozilla/5.0 (compatible; tsundoko/1.0; +https://github.com/Robot-Inventor/tsundoko; purpose=link-preview; like-twitterbot)";
+
 const maxHtmlBytes = 2_097_152;
 const maxDescriptionLength = 1000;
 const maxSiteNameLength = 150;
@@ -54,7 +57,8 @@ const fetchHtml = async (
     const response = await fetch(pageUrl, {
         credentials: "omit",
         headers: {
-            accept: "text/html, application/xhtml+xml"
+            accept: "text/html, application/xhtml+xml",
+            "user-agent": userAgent
         },
         redirect: "manual",
         signal
