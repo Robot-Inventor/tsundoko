@@ -29,7 +29,7 @@ const countAppliedMigrations = async ({ client }: TestDatabase): Promise<number>
 };
 
 beforeAll(async () => {
-    const container = await new PostgreSqlContainer("postgres:16-alpine").start();
+    const container = await new PostgreSqlContainer("pgvector/pgvector:pg16").start();
 
     state.current = {
         client: postgres(container.getConnectionUri())
@@ -38,6 +38,8 @@ beforeAll(async () => {
     process.env.BETTER_AUTH_SECRET = "test-secret-at-least-thirty-two-characters";
     process.env.BETTER_AUTH_URL = "http://localhost:3300";
     process.env.DATABASE_URL = container.getConnectionUri();
+    // Keep startup migrations independent of a developer's semantic-search settings.
+    delete process.env.EMBEDDING_API_KEY;
     process.env.ENABLE_SIGNUP = "false";
 
     vi.resetModules();

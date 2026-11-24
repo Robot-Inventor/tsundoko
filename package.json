@@ -32,7 +32,8 @@
     "ci:version": "changeset version",
     "ci:publish": "changeset publish",
     "migrate:create": "drizzle-kit generate",
-    "migrate:apply": "drizzle-kit migrate"
+    "migrate:apply": "drizzle-kit migrate",
+    "embeddings:backfill": "bun src/db/backfillEmbeddings.ts"
   },
   "dependencies": {
     "@arkenv/core": "^1.0.0-rc.4",
