@@ -5,10 +5,10 @@ import { httpStatus } from "./httpStatus";
 
 const defaultWindowMs = 60_000;
 const millisecondsPerSecond = 1000;
+const rateLimitMessage = "リクエストが多すぎます。しばらくしてからお試しください。";
 
 interface RateLimitOptions {
     limit: number;
-    windowMs?: number;
 }
 
 interface Window {
@@ -16,37 +16,57 @@ interface Window {
     resetAt: number;
 }
 
+interface RateLimitResult {
+    allowed: boolean;
+    retryAfterSeconds: number;
+}
+
 // A fixed window per user is enough here: the goal is to bound outbound work, not to smooth bursts
 // precisely. Each route that spends server resources gets its own limiter.
-const createRateLimit = ({ limit, windowMs = defaultWindowMs }: RateLimitOptions): MiddlewareHandler<AuthEnv> => {
+const createRateLimiter = ({ limit }: RateLimitOptions) => {
     const windows = new Map<string, Window>();
 
-    return createMiddleware<AuthEnv>(async (context, next) => {
-        const userId = context.get("userId");
-        const now = Date.now();
-        const current = windows.get(userId);
+    return (key: string, now = Date.now()): RateLimitResult => {
+        const current = windows.get(key);
         const window =
             !current || now >= current.resetAt
                 ? {
                       count: 0,
-                      resetAt: now + windowMs
+                      resetAt: now + defaultWindowMs
                   }
                 : current;
 
         if (window.count >= limit) {
-            context.header("Retry-After", String(Math.ceil((window.resetAt - now) / millisecondsPerSecond)));
-
-            return context.json(
-                { error: "リクエストが多すぎます。しばらくしてからお試しください。" },
-                httpStatus.tooManyRequests
-            );
+            return {
+                allowed: false,
+                retryAfterSeconds: Math.ceil((window.resetAt - now) / millisecondsPerSecond)
+            };
         }
 
         window.count += 1;
-        windows.set(userId, window);
+        windows.set(key, window);
+
+        return {
+            allowed: true,
+            retryAfterSeconds: 0
+        };
+    };
+};
+
+const createRateLimit = (options: RateLimitOptions): MiddlewareHandler<AuthEnv> => {
+    const take = createRateLimiter(options);
+
+    return createMiddleware<AuthEnv>(async (context, next) => {
+        const result = take(context.get("userId"));
+
+        if (!result.allowed) {
+            context.header("Retry-After", String(result.retryAfterSeconds));
+
+            return context.json({ error: rateLimitMessage }, httpStatus.tooManyRequests);
+        }
 
         return next();
     });
 };
 
-export { createRateLimit };
+export { createRateLimit, createRateLimiter, rateLimitMessage };
