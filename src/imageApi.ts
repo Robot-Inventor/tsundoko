@@ -1,15 +1,21 @@
 import { type Context, Hono } from "hono";
+import { createRateLimit } from "./lib/rateLimit";
 import { getBookmarkImageUrls } from "./db/bookmarks";
 import { httpStatus } from "./lib/httpStatus";
 import { parseContentType } from "./lib/mediaType";
 import { readThumbnail } from "./lib/thumbnailStore";
+import { runOutbound } from "./lib/outboundLimit";
 import { type } from "arktype";
 import { validator } from "hono/validator";
 
 const fetchTimeout = 8000;
 const maxImageBytes = 10_485_760;
+const imageRequestLimit = 300;
+const rateLimitWindowMs = 60_000;
 // Thumbnails and favicons are stable per page, so letting the browser cache them for a day keeps reloads cheap.
 const imageCacheControl = "private, max-age=86400";
+
+const imageRateLimit = createRateLimit({ limit: imageRequestLimit, windowMs: rateLimitWindowMs });
 
 // The proxy is keyed by bookmark id, so only saved bookmarks' images can be fetched.
 const bookmarkId = type("string.uuid");
@@ -57,14 +63,16 @@ const serveImage = async (context: Context, imageUrl: string | null): Promise<Re
     }
 
     try {
-        const response = await fetch(imageUrl, {
-            credentials: "omit",
-            headers: {
-                accept: "image/*"
-            },
-            redirect: "follow",
-            signal: AbortSignal.timeout(fetchTimeout)
-        });
+        const response = await runOutbound(() =>
+            fetch(imageUrl, {
+                credentials: "omit",
+                headers: {
+                    accept: "image/*"
+                },
+                redirect: "follow",
+                signal: AbortSignal.timeout(fetchTimeout)
+            })
+        );
 
         const contentType = parseContentType(response.headers.get("content-type"));
         // Browsers execute scripts in SVG loaded as a document, so serving it from the app origin would allow
@@ -107,7 +115,7 @@ const getFaviconUrl = async (id: string | null, userId: string): Promise<string 
 };
 
 const imageApi = new Hono<{ Variables: { userId: string } }>()
-    .get("/api/thumbnail", imageIdQuery, async (context) => {
+    .get("/api/thumbnail", imageRateLimit, imageIdQuery, async (context) => {
         const id = context.req.valid("query");
         const bookmark = id ? await getBookmarkImageUrls(id, context.get("userId")) : null;
         const stored = bookmark?.thumbnailFile ? await readThumbnail(bookmark.thumbnailFile) : null;
@@ -121,7 +129,7 @@ const imageApi = new Hono<{ Variables: { userId: string } }>()
 
         return serveImage(context, bookmark?.thumbnailUrl ?? null);
     })
-    .get("/api/favicon", imageIdQuery, async (context) => {
+    .get("/api/favicon", imageRateLimit, imageIdQuery, async (context) => {
         const faviconUrl = await getFaviconUrl(context.req.valid("query"), context.get("userId"));
 
         return serveImage(context, faviconUrl);

@@ -1,10 +1,12 @@
 import dns from "node:dns/promises";
 import { loadXeet } from "@xeet/core/node";
+import { runOutbound } from "./outboundLimit";
 
 const xPostHostnames = new Set(["mobile.twitter.com", "mobile.x.com", "twitter.com", "x.com"]);
 const renderWidth = 390;
 const renderDpr = 2;
 const maxXPostTitleLength = 100;
+const maxThumbnailBytes = 5_242_880;
 
 // Matches post detail pages such as /user/status/123 and /i/status/123, including their /photo and /video variants.
 // URL parsing lowercases the hostname already, so no case handling is needed here.
@@ -26,33 +28,38 @@ interface XPostThumbnail {
     title: string | null;
 }
 
-const renderXPost = async (url: URL): Promise<XPostThumbnail> => {
-    const xeet = await loadXeet();
-    // The lookup callback enables the resolver's DNS-hop SSRF guard for user-supplied URLs.
-    const host = xeet.whatwgHost({ lookup: (hostname) => dns.resolve(hostname) });
-    const { post } = await xeet.resolve(
-        url.href,
-        {
+const renderXPost = async (url: URL): Promise<XPostThumbnail> =>
+    runOutbound(async () => {
+        const xeet = await loadXeet();
+        // The lookup callback enables the resolver's DNS-hop SSRF guard for user-supplied URLs.
+        const host = xeet.whatwgHost({ lookup: (hostname) => dns.resolve(hostname) });
+        const { post } = await xeet.resolve(
+            url.href,
+            {
+                dpr: renderDpr,
+                media: true,
+                width: renderWidth
+            },
+            host
+        );
+
+        const { png } = xeet.render(post, {
             dpr: renderDpr,
-            media: true,
+            theme: "dark",
             width: renderWidth
-        },
-        host
-    );
+        });
 
-    const { png } = xeet.render(post, {
-        dpr: renderDpr,
-        theme: "dark",
-        width: renderWidth
+        if (png.byteLength > maxThumbnailBytes) {
+            throw new Error("Rendered X post thumbnail exceeded its size limit");
+        }
+
+        const text = post.text.trim();
+
+        return {
+            png,
+            siteName: post.author?.handle ? `X（@${post.author.handle}）` : "X",
+            title: text ? firstGraphemes(text, maxXPostTitleLength) : null
+        };
     });
-
-    const text = post.text.trim();
-
-    return {
-        png,
-        siteName: post.author?.handle ? `X（@${post.author.handle}）` : "X",
-        title: text ? firstGraphemes(text, maxXPostTitleLength) : null
-    };
-};
 
 export { type XPostThumbnail, isXPostUrl, renderXPost };

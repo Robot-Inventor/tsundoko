@@ -14,6 +14,7 @@ const httpStatus = {
     permanentRedirect: 308,
     seeOther: 303,
     temporaryRedirect: 307,
+    tooManyRequests: 429,
     unauthorized: 401,
     unsupportedMediaType: 415
 } as const;

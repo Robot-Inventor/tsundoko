@@ -1,15 +1,21 @@
+// oxlint-disable import/max-dependencies -- The route module legitimately wires validation, storage, previews, and rate limiting.
 import { type BookmarkScope, bookmarkMessages, httpStatus } from "./lib/bookmark";
 import { bookmarkExists, deleteBookmark, listBookmarks, saveBookmark, setBookmarkArchived } from "./db/bookmarks";
 import { bookmarkUrl, invalidBookmarkUrlMessage, normalizeBookmarkUrl } from "./lib/bookmarkUrl";
 import { isXPostUrl, renderXPost } from "./lib/xPost";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { createRateLimit } from "./lib/rateLimit";
 import { getPreview } from "./lib/preview";
 import { parseContentType } from "./lib/mediaType";
 import { type } from "arktype";
 import { validator } from "hono/validator";
 
 const maxRequestBytes = 16_384;
+const bookmarkSaveLimit = 30;
+const rateLimitWindowMs = 60_000;
+
+const bookmarkSaveRateLimit = createRateLimit({ limit: bookmarkSaveLimit, windowMs: rateLimitWindowMs });
 
 const previewRequest = type("string.json.parse").to({
     url: bookmarkUrl
@@ -69,6 +75,7 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
     })
     .post(
         "/api/bookmarks",
+        bookmarkSaveRateLimit,
         bodyLimit({
             maxSize: maxRequestBytes,
             onError: (context) => context.json({ error: "入力が長すぎます。" }, httpStatus.payloadTooLarge)
