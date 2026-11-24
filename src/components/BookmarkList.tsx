@@ -1,9 +1,9 @@
 import { type Bookmark, bookmarkMessages } from "../lib/bookmark";
+import { BookmarkCardSkeleton } from "./BookmarkCardSkeleton";
 import { BookmarkListItem } from "./BookmarkListItem";
 import { Button } from "./ui/button";
 import type { LoadState } from "../hooks/useBookmarkList";
 import type { ReactNode } from "react";
-import { Skeleton } from "./ui/skeleton";
 
 // Rows are full-bleed on mobile so the swipe gesture, the sliding card, and the reveal
 // background span the screen edges. The vertical half of the row gap rides on the cards
@@ -42,10 +42,10 @@ const BookmarkList = ({
                 </p>
                 <div aria-hidden="true" className={bookmarkGrid}>
                     {Array.from({ length: skeletonCount }, (_bookmark, index) => (
-                        <Skeleton
-                            className="h-21 max-sm:mx-4 max-sm:my-3 rounded-lg sm:h-64 sm:rounded-xl"
-                            key={index}
-                        />
+                        // The wrapper carries the same mobile swipe margins as a real item's card.
+                        <div className="h-full min-w-0 max-sm:px-4 max-sm:py-3" key={index}>
+                            <BookmarkCardSkeleton />
+                        </div>
                     ))}
                 </div>
             </>
