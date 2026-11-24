@@ -39,9 +39,9 @@ const authApi = new Hono()
         const email = parsed.email.toLowerCase();
         const { name } = parsed;
 
-        // A duplicate address is only rejected after passkey verification
-        // (createSignupUser re-checks inside the transaction). Reporting it here would let an
-        // unauthenticated caller enumerate registered addresses through the status code.
+        // A duplicate address is rejected when the user row is inserted: createSignupUser re-checks
+        // emailTaken, and the unique index on user.email catches a concurrent signup. Reporting it
+        // here would let an unauthenticated caller enumerate registered addresses through the status.
         return context.json({ token: createSignupToken({ email, name }) }, httpStatus.ok);
     })
     .on(["POST", "GET"], "/api/auth/*", (context) => auth.handler(context.req.raw));
