@@ -1,10 +1,10 @@
 import { type Context, Hono } from "hono";
+import { OutboundBusyError, runOutbound } from "./lib/outboundLimit";
 import { createRateLimiter, rateLimitMessage } from "./lib/rateLimit";
 import { getBookmarkImageUrls } from "./db/bookmarks";
 import { httpStatus } from "./lib/httpStatus";
 import { parseContentType } from "./lib/mediaType";
 import { readThumbnail } from "./lib/thumbnailStore";
-import { runOutbound } from "./lib/outboundLimit";
 import { type } from "arktype";
 import { validator } from "hono/validator";
 
@@ -104,7 +104,13 @@ const serveImage = async (
 
             return context.body(image);
         });
-    } catch {
+    } catch (error) {
+        if (error instanceof OutboundBusyError) {
+            context.header("Retry-After", "1");
+
+            return context.body(null, httpStatus.serviceUnavailable);
+        }
+
         return context.body(null, httpStatus.badGateway);
     }
 };

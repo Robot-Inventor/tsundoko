@@ -1,110 +1,51 @@
+// oxlint-disable no-magic-numbers -- The counters are self-evident 0 and 1.
 const maxConcurrentOutboundFetches = 8;
 const maxConcurrentPerKey = 4;
-const acquireTimeoutMs = 5000;
-const slot = 1;
-const absentIndex = -1;
-const emptyCount = 0;
 
-interface Waiter {
-    key: string;
-    start: () => void;
-}
+class OutboundBusyError extends Error {}
 
-// Bound how many outbound operations one process runs at once, how many of them one user can hold,
-// and how long a request may wait for a slot. A full queue fails fast instead of hanging the
-// handler. The limit is per process; running several replicas multiplies it.
-const createSemaphore = (maxConcurrent: number, maxPerKey: number, waitMs: number) => {
-    let active = 0;
-    const activePerKey = new Map<string, number>();
-    const waiting: Waiter[] = [];
+const active = new Map<string, number>();
 
-    const countFor = (key: string): number => activePerKey.get(key) ?? emptyCount;
+const countFor = (key: string): number => active.get(key) ?? 0;
+const totalActive = (): number => {
+    let total = 0;
 
-    const start = (waiter: Waiter): void => {
-        active += slot;
-        activePerKey.set(waiter.key, countFor(waiter.key) + slot);
-        waiter.start();
-    };
+    for (const count of active.values()) {
+        total += count;
+    }
 
-    const canStart = (key: string): boolean => active < maxConcurrent && countFor(key) < maxPerKey;
-
-    // Waiters are scanned in order, so a user at their own cap does not block requests from others.
-    const drain = (): void => {
-        for (let index = 0; index < waiting.length;) {
-            const waiter = waiting[index];
-
-            if (!waiter) {
-                return;
-            }
-
-            if (canStart(waiter.key)) {
-                waiting.splice(index, slot);
-                start(waiter);
-            } else {
-                index += slot;
-            }
-        }
-    };
-
-    const release = (key: string): void => {
-        active -= slot;
-        const remaining = countFor(key) - slot;
-
-        if (remaining) {
-            activePerKey.set(key, remaining);
-        } else {
-            activePerKey.delete(key);
-        }
-
-        drain();
-    };
-
-    const acquire = async (key: string): Promise<void> => {
-        if (canStart(key)) {
-            active += slot;
-            activePerKey.set(key, countFor(key) + slot);
-
-            return;
-        }
-
-        await new Promise<void>((resolve, reject) => {
-            const waiter: Waiter = {
-                key,
-                start: () => {
-                    // Replaced below once the timer exists.
-                }
-            };
-
-            const timer = setTimeout(() => {
-                const index = waiting.indexOf(waiter);
-
-                if (index !== absentIndex) {
-                    waiting.splice(index, slot);
-                }
-
-                reject(new Error("Timed out waiting for an outbound request slot"));
-            }, waitMs);
-
-            waiter.start = (): void => {
-                clearTimeout(timer);
-                resolve();
-            };
-
-            waiting.push(waiter);
-        });
-    };
-
-    return async <T>(key: string, task: () => Promise<T>): Promise<T> => {
-        await acquire(key);
-
-        try {
-            return await task();
-        } finally {
-            release(key);
-        }
-    };
+    return total;
 };
 
-const runOutbound = createSemaphore(maxConcurrentOutboundFetches, maxConcurrentPerKey, acquireTimeoutMs);
+// Admit immediately or not at all. Browser subresource loads open several requests at once and a
+// late image is worth less than a fast retriable answer, so waiting would only turn successful
+// loads into confusing failures.
+const acquire = (key: string): void => {
+    if (totalActive() >= maxConcurrentOutboundFetches || countFor(key) >= maxConcurrentPerKey) {
+        throw new OutboundBusyError("No outbound request slot is available");
+    }
 
-export { runOutbound };
+    active.set(key, countFor(key) + 1);
+};
+
+const release = (key: string): void => {
+    const remaining = countFor(key) - 1;
+
+    if (remaining) {
+        active.set(key, remaining);
+    } else {
+        active.delete(key);
+    }
+};
+
+const runOutbound = async <T>(key: string, task: () => Promise<T>): Promise<T> => {
+    acquire(key);
+
+    try {
+        return await task();
+    } finally {
+        release(key);
+    }
+};
+
+export { OutboundBusyError, runOutbound };

@@ -105,17 +105,15 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
             // either one succeeding is enough to save the bookmark, and the OG result fills the rest.
             const [xPost, preview] = await Promise.all([
                 isXPostUrl(input.url)
-                    ? runOutbound(context.get("userId"), () =>
-                          renderXPost(input.url).catch((error: unknown) => {
-                              // The OG fallback keeps this non-fatal, but the signal matters for diagnosis.
-                              // oxlint-disable-next-line no-console -- Server-side diagnostics are console's legitimate use.
-                              console.warn("X post thumbnail rendering failed:", error);
+                    ? runOutbound(context.get("userId"), () => renderXPost(input.url)).catch((error: unknown) => {
+                          // A busy pool and a failed render both degrade to the OG result.
+                          // oxlint-disable-next-line no-console -- Server-side diagnostics are console's legitimate use.
+                          console.warn("X post thumbnail rendering failed:", error);
 
-                              return null;
-                          })
-                      )
+                          return null;
+                      })
                     : null,
-                runOutbound(context.get("userId"), () => getPreview(input.url).catch(() => null))
+                runOutbound(context.get("userId"), () => getPreview(input.url)).catch(() => null)
             ]);
 
             if (!preview && !xPost) {
