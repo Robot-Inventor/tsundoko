@@ -58,7 +58,7 @@ const useSearch = (): UseSearchResult => {
             return;
         }
 
-        // The bar mounts on open; it focuses its input itself.
+        // Opening flips focusOnOpen; the bar focuses its own input.
         setSearchOpen(true);
     }, [searchOpen]);
 
@@ -127,4 +127,4 @@ const useSearchContext = (): UseSearchResult => {
     return context;
 };
 
-export { SearchContext, desktopLayout, useSearch, useSearchContext };
+export { type UseSearchResult, SearchContext, desktopLayout, useSearch, useSearchContext };

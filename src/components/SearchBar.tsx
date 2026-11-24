@@ -6,7 +6,7 @@ import { useLocation } from "@tanstack/react-router";
 
 interface SearchBarProps {
     className?: string;
-    focusOnMount?: boolean;
+    focusOnOpen?: boolean;
     inputRef: React.RefObject<HTMLInputElement | null>;
     onSearch: () => void;
     onSearchTextChange: (value: string) => void;
@@ -15,7 +15,7 @@ interface SearchBarProps {
 
 const SearchBar = ({
     className,
-    focusOnMount,
+    focusOnOpen,
     inputRef,
     onSearch,
     onSearchTextChange,
@@ -24,13 +24,15 @@ const SearchBar = ({
     const { pathname } = useLocation();
     const label = getPage(pathname).searchLabel;
 
-    // Focusing on mount is intended: the bar only mounts on an explicit user action.
-    // A layout effect keeps the focus call inside that action, which iOS requires to open the keyboard.
+    // A layout effect keeps focus inside the tap or keystroke that opened the bar, which iOS
+    // requires to open the keyboard. The mobile bar stays mounted, so the same effect blurs on close.
     useLayoutEffect(() => {
-        if (focusOnMount) {
+        if (focusOnOpen === true) {
             inputRef.current?.focus();
+        } else if (focusOnOpen === false) {
+            inputRef.current?.blur();
         }
-    }, [focusOnMount, inputRef]);
+    }, [focusOnOpen, inputRef]);
 
     return (
         <form

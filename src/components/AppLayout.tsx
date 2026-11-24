@@ -1,7 +1,7 @@
 import { ArchiveIcon, HouseIcon, MenuIcon, SearchIcon, XIcon } from "lucide-react";
 import { HeadContent, Link, Outlet, useLocation } from "@tanstack/react-router";
-import { type ReactNode, useEffect, useRef, useState } from "react";
-import { SearchContext, desktopLayout, useSearch } from "../hooks/useSearch";
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { SearchContext, type UseSearchResult, desktopLayout, useSearch } from "../hooks/useSearch";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { Button } from "./ui/button";
 import { SearchBar } from "./SearchBar";
@@ -45,12 +45,77 @@ const MobilePageTitle = ({ searchOpen }: { searchOpen: boolean }): ReactNode => 
     return (
         <h1
             className={cn(
-                "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-base font-semibold md:hidden",
-                searchOpen && "hidden"
+                "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-base font-semibold transition-opacity duration-200 md:hidden motion-reduce:transition-none",
+                searchOpen && "opacity-0"
             )}
+            inert={searchOpen}
         >
             {getPage(pathname).label}
         </h1>
+    );
+};
+
+// Stays mounted so both the entrance and the exit animate; inert keeps the hidden input unreachable.
+// start-4 matches the bookmark thumbnails' inset; end-16 covers the header's 12px padding,
+// the toggle's 44px, and the 8px gap, so the bar ends beside it.
+const MobileSearch = ({ search }: { search: UseSearchResult }): ReactNode => (
+    <div
+        className={cn(
+            "absolute inset-y-0 start-4 end-16 flex items-center transition-[opacity,translate,scale] duration-200 ease-out md:hidden motion-reduce:transition-none",
+            search.searchOpen ? "translate-y-0 scale-100 opacity-100" : "-translate-y-1 scale-95 opacity-0"
+        )}
+        inert={!search.searchOpen}
+    >
+        <SearchBar
+            className="w-full"
+            focusOnOpen={search.searchOpen}
+            inputRef={search.mobileSearchInput}
+            onSearch={search.runSearch}
+            onSearchTextChange={search.setSearchText}
+            searchText={search.searchText}
+        />
+    </div>
+);
+
+const MobileSearchToggle = ({ search }: { search: UseSearchResult }): ReactNode => {
+    const buttonRef = useRef<HTMLButtonElement>(null);
+    const wasOpen = useRef(false);
+
+    useLayoutEffect(() => {
+        // Enter runs the search without touching this button, so give keyboard users their place back.
+        if (wasOpen.current && !search.searchOpen) {
+            buttonRef.current?.focus();
+        }
+
+        wasOpen.current = search.searchOpen;
+    }, [search.searchOpen]);
+
+    return (
+        <Button
+            aria-label={search.searchOpen ? "検索を閉じる" : "検索を開く"}
+            className="ms-auto size-11 md:hidden"
+            onClick={search.searchOpen ? search.closeSearch : search.openSearch}
+            ref={buttonRef}
+            size="icon"
+            variant="ghost"
+        >
+            <span className="relative block size-4">
+                <SearchIcon
+                    aria-hidden="true"
+                    className={cn(
+                        "absolute inset-0 size-4 rotate-0 scale-100 opacity-100 transition-[opacity,rotate,scale] duration-200 ease-out motion-reduce:transition-none",
+                        search.searchOpen && "rotate-90 scale-50 opacity-0"
+                    )}
+                />
+                <XIcon
+                    aria-hidden="true"
+                    className={cn(
+                        "absolute inset-0 size-4 rotate-90 scale-50 opacity-0 transition-[opacity,rotate,scale] duration-200 ease-out motion-reduce:transition-none",
+                        search.searchOpen && "rotate-0 scale-100 opacity-100"
+                    )}
+                />
+            </span>
+        </Button>
     );
 };
 
@@ -83,7 +148,11 @@ const AppLayout = (): ReactNode => {
                     <SheetTrigger
                         aria-label="メニューを開く"
                         render=<Button
-                            className={cn("size-11 md:hidden", search.searchOpen && "hidden")}
+                            className={cn(
+                                "size-11 transition-opacity duration-200 md:hidden motion-reduce:transition-none",
+                                search.searchOpen && "pointer-events-none opacity-0"
+                            )}
+                            inert={search.searchOpen}
                             size="icon"
                             variant="ghost"
                         />
@@ -105,15 +174,7 @@ const AppLayout = (): ReactNode => {
                 </Sheet>
                 <Logo className="hidden h-auto w-32 md:block" />
                 <MobilePageTitle searchOpen={search.searchOpen} />
-                <Button
-                    aria-label="検索を開く"
-                    className={cn("ms-auto size-11 md:hidden", search.searchOpen && "hidden")}
-                    onClick={search.openSearch}
-                    size="icon"
-                    variant="ghost"
-                >
-                    <SearchIcon aria-hidden="true" />
-                </Button>
+                <MobileSearchToggle search={search} />
                 {/* Centered on the viewport instead of the space next to the logo; w-full prevents shrink-to-fit
                     sizing from collapsing the absolutely positioned bar to the input's intrinsic width. */}
                 <div className="absolute left-1/2 top-1/2 hidden w-full max-w-xl -translate-x-1/2 -translate-y-1/2 md:block">
@@ -124,21 +185,7 @@ const AppLayout = (): ReactNode => {
                         searchText={search.searchText}
                     />
                 </div>
-                {search.searchOpen && (
-                    <div className="flex w-full items-center gap-2 md:hidden">
-                        <SearchBar
-                            className="min-w-0 flex-1"
-                            focusOnMount
-                            inputRef={search.mobileSearchInput}
-                            onSearch={search.runSearch}
-                            onSearchTextChange={search.setSearchText}
-                            searchText={search.searchText}
-                        />
-                        <Button aria-label="検索を閉じる" onClick={search.closeSearch} size="icon" variant="ghost">
-                            <XIcon aria-hidden="true" />
-                        </Button>
-                    </div>
-                )}
+                <MobileSearch search={search} />
             </header>
 
             <div className="flex min-h-[calc(100dvh-3.5rem)]">
