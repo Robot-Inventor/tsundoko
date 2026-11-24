@@ -1,10 +1,10 @@
 import { AccountProvider, MobileAccountMenu, SidebarAccountMenu, useAccountState } from "./AccountMenu";
-import { ArchiveIcon, HouseIcon, MenuIcon, SearchIcon, XIcon } from "lucide-react";
+import { ArchiveIcon, HouseIcon, SearchIcon, XIcon } from "lucide-react";
 import { HeadContent, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SearchContext, type UseSearchResult, desktopLayout, useSearch } from "../hooks/useSearch";
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { Button } from "./ui/button";
+import { MobileMenu } from "./MobileMenu";
 import { SearchBar } from "./SearchBar";
 import { cn } from "../lib/utils";
 import { getPage } from "../lib/page-title";
@@ -171,33 +171,18 @@ const AppLayout = (): ReactNode => {
         <AccountProvider value={accountState}>
             <HeadContent />
             <header className="sticky top-0 z-20 flex h-[calc(3.5rem_+_env(safe-area-inset-top))] items-center gap-2 border-b bg-background px-3 pt-[env(safe-area-inset-top)] md:px-4">
-                <Sheet onOpenChange={setMenuOpen} open={menuOpen}>
-                    <SheetTrigger
-                        aria-label="メニューを開く"
-                        render=<Button
-                            className={cn(
-                                "size-11 transition-opacity duration-200 md:hidden motion-reduce:transition-none",
-                                search.searchOpen && "pointer-events-none opacity-0"
-                            )}
-                            inert={search.searchOpen}
-                            size="icon"
-                            variant="ghost"
-                        />
-                    >
-                        <MenuIcon aria-hidden="true" />
-                    </SheetTrigger>
-                    <SheetContent
-                        className="pt-[calc(2rem_+_env(safe-area-inset-top))]"
-                        finalFocus={() => (window.matchMedia(desktopLayout).matches ? desktopHomeLink.current : true)}
-                    >
-                        <div className="mb-6 flex items-center justify-between gap-3 ps-6 pe-3">
-                            <Logo className="block h-auto w-1/2" />
-                            {account && <MobileAccountMenu account={account} onNavigate={closeMenu} />}
-                        </div>
-                        <SheetTitle>メニュー</SheetTitle>
-                        <MainNavigation onNavigate={closeMenu} />
-                    </SheetContent>
-                </Sheet>
+                <MobileMenu
+                    finalFocus={() => (window.matchMedia(desktopLayout).matches ? desktopHomeLink.current : true)}
+                    onOpenChange={setMenuOpen}
+                    open={menuOpen}
+                    searchOpen={search.searchOpen}
+                >
+                    <div className="mb-6 flex items-center justify-between gap-3 ps-6 pe-3">
+                        <Logo className="block h-auto w-1/2" />
+                        {account && <MobileAccountMenu account={account} onNavigate={closeMenu} />}
+                    </div>
+                    <MainNavigation onNavigate={closeMenu} />
+                </MobileMenu>
                 <Logo className="hidden h-auto w-32 md:block" />
                 <MobilePageTitle searchOpen={search.searchOpen} />
                 {showsSearch && <HeaderSearch search={search} />}

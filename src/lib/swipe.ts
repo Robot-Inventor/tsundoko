@@ -1,6 +1,9 @@
-// Shared between the swipe gesture (BookmarkListItem) and its reveal background
-// (SwipeReveal): the card's slide-out/return duration and the offset the card rests at.
+// The card's slide-out/return duration and the offset the card rests at, shared by the swipe
+// gesture (BookmarkListItem) and its reveal background (SwipeReveal).
 const exitAnimationMs = 200;
 const restingOffsetPx = 0;
 
-export { exitAnimationMs, restingOffsetPx };
+// Touch-only gestures are the row swipe and the empty-space menu swipe; pointer devices use buttons.
+const touchPointerType = "touch";
+
+export { exitAnimationMs, restingOffsetPx, touchPointerType };
