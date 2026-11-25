@@ -2,15 +2,13 @@ import { type Context, Hono } from "hono";
 import { RateLimiterRes, runImageOutbound, runThumbnailRead } from "./lib/outboundLimit";
 import type { AuthEnv } from "./authMiddleware";
 import { createRateLimit } from "./lib/rateLimit";
+import { fetchValidImage } from "./lib/remoteImage";
 import { getBookmarkImageUrls } from "./db/bookmarks";
 import { httpStatus } from "./lib/httpStatus";
-import { parseContentType } from "./lib/mediaType";
 import { readThumbnail } from "./lib/thumbnailStore";
 import { type } from "arktype";
 import { validator } from "hono/validator";
 
-const fetchTimeout = 8000;
-const maxImageBytes = 10_485_760;
 const imageRequestLimit = 5000;
 // Thumbnails and favicons are stable per page, so letting the browser cache them for a day keeps reloads cheap.
 const imageCacheControl = "private, max-age=86400";
@@ -27,33 +25,6 @@ const imageIdQuery = validator("query", (value): string | null => {
     return bookmarkId(id) instanceof type.errors ? null : id;
 });
 
-const readImage = async (body: ReadableStream<Uint8Array>): Promise<Uint8Array<ArrayBuffer>> => {
-    const chunks: Uint8Array[] = [];
-    let size = 0;
-
-    for await (const chunk of body) {
-        size += chunk.byteLength;
-
-        if (size > maxImageBytes) {
-            throw new Error("Proxied image exceeded its size limit");
-        }
-
-        chunks.push(chunk);
-    }
-
-    // Hono's `.body()` only accepts `Uint8Array<ArrayBuffer>`, and `Buffer.concat` returns a buffer typed as
-    // `ArrayBufferLike`, so the bytes are copied into a plain `Uint8Array`.
-    const bytes = new Uint8Array(size);
-    let offset = 0;
-
-    for (const chunk of chunks) {
-        bytes.set(chunk, offset);
-        offset += chunk.byteLength;
-    }
-
-    return bytes;
-};
-
 const serveImage = async (context: Context<AuthEnv>, imageUrl: string | null): Promise<Response> => {
     // Error responses must not be cached by the browser, unlike successful ones.
     context.header("Cache-Control", "no-store");
@@ -65,35 +36,16 @@ const serveImage = async (context: Context<AuthEnv>, imageUrl: string | null): P
     try {
         // The slot stays held until the body has been read: the 10 MiB buffer is the expensive part,
         // not just the connection.
-        return await runImageOutbound(context.get("userId"), async () => {
-            const response = await fetch(imageUrl, {
-                credentials: "omit",
-                headers: {
-                    accept: "image/*"
-                },
-                redirect: "follow",
-                signal: AbortSignal.timeout(fetchTimeout)
-            });
+        const image = await runImageOutbound(context.get("userId"), () => fetchValidImage(imageUrl));
 
-            const contentType = parseContentType(response.headers.get("content-type"));
-            // Browsers execute scripts in SVG loaded as a document, so serving it from the app origin would allow
-            // stored XSS; only raster images are proxied.
-            const usable =
-                response.ok && contentType?.type === "image" && !contentType.subtype.startsWith("svg") && response.body;
+        if (!image) {
+            return context.body(null, httpStatus.badGateway);
+        }
 
-            if (!usable) {
-                await response.body?.cancel();
+        context.header("content-type", image.mediaType);
+        context.header("Cache-Control", imageCacheControl);
 
-                return context.body(null, httpStatus.badGateway);
-            }
-
-            const image = await readImage(response.body);
-
-            context.header("content-type", contentType.essence);
-            context.header("Cache-Control", imageCacheControl);
-
-            return context.body(image);
-        });
+        return context.body(image.bytes);
     } catch (error) {
         if (error instanceof RateLimiterRes) {
             context.header("Retry-After", "1");
