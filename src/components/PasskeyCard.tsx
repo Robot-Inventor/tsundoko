@@ -33,17 +33,15 @@ const RenameDialog = ({ name, onClose, onRenamed, open, passkeyId }: RenameDialo
 
             if (result.error) {
                 setError(toPasskeyError(result.error).message);
-
-                return;
+            } else {
+                onClose();
+                onRenamed();
             }
-
-            onClose();
-            onRenamed();
         } catch {
             setError(passkeyMessages.saveFailed);
-        } finally {
-            setBusy(false);
         }
+
+        setBusy(false);
     };
 
     const close = (): void => {
@@ -126,27 +124,27 @@ const DeleteDialog = ({ name, onClose, onDeleted, onError, open, passkeyId }: De
             } else {
                 const failure = deleteErrorBody(await response.json());
 
-                if (failure instanceof type.errors) {
-                    onError({
-                        code: "",
-                        message: passkeyMessages.saveFailed
-                    });
-                } else {
-                    onError({
-                        code: failure.code,
-                        message: failure.error
-                    });
-                }
+                onError(
+                    failure instanceof type.errors
+                        ? {
+                              code: "",
+                              message: passkeyMessages.saveFailed
+                          }
+                        : {
+                              code: failure.code,
+                              message: failure.error
+                          }
+                );
             }
         } catch {
             onError({
                 code: "",
                 message: passkeyMessages.saveFailed
             });
-        } finally {
-            setBusy(false);
-            onClose();
         }
+
+        setBusy(false);
+        onClose();
     };
 
     return (

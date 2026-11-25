@@ -109,41 +109,36 @@ const SignupPage = (): ReactNode => {
         setBusy(true);
         setError(null);
 
-        const token = await requestSignupToken(email, name);
+        try {
+            const token = await requestSignupToken(email, name);
 
-        if (token.kind === "error") {
-            setError(token.message);
-            setBusy(false);
+            if (token.kind === "error") {
+                setError(token.message);
+            } else {
+                const result = await authClient.passkey.addPasskey({
+                    context: token.token,
+                    createSession: true
+                });
 
-            return;
+                if (result.error) {
+                    setError(result.error.message ?? "アカウントを作成できませんでした。");
+                } else {
+                    clearAuthState();
+                    await router.navigate({
+                        to: hasPendingShare() ? "/share" : "/"
+                    });
+                }
+            }
+        } catch {
+            setError("アカウントを作成できませんでした。");
         }
-
-        const result = await authClient.passkey.addPasskey({
-            context: token.token,
-            createSession: true
-        });
-
-        if (result.error) {
-            setError(result.error.message ?? "アカウントを作成できませんでした。");
-            setBusy(false);
-
-            return;
-        }
-
-        clearAuthState();
-        await router.navigate({
-            to: hasPendingShare() ? "/share" : "/"
-        });
 
         setBusy(false);
     };
 
     const handleSubmit = (event: { preventDefault: () => void }): void => {
         event.preventDefault();
-        signup().catch(() => {
-            setError("アカウントを作成できませんでした。");
-            setBusy(false);
-        });
+        void signup();
     };
 
     return (
