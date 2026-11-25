@@ -1,8 +1,17 @@
 import { isIP, isIPv6 } from "node:net";
+import { httpStatus } from "./httpStatus";
 import { isPublicAddress } from "./publicAddress";
 import { lookup } from "node:dns/promises";
 
 const bracketOffset = 1;
+const maxRedirects = 5;
+const redirectStatuses = new Set<number>([
+    httpStatus.found,
+    httpStatus.movedPermanently,
+    httpStatus.permanentRedirect,
+    httpStatus.seeOther,
+    httpStatus.temporaryRedirect
+]);
 
 // Bun's fetch extensions that are not part of RequestInit.
 interface FetchOptions extends RequestInit {
@@ -27,10 +36,7 @@ const defaultLookup: AddressLookup = (hostname) => lookup(hostname, { all: true,
 
 // Resolve and validate before connecting. If any resolved address is private, the whole hostname is
 // rejected, so round-robin DNS cannot alternate a public and an internal answer.
-const resolvePublicAddresses = async (
-    hostname: string,
-    lookupAddresses: AddressLookup = defaultLookup
-): Promise<string[]> => {
+const resolvePublicAddresses = async (hostname: string, lookupAddresses: AddressLookup): Promise<string[]> => {
     const literal = stripBrackets(hostname);
 
     if (isIP(literal)) {
@@ -79,34 +85,69 @@ const fetchFromAddress = async (url: URL, address: string, init: RequestInit): P
     return fetch(target, options);
 };
 
-// A name with several validated addresses needs its own fallback: the baked-in connection has no
-// Happy Eyeballs, so a dual-stack host whose first record is unusable would otherwise fail.
-const fetchFirstReachableAddress = async (url: URL, addresses: string[], init: RequestInit): Promise<Response> => {
-    const [address, ...remaining] = addresses;
+// Resolves the hostname to validated public addresses and dials the first one that connects.
+const fetchResolvedAddress = async (url: URL, init: RequestInit, resolve: AddressLookup): Promise<Response> => {
+    const addresses = await resolvePublicAddresses(url.hostname, resolve);
+    let failure: unknown = null;
 
-    if (!address) {
-        throw new Error("The hostname does not resolve to a public address");
-    }
-
-    try {
-        return await fetchFromAddress(url, address, init);
-    } catch (error) {
-        if (!remaining.length) {
-            throw error;
+    // A name with several validated addresses needs its own fallback: the baked-in connection has no
+    // Happy Eyeballs, so a dual-stack host whose first record is unusable would otherwise fail.
+    for (const address of addresses) {
+        try {
+            // oxlint-disable-next-line no-await-in-loop -- The next address is only dialed after this one fails.
+            return await fetchFromAddress(url, address, init);
+        } catch (error) {
+            failure = error;
         }
-
-        return fetchFirstReachableAddress(url, remaining, init);
     }
+
+    throw failure;
 };
 
+// Only http(s) without embedded credentials is fetchable. Redirect targets come from the remote
+// server, so every hop is held to this rule before it is resolved and dialed.
+const isFetchableUrl = (url: URL): boolean =>
+    (url.protocol === "https:" || url.protocol === "http:") && !url.username && !url.password;
+
+// Follows redirects itself so each hop is re-resolved and re-validated; a 302 can never move an
+// approved URL onto an internal address. The shared deadline travels in `init.signal`, covering the
+// whole chain. The final `url` is reported in original-hostname form because `response.url` holds
+// the rewritten IP this fetch dialed.
 const publicFetch = async (
-    url: URL,
+    input: URL,
     init: RequestInit = {},
     resolve: AddressLookup = defaultLookup
-): Promise<Response> => {
-    const addresses = await resolvePublicAddresses(url.hostname, resolve);
+): Promise<{ response: Response; url: URL }> => {
+    let url = input;
+    let hopsFollowed = 0;
 
-    return fetchFirstReachableAddress(url, addresses, init);
+    for (;;) {
+        if (!isFetchableUrl(url)) {
+            throw new Error("Only public http and https URLs are fetchable");
+        }
+
+        // oxlint-disable-next-line no-await-in-loop -- Hops are sequential: a redirect is only fetched after the previous response.
+        const response = await fetchResolvedAddress(url, init, resolve);
+
+        if (!redirectStatuses.has(response.status)) {
+            return {
+                response,
+                url
+            };
+        }
+
+        // oxlint-disable-next-line no-await-in-loop -- Hops are sequential: a redirect is only fetched after the previous response.
+        await response.body?.cancel();
+
+        const location = response.headers.get("location");
+
+        if (!location || hopsFollowed === maxRedirects) {
+            throw new Error("The redirect could not be followed");
+        }
+
+        hopsFollowed++;
+        url = new URL(location, url);
+    }
 };
 
 export { publicFetch };
