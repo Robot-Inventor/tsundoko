@@ -1,15 +1,23 @@
+// oxlint-disable import/max-dependencies -- The route module legitimately wires validation, storage, previews, and rate limiting.
 import { type BookmarkScope, bookmarkMessages, httpStatus } from "./lib/bookmark";
 import { bookmarkExists, deleteBookmark, listBookmarks, saveBookmark, setBookmarkArchived } from "./db/bookmarks";
 import { bookmarkUrl, invalidBookmarkUrlMessage, normalizeBookmarkUrl } from "./lib/bookmarkUrl";
 import { isXPostUrl, renderXPost } from "./lib/xPost";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { createRateLimit } from "./lib/rateLimit";
 import { getPreview } from "./lib/preview";
 import { parseContentType } from "./lib/mediaType";
+import { runOutbound } from "./lib/outboundLimit";
 import { type } from "arktype";
 import { validator } from "hono/validator";
 
 const maxRequestBytes = 16_384;
+const bookmarkSaveLimit = 30;
+const bookmarkListLimit = 60;
+
+const bookmarkSaveRateLimit = createRateLimit({ limit: bookmarkSaveLimit });
+const bookmarkListRateLimit = createRateLimit({ limit: bookmarkListLimit });
 
 const previewRequest = type("string.json.parse").to({
     url: bookmarkUrl
@@ -57,7 +65,7 @@ const archivePayload = validator("json", (value, context) => {
 });
 
 const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
-    .get("/api/bookmarks", listQuery, async (context) => {
+    .get("/api/bookmarks", bookmarkListRateLimit, listQuery, async (context) => {
         context.header("Cache-Control", "no-store");
         const query = context.req.valid("query");
 
@@ -69,6 +77,7 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
     })
     .post(
         "/api/bookmarks",
+        bookmarkSaveRateLimit,
         bodyLimit({
             maxSize: maxRequestBytes,
             onError: (context) => context.json({ error: "入力が長すぎます。" }, httpStatus.payloadTooLarge)
@@ -98,15 +107,15 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
             // either one succeeding is enough to save the bookmark, and the OG result fills the rest.
             const [xPost, preview] = await Promise.all([
                 isXPostUrl(input.url)
-                    ? renderXPost(input.url).catch((error: unknown) => {
-                          // The OG fallback keeps this non-fatal, but the signal matters for diagnosis.
+                    ? runOutbound(context.get("userId"), () => renderXPost(input.url)).catch((error: unknown) => {
+                          // A busy pool and a failed render both degrade to the OG result.
                           // oxlint-disable-next-line no-console -- Server-side diagnostics are console's legitimate use.
                           console.warn("X post thumbnail rendering failed:", error);
 
                           return null;
                       })
                     : null,
-                getPreview(input.url).catch(() => null)
+                runOutbound(context.get("userId"), () => getPreview(input.url)).catch(() => null)
             ]);
 
             if (!preview && !xPost) {

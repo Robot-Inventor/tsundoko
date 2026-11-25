@@ -1,0 +1,34 @@
+import { RateLimiterMemory, RateLimiterRes } from "rate-limiter-flexible";
+import type { AuthEnv } from "../authMiddleware";
+import type { MiddlewareHandler } from "hono";
+import { createMiddleware } from "hono/factory";
+import { httpStatus } from "./httpStatus";
+
+const rateLimitWindowSeconds = 60;
+const millisecondsPerSecond = 1000;
+const rateLimitMessage = "リクエストが多すぎます。しばらくしてからお試しください。";
+
+// A fixed window per user is enough here: the goal is to bound outbound work, not to smooth bursts
+// precisely. Each route that spends server resources gets its own limiter.
+const createRateLimit = ({ limit }: { limit: number }): MiddlewareHandler<AuthEnv> => {
+    const limiter = new RateLimiterMemory({ duration: rateLimitWindowSeconds, points: limit });
+
+    return createMiddleware<AuthEnv>(async (context, next) => {
+        try {
+            await limiter.consume(context.get("userId"));
+        } catch (error) {
+            if (!(error instanceof RateLimiterRes)) {
+                throw error;
+            }
+
+            context.header("Cache-Control", "no-store");
+            context.header("Retry-After", String(Math.ceil(error.msBeforeNext / millisecondsPerSecond)));
+
+            return context.json({ error: rateLimitMessage }, httpStatus.tooManyRequests);
+        }
+
+        return next();
+    });
+};
+
+export { createRateLimit };

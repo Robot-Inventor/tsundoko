@@ -68,7 +68,7 @@ const listBookmarks = async (query: string, scope: BookmarkScope, userId: string
     const scopeCondition = scope === "active" ? isNull(bookmarks.archivedAt) : isNotNull(bookmarks.archivedAt);
 
     // The embedding round trip runs alongside the keyword query instead of after it.
-    const embeddingRequest = query ? embed(query) : Promise.resolve(null);
+    const embeddingRequest = query ? embed(query, userId) : Promise.resolve(null);
 
     const keywordRows = await db
         .select(bookmarkListItemColumns)
@@ -162,7 +162,7 @@ const saveBookmark = async ({ preview, url, userId, xPost }: SaveBookmarkInput):
 
     // Embedding failures must not cost the user the bookmark itself: a NULL embedding still saves,
     // and the row keeps working through keyword search.
-    const embedding = await embed(embeddingInput(bookmark));
+    const embedding = await embed(embeddingInput(bookmark), userId);
 
     return insertBookmark({ ...bookmark, embedding, id, userId });
 };

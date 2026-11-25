@@ -13,7 +13,9 @@ const httpStatus = {
     payloadTooLarge: 413,
     permanentRedirect: 308,
     seeOther: 303,
+    serviceUnavailable: 503,
     temporaryRedirect: 307,
+    tooManyRequests: 429,
     unauthorized: 401,
     unsupportedMediaType: 415
 } as const;

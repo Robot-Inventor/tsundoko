@@ -1,4 +1,7 @@
 import { type Context, Hono } from "hono";
+import { RateLimiterRes, runImageOutbound, runThumbnailRead } from "./lib/outboundLimit";
+import type { AuthEnv } from "./authMiddleware";
+import { createRateLimit } from "./lib/rateLimit";
 import { getBookmarkImageUrls } from "./db/bookmarks";
 import { httpStatus } from "./lib/httpStatus";
 import { parseContentType } from "./lib/mediaType";
@@ -8,8 +11,11 @@ import { validator } from "hono/validator";
 
 const fetchTimeout = 8000;
 const maxImageBytes = 10_485_760;
+const imageRequestLimit = 5000;
 // Thumbnails and favicons are stable per page, so letting the browser cache them for a day keeps reloads cheap.
 const imageCacheControl = "private, max-age=86400";
+
+const imageRateLimit = createRateLimit({ limit: imageRequestLimit });
 
 // The proxy is keyed by bookmark id, so only saved bookmarks' images can be fetched.
 const bookmarkId = type("string.uuid");
@@ -48,7 +54,7 @@ const readImage = async (body: ReadableStream<Uint8Array>): Promise<Uint8Array<A
     return bytes;
 };
 
-const serveImage = async (context: Context, imageUrl: string | null): Promise<Response> => {
+const serveImage = async (context: Context<AuthEnv>, imageUrl: string | null): Promise<Response> => {
     // Error responses must not be cached by the browser, unlike successful ones.
     context.header("Cache-Control", "no-store");
 
@@ -57,34 +63,44 @@ const serveImage = async (context: Context, imageUrl: string | null): Promise<Re
     }
 
     try {
-        const response = await fetch(imageUrl, {
-            credentials: "omit",
-            headers: {
-                accept: "image/*"
-            },
-            redirect: "follow",
-            signal: AbortSignal.timeout(fetchTimeout)
+        // The slot stays held until the body has been read: the 10 MiB buffer is the expensive part,
+        // not just the connection.
+        return await runImageOutbound(context.get("userId"), async () => {
+            const response = await fetch(imageUrl, {
+                credentials: "omit",
+                headers: {
+                    accept: "image/*"
+                },
+                redirect: "follow",
+                signal: AbortSignal.timeout(fetchTimeout)
+            });
+
+            const contentType = parseContentType(response.headers.get("content-type"));
+            // Browsers execute scripts in SVG loaded as a document, so serving it from the app origin would allow
+            // stored XSS; only raster images are proxied.
+            const usable =
+                response.ok && contentType?.type === "image" && !contentType.subtype.startsWith("svg") && response.body;
+
+            if (!usable) {
+                await response.body?.cancel();
+
+                return context.body(null, httpStatus.badGateway);
+            }
+
+            const image = await readImage(response.body);
+
+            context.header("content-type", contentType.essence);
+            context.header("Cache-Control", imageCacheControl);
+
+            return context.body(image);
         });
+    } catch (error) {
+        if (error instanceof RateLimiterRes) {
+            context.header("Retry-After", "1");
 
-        const contentType = parseContentType(response.headers.get("content-type"));
-        // Browsers execute scripts in SVG loaded as a document, so serving it from the app origin would allow
-        // stored XSS; only raster images are proxied.
-        const usable =
-            response.ok && contentType?.type === "image" && !contentType.subtype.startsWith("svg") && response.body;
-
-        if (!usable) {
-            await response.body?.cancel();
-
-            return context.body(null, httpStatus.badGateway);
+            return context.body(null, httpStatus.serviceUnavailable);
         }
 
-        const image = await readImage(response.body);
-
-        context.header("content-type", contentType.essence);
-        context.header("Cache-Control", imageCacheControl);
-
-        return context.body(image);
-    } catch {
         return context.body(null, httpStatus.badGateway);
     }
 };
@@ -106,22 +122,39 @@ const getFaviconUrl = async (id: string | null, userId: string): Promise<string 
     return stored ?? googleFaviconUrl.href;
 };
 
-const imageApi = new Hono<{ Variables: { userId: string } }>()
-    .get("/api/thumbnail", imageIdQuery, async (context) => {
+const imageApi = new Hono<AuthEnv>()
+    .get("/api/thumbnail", imageRateLimit, imageIdQuery, async (context) => {
+        context.header("Cache-Control", "no-store");
+
         const id = context.req.valid("query");
         const bookmark = id ? await getBookmarkImageUrls(id, context.get("userId")) : null;
-        const stored = bookmark?.thumbnailFile ? await readThumbnail(bookmark.thumbnailFile) : null;
 
-        if (stored) {
-            context.header("content-type", "image/png");
-            context.header("Cache-Control", imageCacheControl);
+        if (bookmark?.thumbnailFile) {
+            const { thumbnailFile } = bookmark;
 
-            return context.body(stored);
+            try {
+                const stored = await runThumbnailRead(context.get("userId"), () => readThumbnail(thumbnailFile));
+
+                if (stored) {
+                    context.header("content-type", "image/png");
+                    context.header("Cache-Control", imageCacheControl);
+
+                    return context.body(stored);
+                }
+            } catch (error) {
+                if (error instanceof RateLimiterRes) {
+                    context.header("Retry-After", "1");
+
+                    return context.body(null, httpStatus.serviceUnavailable);
+                }
+
+                throw error;
+            }
         }
 
         return serveImage(context, bookmark?.thumbnailUrl ?? null);
     })
-    .get("/api/favicon", imageIdQuery, async (context) => {
+    .get("/api/favicon", imageRateLimit, imageIdQuery, async (context) => {
         const faviconUrl = await getFaviconUrl(context.req.valid("query"), context.get("userId"));
 
         return serveImage(context, faviconUrl);

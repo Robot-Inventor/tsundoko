@@ -5,6 +5,7 @@ const xPostHostnames = new Set(["mobile.twitter.com", "mobile.x.com", "twitter.c
 const renderWidth = 390;
 const renderDpr = 2;
 const maxXPostTitleLength = 100;
+const maxThumbnailBytes = 5_242_880;
 
 // Matches post detail pages such as /user/status/123 and /i/status/123, including their /photo and /video variants.
 // URL parsing lowercases the hostname already, so no case handling is needed here.
@@ -45,6 +46,10 @@ const renderXPost = async (url: URL): Promise<XPostThumbnail> => {
         theme: "dark",
         width: renderWidth
     });
+
+    if (png.byteLength > maxThumbnailBytes) {
+        throw new Error("Rendered X post thumbnail exceeded its size limit");
+    }
 
     const text = post.text.trim();
 
