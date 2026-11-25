@@ -1,5 +1,5 @@
 import { type Context, Hono } from "hono";
-import { OutboundBusyError, runImageOutbound, runThumbnailRead } from "./lib/outboundLimit";
+import { RateLimiterRes, runImageOutbound, runThumbnailRead } from "./lib/outboundLimit";
 import type { AuthEnv } from "./authMiddleware";
 import { createRateLimit } from "./lib/rateLimit";
 import { getBookmarkImageUrls } from "./db/bookmarks";
@@ -95,7 +95,7 @@ const serveImage = async (context: Context<AuthEnv>, imageUrl: string | null): P
             return context.body(image);
         });
     } catch (error) {
-        if (error instanceof OutboundBusyError) {
+        if (error instanceof RateLimiterRes) {
             context.header("Retry-After", "1");
 
             return context.body(null, httpStatus.serviceUnavailable);
@@ -142,7 +142,7 @@ const imageApi = new Hono<AuthEnv>()
                     return context.body(stored);
                 }
             } catch (error) {
-                if (error instanceof OutboundBusyError) {
+                if (error instanceof RateLimiterRes) {
                     context.header("Retry-After", "1");
 
                     return context.body(null, httpStatus.serviceUnavailable);

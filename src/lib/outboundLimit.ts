@@ -1,55 +1,49 @@
-// oxlint-disable no-magic-numbers -- The counters and caps are self-evident constants.
+import { RateLimiterMemory, RateLimiterRes } from "rate-limiter-flexible";
+
 const maxConcurrentOutboundFetches = 8;
 const maxConcurrentPerKey = 4;
 const maxConcurrentImageFetches = 16;
 const maxConcurrentImagePerKey = 8;
 const maxConcurrentThumbnailReads = 8;
 const maxConcurrentThumbnailReadsPerKey = 4;
+// A backstop that recovers points from a task that never settles; it comfortably exceeds every
+// task timeout in the app, and normal slots return through reward() the moment a task settles.
+// A task that outlives the window temporarily over-credits the pool until the next expiry.
+const gateWindowSeconds = 60;
 
-class OutboundBusyError extends Error {}
-
+// A concurrency gate on the library's consume/reward pattern: one point per pool is held while the
+// task runs and returned when it does. A rejected consume is refunded at once — the library keeps
+// the point counted on rejection, so without the refund a burst of busy answers would exhaust the
+// window and close the pool for up to its full duration. Admission stays immediate or not at all:
+// a late image is worth less than a fast retriable answer, so waiting would only turn successful
+// loads into confusing failures.
 const createGate = (maxConcurrent: number, maxPerKey: number) => {
-    const active = new Map<string, number>();
-
-    const countFor = (key: string): number => active.get(key) ?? 0;
-
-    const totalActive = (): number => {
-        let total = 0;
-
-        for (const count of active.values()) {
-            total += count;
-        }
-
-        return total;
-    };
-
-    // Admit immediately or not at all. A late image is worth less than a fast retriable answer, so
-    // waiting would only turn successful loads into confusing failures.
-    const acquire = (key: string): void => {
-        if (totalActive() >= maxConcurrent || countFor(key) >= maxPerKey) {
-            throw new OutboundBusyError("No outbound request slot is available");
-        }
-
-        active.set(key, countFor(key) + 1);
-    };
-
-    const release = (key: string): void => {
-        const remaining = countFor(key) - 1;
-
-        if (remaining) {
-            active.set(key, remaining);
-        } else {
-            active.delete(key);
-        }
-    };
+    const globalPool = new RateLimiterMemory({ duration: gateWindowSeconds, points: maxConcurrent });
+    const perKeyPool = new RateLimiterMemory({ duration: gateWindowSeconds, points: maxPerKey });
 
     return async <T>(key: string, task: () => Promise<T>): Promise<T> => {
-        acquire(key);
+        try {
+            await globalPool.consume("process");
+        } catch (error) {
+            await globalPool.reward("process");
+
+            throw error;
+        }
+
+        try {
+            await perKeyPool.consume(key);
+        } catch (error) {
+            await globalPool.reward("process");
+            await perKeyPool.reward(key);
+
+            throw error;
+        }
 
         try {
             return await task();
         } finally {
-            release(key);
+            await globalPool.reward("process");
+            await perKeyPool.reward(key);
         }
     };
 };
@@ -61,4 +55,4 @@ const runOutbound = createGate(maxConcurrentOutboundFetches, maxConcurrentPerKey
 const runImageOutbound = createGate(maxConcurrentImageFetches, maxConcurrentImagePerKey);
 const runThumbnailRead = createGate(maxConcurrentThumbnailReads, maxConcurrentThumbnailReadsPerKey);
 
-export { OutboundBusyError, runImageOutbound, runOutbound, runThumbnailRead };
+export { RateLimiterRes, runImageOutbound, runOutbound, runThumbnailRead };

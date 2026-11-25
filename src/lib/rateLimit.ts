@@ -1,68 +1,28 @@
+import { RateLimiterMemory, RateLimiterRes } from "rate-limiter-flexible";
 import type { AuthEnv } from "../authMiddleware";
 import type { MiddlewareHandler } from "hono";
 import { createMiddleware } from "hono/factory";
 import { httpStatus } from "./httpStatus";
 
-const defaultWindowMs = 60_000;
+const rateLimitWindowSeconds = 60;
 const millisecondsPerSecond = 1000;
 const rateLimitMessage = "リクエストが多すぎます。しばらくしてからお試しください。";
 
-interface RateLimitOptions {
-    limit: number;
-}
-
-interface RateLimitWindow {
-    count: number;
-    resetAt: number;
-}
-
-interface RateLimitResult {
-    allowed: boolean;
-    retryAfterSeconds: number;
-}
-
 // A fixed window per user is enough here: the goal is to bound outbound work, not to smooth bursts
 // precisely. Each route that spends server resources gets its own limiter.
-const createRateLimiter = ({ limit }: RateLimitOptions) => {
-    const windows = new Map<string, RateLimitWindow>();
-
-    return (key: string): RateLimitResult => {
-        const now = Date.now();
-        const current = windows.get(key);
-        const window =
-            !current || now >= current.resetAt
-                ? {
-                      count: 0,
-                      resetAt: now + defaultWindowMs
-                  }
-                : current;
-
-        if (window.count >= limit) {
-            return {
-                allowed: false,
-                retryAfterSeconds: Math.ceil((window.resetAt - now) / millisecondsPerSecond)
-            };
-        }
-
-        window.count += 1;
-        windows.set(key, window);
-
-        return {
-            allowed: true,
-            retryAfterSeconds: 0
-        };
-    };
-};
-
-const createRateLimit = (options: RateLimitOptions): MiddlewareHandler<AuthEnv> => {
-    const take = createRateLimiter(options);
+const createRateLimit = ({ limit }: { limit: number }): MiddlewareHandler<AuthEnv> => {
+    const limiter = new RateLimiterMemory({ duration: rateLimitWindowSeconds, points: limit });
 
     return createMiddleware<AuthEnv>(async (context, next) => {
-        const result = take(context.get("userId"));
+        try {
+            await limiter.consume(context.get("userId"));
+        } catch (error) {
+            if (!(error instanceof RateLimiterRes)) {
+                throw error;
+            }
 
-        if (!result.allowed) {
             context.header("Cache-Control", "no-store");
-            context.header("Retry-After", String(result.retryAfterSeconds));
+            context.header("Retry-After", String(Math.ceil(error.msBeforeNext / millisecondsPerSecond)));
 
             return context.json({ error: rateLimitMessage }, httpStatus.tooManyRequests);
         }
