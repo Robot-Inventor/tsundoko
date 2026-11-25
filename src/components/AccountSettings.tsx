@@ -6,7 +6,7 @@ import { Input } from "./ui/Input";
 import { authClient } from "../lib/authClient";
 import { notifySuccess } from "../lib/appToast";
 import { type } from "arktype";
-import { useAccountContext } from "./AccountMenu";
+import { useAccountContext } from "../hooks/useAccount";
 
 const errorResponse = type({ error: "string" });
 
@@ -18,13 +18,13 @@ const sendAvatar = async (request: RequestInit): Promise<string | null> => {
     try {
         const response = await fetch("/api/me/avatar", request);
 
-        if (response.ok) {
-            return null;
+        if (!response.ok) {
+            const failure = errorResponse(await response.json());
+
+            return failure instanceof type.errors ? avatarFailureMessage : failure.error;
         }
 
-        const failure = errorResponse(await response.json());
-
-        return failure instanceof type.errors ? avatarFailureMessage : failure.error;
+        return null;
     } catch {
         return avatarFailureMessage;
     }
@@ -44,18 +44,16 @@ const AvatarForm = ({ account, onSaved }: AccountFormProps): ReactNode => {
         setBusy(true);
         setError(null);
 
-        try {
-            const failure = await sendAvatar(request);
+        const failure = await sendAvatar(request);
 
-            if (failure) {
-                setError(failure);
-            } else {
-                onSaved();
-                notifySuccess("アイコンを変更しました");
-            }
-        } finally {
-            setBusy(false);
+        if (failure) {
+            setError(failure);
+        } else {
+            onSaved();
+            notifySuccess("アイコンを変更しました");
         }
+
+        setBusy(false);
     };
 
     const hasCustomAvatar = account.avatarUrl.startsWith("data:");
@@ -127,7 +125,10 @@ const AvatarForm = ({ account, onSaved }: AccountFormProps): ReactNode => {
 };
 
 const NameForm = ({ account, onSaved }: AccountFormProps): ReactNode => {
-    const [name, setName] = useState(account.name);
+    // The prop is only the initial value; the user's edit wins once they type, so an
+    // account refresh after saving never clobbers or resurrects stale text.
+    const [edit, setEdit] = useState<string | null>(null);
+    const name = edit ?? account.name;
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -140,17 +141,15 @@ const NameForm = ({ account, onSaved }: AccountFormProps): ReactNode => {
 
             if (result.error) {
                 setError("ユーザー名を保存できませんでした。");
-
-                return;
+            } else {
+                onSaved();
+                notifySuccess("保存しました");
             }
-
-            onSaved();
-            notifySuccess("保存しました");
         } catch {
             setError("ユーザー名を保存できませんでした。");
-        } finally {
-            setBusy(false);
         }
+
+        setBusy(false);
     };
 
     return (
@@ -169,7 +168,7 @@ const NameForm = ({ account, onSaved }: AccountFormProps): ReactNode => {
                     autoComplete="nickname"
                     id="account-name"
                     onChange={(event) => {
-                        setName(event.target.value);
+                        setEdit(event.target.value);
                     }}
                     required
                     value={name}

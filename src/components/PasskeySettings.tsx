@@ -1,7 +1,7 @@
 import { type PasskeyError, minimumPasskeysForDeletion, passkeyMessages, toPasskeyError } from "../lib/passkey";
 import { type ReactNode, useState } from "react";
 import { notifyError, notifySuccess } from "../lib/appToast";
-import { useAccountContext, useRelogin } from "./AccountMenu";
+import { useAccountContext, useRelogin } from "../hooks/useAccount";
 import { Button } from "./ui/button";
 import { PasskeyCard } from "./PasskeyCard";
 import { authClient } from "../lib/authClient";
@@ -41,9 +41,9 @@ const PasskeySettings = (): ReactNode => {
             }
         } catch {
             notifyError(passkeyMessages.saveFailed);
-        } finally {
-            setBusy(false);
         }
+
+        setBusy(false);
     };
 
     return (

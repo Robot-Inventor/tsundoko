@@ -15,14 +15,14 @@ const getBookmarkCardActions = (archived: boolean, bookmark: Bookmark): Bookmark
     {
         icon: archived ? ArchiveRestoreIcon : ArchiveIcon,
         label: archived ? "アーカイブから戻す" : "アーカイブ",
-        onSelect: () => {
+        onSelect: (): void => {
             requestBookmarkAction(archived ? "unarchive" : "archive", bookmark);
         }
     },
     {
         icon: Trash2Icon,
         label: "削除",
-        onSelect: () => {
+        onSelect: (): void => {
             requestBookmarkAction("delete", bookmark);
         },
         variant: "destructive"

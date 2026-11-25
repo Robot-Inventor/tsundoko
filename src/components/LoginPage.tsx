@@ -14,30 +14,28 @@ const LoginPage = (): ReactNode => {
         setBusy(true);
         setError(null);
 
-        const result = await authClient.signIn.passkey();
+        try {
+            const result = await authClient.signIn.passkey();
 
-        if (result.error) {
-            setError(result.error.message ?? "ログインできませんでした。");
-            setBusy(false);
-
-            return;
+            if (result.error) {
+                setError(result.error.message ?? "ログインできませんでした。");
+            } else {
+                clearAuthState();
+                // Navigating first lets the target route's guard read the fresh session; invalidating here
+                // would run the login route's guest guard and drop the redirect before it is used.
+                await router.navigate({
+                    to: redirect ?? "/"
+                });
+            }
+        } catch {
+            setError("ログインできませんでした。");
         }
-
-        clearAuthState();
-        // Navigating first lets the target route's guard read the fresh session; invalidating here
-        // would run the login route's guest guard and drop the redirect before it is used.
-        await router.navigate({
-            to: redirect ?? "/"
-        });
 
         setBusy(false);
     };
 
     const handleLogin = (): void => {
-        login().catch(() => {
-            setError("ログインできませんでした。");
-            setBusy(false);
-        });
+        void login();
     };
 
     return (

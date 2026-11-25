@@ -3,7 +3,7 @@ import { Button } from "./ui/button";
 import { PasskeySettings } from "./PasskeySettings";
 import type { ReactNode } from "react";
 import { pages } from "../lib/page-title";
-import { useAccountContext } from "./AccountMenu";
+import { useAccountContext } from "../hooks/useAccount";
 
 const SettingsContent = (): ReactNode => {
     const { account, failed, refresh } = useAccountContext();

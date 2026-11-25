@@ -27,10 +27,12 @@ const startTestDatabase = async (): Promise<TestDatabase> => {
         })
     );
 
-    await statements.flat().reduce(async (previous, statement) => {
-        await previous;
-        await client.unsafe(statement);
-    }, Promise.resolve());
+    await statements
+        .flat()
+        .reduce<Promise<unknown>>(
+            (previous, statement) => previous.then(() => client.unsafe(statement)),
+            Promise.resolve()
+        );
 
     return {
         client,

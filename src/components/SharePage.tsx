@@ -99,6 +99,9 @@ const SharePage = (): ReactNode => {
         setConfirmed(true);
     };
 
+    // The run starts at most once per mount (the started ref guards re-entry), so overlapping
+    // runs cannot write stale progress; the rule cannot trace the ref guard through the loop.
+    // oxlint-disable-next-line react-doctor/no-set-state-after-await-in-effect
     useEffect(() => {
         if (started.current || waitsForConfirmation) {
             return;
@@ -122,7 +125,7 @@ const SharePage = (): ReactNode => {
 
             for (const [index, href] of urls.entries()) {
                 // One request at a time keeps the progress count meaningful and the server load flat.
-                // oxlint-disable-next-line no-await-in-loop
+                // oxlint-disable-next-line no-await-in-loop react-doctor/async-await-in-loop
                 const result = await requestBookmark(new URL(href));
 
                 if ("bookmark" in result) {
