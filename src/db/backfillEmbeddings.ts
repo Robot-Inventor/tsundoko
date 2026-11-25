@@ -37,7 +37,7 @@ const backfillEmbeddings = async (force: boolean): Promise<void> => {
             .where(eq(bookmarks.id, id));
 
         if (row) {
-            const embedding = await embed(embeddingInput(row));
+            const embedding = await embed(embeddingInput(row), "backfill");
 
             if (embedding) {
                 await db.update(bookmarks).set({ embedding }).where(eq(bookmarks.id, id));

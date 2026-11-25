@@ -1,3 +1,4 @@
+// oxlint-disable import/max-dependencies -- This file is the composition root that wires every API module together.
 import { type AuthEnv, requireAuth } from "./authMiddleware";
 import { serveAppAssets, serveAppHtml, serveShareGate } from "./spaStatic";
 import { Hono } from "hono";
@@ -8,6 +9,7 @@ import { bookmarkApi } from "./bookmarkApi";
 import { httpStatus } from "./lib/httpStatus";
 import { imageApi } from "./imageApi";
 import { manifestApi } from "./manifestApi";
+import { responseHeaders } from "./responseHeaders";
 
 const isProduction = process.env["NODE_ENV"] === "production";
 
@@ -22,12 +24,7 @@ if (isProduction) {
 
 const app = new Hono<AuthEnv>();
 
-// Every response opts in to the color-scheme hint. The manifest is served per theme, and the
-// manifest request that follows a document load only carries the hint after this opt-in.
-app.use("*", async (context, next) => {
-    await next();
-    context.header("accept-ch", "Sec-CH-Prefers-Color-Scheme");
-});
+app.use("*", responseHeaders);
 
 app.use("*", serveShareGate);
 
