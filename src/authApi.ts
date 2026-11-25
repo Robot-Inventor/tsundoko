@@ -1,4 +1,4 @@
-import { emailTaken, needsSetup, signupAllowed } from "./lib/signupPolicy";
+import { needsSetup, signupAllowed } from "./lib/signupPolicy";
 import { Hono } from "hono";
 import { auth } from "./lib/auth";
 import { bodyLimit } from "hono/body-limit";
@@ -48,10 +48,9 @@ const authApi = new Hono()
             const email = parsed.email.toLowerCase();
             const { name } = parsed;
 
-            if (await emailTaken(email)) {
-                return context.json({ error: "このメールアドレスはすでに登録されています。" }, httpStatus.conflict);
-            }
-
+            // A duplicate address is rejected when the user row is inserted: createSignupUser re-checks
+            // emailTaken, and the unique index on user.email catches a concurrent signup. Reporting it
+            // here would let an unauthenticated caller enumerate registered addresses through the status.
             return context.json({ token: createSignupToken({ email, name }) }, httpStatus.ok);
         }
     )
