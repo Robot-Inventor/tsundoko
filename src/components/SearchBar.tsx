@@ -9,6 +9,7 @@ interface SearchBarProps {
     className?: string;
     focusOnOpen?: boolean;
     inputRef: React.RefObject<HTMLInputElement | null>;
+    onClear: () => void;
     onSearch: () => void;
     onSearchTextChange: (value: string) => void;
     searchText: string;
@@ -18,6 +19,7 @@ const SearchBar = ({
     className,
     focusOnOpen,
     inputRef,
+    onClear,
     onSearch,
     onSearchTextChange,
     searchText
@@ -86,7 +88,7 @@ const SearchBar = ({
                         aria-label={translate("common.clearSearch")}
                         className="absolute end-1 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:focus-outline dark:hover:bg-muted/50"
                         onClick={() => {
-                            onSearchTextChange("");
+                            onClear();
                             inputRef.current?.focus();
                         }}
                         onMouseDown={(event) => {

@@ -21,6 +21,7 @@ const MobileSearch = ({ search }: { search: UseSearchResult }): ReactNode => (
             className="w-full"
             focusOnOpen={search.searchOpen}
             inputRef={search.mobileSearchInput}
+            onClear={search.clearSearch}
             onSearch={search.runSearch}
             onSearchTextChange={search.setSearchText}
             searchText={search.searchText}
@@ -79,6 +80,7 @@ const HeaderSearch = ({ search }: { search: UseSearchResult }): ReactNode => (
         <div className="absolute left-1/2 top-[calc(env(safe-area-inset-top)_+_1.75rem)] hidden w-full max-w-xl -translate-x-1/2 -translate-y-1/2 md:block">
             <SearchBar
                 inputRef={search.desktopSearchInput}
+                onClear={search.clearSearch}
                 onSearch={search.runSearch}
                 onSearchTextChange={search.setSearchText}
                 searchText={search.searchText}
