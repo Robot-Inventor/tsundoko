@@ -15,6 +15,7 @@ import { authClient, clearAuthState } from "../lib/authClient";
 import type { Account } from "../lib/meClient";
 import { Button } from "./ui/button";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 const AccountProvider = ({ children, value }: { children: ReactNode; value: AccountContextValue }): ReactNode => (
     <AccountContext value={value}>{children}</AccountContext>
@@ -41,6 +42,7 @@ const AccountNames = ({ account }: { account: Account }): ReactNode => (
 
 const AccountMenuItems = ({ onNavigate }: { onNavigate?: () => void }): ReactNode => {
     const router = useRouter();
+    const { t: translate } = useTranslation();
 
     const logout = async (): Promise<void> => {
         await authClient.signOut();
@@ -53,7 +55,7 @@ const AccountMenuItems = ({ onNavigate }: { onNavigate?: () => void }): ReactNod
         <>
             <DropdownMenuItem onClick={onNavigate} render=<Link to="/settings" />>
                 <SettingsIcon aria-hidden="true" />
-                設定
+                {translate("common.settings")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -64,50 +66,58 @@ const AccountMenuItems = ({ onNavigate }: { onNavigate?: () => void }): ReactNod
                 variant="destructive"
             >
                 <LogOutIcon aria-hidden="true" />
-                ログアウト
+                {translate("common.logout")}
             </DropdownMenuItem>
         </>
     );
 };
 
-const SidebarAccountMenu = ({ account }: { account: Account }): ReactNode => (
-    <DropdownMenu>
-        <div className="flex items-center gap-2">
-            <AccountAvatar account={account} />
-            <AccountNames account={account} />
-            <DropdownMenuTrigger
-                aria-label={`${account.name}のアカウントメニューを開く`}
-                render=<Button className="size-11" size="icon" variant="ghost" />
-            >
-                <EllipsisVerticalIcon aria-hidden="true" />
-            </DropdownMenuTrigger>
-        </div>
-        <DropdownMenuContent align="end" className="w-52" side="top">
-            <AccountMenuItems />
-        </DropdownMenuContent>
-    </DropdownMenu>
-);
+const SidebarAccountMenu = ({ account }: { account: Account }): ReactNode => {
+    const { t: translate } = useTranslation();
 
-const MobileAccountMenu = ({ account, onNavigate }: { account: Account; onNavigate: () => void }): ReactNode => (
-    <DropdownMenu>
-        <DropdownMenuTrigger
-            aria-label={`${account.name}のアカウントメニューを開く`}
-            render=<Button className="size-11 rounded-full" size="icon" variant="ghost" />
-        >
-            <AccountAvatar account={account} />
-        </DropdownMenuTrigger>
-        {/* The icon-only trigger needs the names inside the menu; the sidebar keeps them visible instead.
-            The group label is what screen readers announce as the account on entering the menu. */}
-        <DropdownMenuContent align="end" className="w-64" sideOffset={8}>
-            <DropdownMenuGroup>
-                <DropdownMenuLabel className="p-2 text-foreground">
-                    <AccountNames account={account} />
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <AccountMenuItems onNavigate={onNavigate} />
-            </DropdownMenuGroup>
-        </DropdownMenuContent>
-    </DropdownMenu>
-);
+    return (
+        <DropdownMenu>
+            <div className="flex items-center gap-2">
+                <AccountAvatar account={account} />
+                <AccountNames account={account} />
+                <DropdownMenuTrigger
+                    aria-label={translate("common.accountMenuLabel", { name: account.name })}
+                    render=<Button className="size-11" size="icon" variant="ghost" />
+                >
+                    <EllipsisVerticalIcon aria-hidden="true" />
+                </DropdownMenuTrigger>
+            </div>
+            <DropdownMenuContent align="end" className="w-52" side="top">
+                <AccountMenuItems />
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+};
+
+const MobileAccountMenu = ({ account, onNavigate }: { account: Account; onNavigate: () => void }): ReactNode => {
+    const { t: translate } = useTranslation();
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger
+                aria-label={translate("common.accountMenuLabel", { name: account.name })}
+                render=<Button className="size-11 rounded-full" size="icon" variant="ghost" />
+            >
+                <AccountAvatar account={account} />
+            </DropdownMenuTrigger>
+            {/* The icon-only trigger needs the names inside the menu; the sidebar keeps them visible instead.
+                The group label is what screen readers announce as the account on entering the menu. */}
+            <DropdownMenuContent align="end" className="w-64" sideOffset={8}>
+                <DropdownMenuGroup>
+                    <DropdownMenuLabel className="p-2 text-foreground">
+                        <AccountNames account={account} />
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <AccountMenuItems onNavigate={onNavigate} />
+                </DropdownMenuGroup>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+};
 
 export { AccountProvider, MobileAccountMenu, SidebarAccountMenu };

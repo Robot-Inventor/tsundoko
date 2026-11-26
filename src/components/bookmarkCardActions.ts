@@ -1,5 +1,6 @@
 import { ArchiveIcon, ArchiveRestoreIcon, type LucideIcon, Trash2Icon } from "lucide-react";
 import type { Bookmark } from "../lib/bookmark";
+import { i18n } from "../lib/i18n";
 import { requestBookmarkAction } from "../lib/bookmarkActions";
 
 interface BookmarkCardAction {
@@ -14,14 +15,14 @@ interface BookmarkCardAction {
 const getBookmarkCardActions = (archived: boolean, bookmark: Bookmark): BookmarkCardAction[] => [
     {
         icon: archived ? ArchiveRestoreIcon : ArchiveIcon,
-        label: archived ? "アーカイブから戻す" : "アーカイブ",
+        label: archived ? i18n.t("bookmark.actionUnarchive") : i18n.t("bookmark.actionArchive"),
         onSelect: (): void => {
             requestBookmarkAction(archived ? "unarchive" : "archive", bookmark);
         }
     },
     {
         icon: Trash2Icon,
-        label: "削除",
+        label: i18n.t("bookmark.actionDelete"),
         onSelect: (): void => {
             requestBookmarkAction("delete", bookmark);
         },

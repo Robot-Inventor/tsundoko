@@ -1,3 +1,4 @@
+import { type Locale, isLocale } from "./locale";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { getGravatarUrl } from "./gravatar";
@@ -14,6 +15,7 @@ interface Account extends AccountSummary {
     // When this passes, adding or removing a passkey needs a fresh sign-in; the settings page uses it
     // to disable those actions before the server has to reject them.
     passkeyEditableUntil: string;
+    locale: Locale;
 }
 
 const readAccount = async (userId: string, sessionStartedAt: Date): Promise<Account | null> => {
@@ -21,6 +23,7 @@ const readAccount = async (userId: string, sessionStartedAt: Date): Promise<Acco
         .select({
             email: user.email,
             image: user.image,
+            locale: user.locale,
             name: user.name
         })
         .from(user)
@@ -34,6 +37,7 @@ const readAccount = async (userId: string, sessionStartedAt: Date): Promise<Acco
         // A stored image wins, so a custom avatar only has to fill user.image.
         avatarUrl: row.image ?? (await getGravatarUrl(row.email)),
         email: row.email,
+        locale: isLocale(row.locale) ? row.locale : "en",
         name: row.name,
         passkeyEditableUntil: getPasskeyEditingDeadline(sessionStartedAt).toISOString()
     };

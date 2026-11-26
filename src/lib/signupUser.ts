@@ -5,7 +5,7 @@ import type { DBTransactionAdapter } from "@better-auth/core/db/adapter";
 import { env } from "../env";
 import { type } from "arktype";
 
-const invalidSignupMessage = "サインアップの有効期限が切れました。もう一度お試しください。";
+const invalidSignupCode = "auth.signupExpired";
 const setupGuardIdentifier = "initial-signup-guard";
 const uniqueViolationCode = "23505";
 const registrationBody = type({ createSession: "boolean" });
@@ -20,7 +20,8 @@ const resolveSignupUser = (context: string | null | undefined): { displayName: s
 
     if (!signup) {
         throw new APIError("BAD_REQUEST", {
-            message: invalidSignupMessage
+            code: invalidSignupCode,
+            message: invalidSignupCode
         });
     }
 
@@ -37,7 +38,8 @@ const verifySignup = (body: unknown, context: string | null | undefined): Signup
 
     if (parsed instanceof type.errors || !parsed.createSession) {
         throw new APIError("BAD_REQUEST", {
-            message: "パスキー登録を完了できませんでした。"
+            code: "auth.passkeyRegistrationFailed",
+            message: "auth.passkeyRegistrationFailed"
         });
     }
 
@@ -45,7 +47,8 @@ const verifySignup = (body: unknown, context: string | null | undefined): Signup
 
     if (!signup) {
         throw new APIError("BAD_REQUEST", {
-            message: invalidSignupMessage
+            code: invalidSignupCode,
+            message: invalidSignupCode
         });
     }
 
@@ -59,13 +62,15 @@ const createSignupUser = async (
 ): Promise<{ userId: string }> => {
     if (!(await signupAllowed())) {
         throw new APIError("FORBIDDEN", {
-            message: "現在は新規サインアップを受け付けていません。"
+            code: "auth.signupClosed",
+            message: "auth.signupClosed"
         });
     }
 
     if (await emailTaken(signup.email)) {
         throw new APIError("CONFLICT", {
-            message: "このメールアドレスはすでに登録されています。"
+            code: "auth.emailTaken",
+            message: "auth.emailTaken"
         });
     }
 
@@ -86,7 +91,8 @@ const createSignupUser = async (
         } catch (error) {
             if (isUniqueViolation(error)) {
                 throw new APIError("FORBIDDEN", {
-                    message: "現在は新規サインアップを受け付けていません。"
+                    code: "auth.signupClosed",
+                    message: "auth.signupClosed"
                 });
             }
 
@@ -101,6 +107,7 @@ const createSignupUser = async (
                 email: signup.email,
                 emailVerified: false,
                 id: userId,
+                locale: signup.locale,
                 name: signup.name,
                 updatedAt: new Date()
             },
@@ -110,7 +117,8 @@ const createSignupUser = async (
     } catch (error) {
         if (isUniqueViolation(error)) {
             throw new APIError("CONFLICT", {
-                message: "このメールアドレスはすでに登録されています。"
+                code: "auth.emailTaken",
+                message: "auth.emailTaken"
             });
         }
 

@@ -1,9 +1,10 @@
-import { type Bookmark, bookmarkMessages } from "../lib/bookmark";
+import type { Bookmark } from "../lib/bookmark";
 import { BookmarkCardSkeleton } from "./BookmarkCardSkeleton";
 import { BookmarkListItem } from "./BookmarkListItem";
 import { Button } from "./ui/button";
 import type { LoadState } from "../hooks/useBookmarkList";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 // Rows are full-bleed on mobile so the swipe gesture, the sliding card, and the reveal
 // background span the screen edges. The vertical half of the row gap rides on the cards
@@ -35,11 +36,13 @@ const BookmarkList = ({
     onRetry,
     query
 }: BookmarkListProps): ReactNode => {
+    const { t: translate } = useTranslation();
+
     if (loadState === "loading" && !bookmarks.length) {
         return (
             <>
                 <p className="sr-only" role="status">
-                    ブックマークを読み込んでいます。
+                    {translate("bookmark.loading")}
                 </p>
                 <div aria-hidden="true" className={bookmarkGrid} data-swipe-zone>
                     {Array.from({ length: skeletonCount }, (_bookmark, index) => (
@@ -56,7 +59,7 @@ const BookmarkList = ({
     if (loadState === "ready" && !bookmarks.length) {
         return (
             <p className="mt-3 text-sm text-muted-foreground">
-                {query ? "該当するブックマークがありません。" : emptyMessage}
+                {query ? translate("bookmark.noResults") : emptyMessage}
             </p>
         );
     }
@@ -68,15 +71,19 @@ const BookmarkList = ({
                 // the first card flush against this banner's bottom edge.
                 <div className="mt-3 max-sm:mb-3 flex items-center gap-2">
                     <p className="text-sm text-muted-foreground" role="alert">
-                        {bookmarkMessages.loadFailed}
+                        {translate("errors.bookmark.loadFailed")}
                     </p>
                     <Button onClick={onRetry} size="sm" type="button" variant="outline">
-                        再試行
+                        {translate("common.retry")}
                     </Button>
                 </div>
             )}
             {Boolean(bookmarks.length) && (
-                <ul aria-label={query ? "検索結果" : listLabel} className={bookmarkGrid} data-swipe-zone>
+                <ul
+                    aria-label={query ? translate("bookmark.searchResults") : listLabel}
+                    className={bookmarkGrid}
+                    data-swipe-zone
+                >
                     {bookmarks.map((bookmark) => (
                         <BookmarkListItem archived={archived} bookmark={bookmark} key={bookmark.id} />
                     ))}

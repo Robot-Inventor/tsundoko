@@ -1,16 +1,25 @@
-const brand = "Tsundoko";
+import type { TFunction } from "i18next";
 
 const pages = {
     "/": {
-        label: "ホーム",
-        searchLabel: "ブックマークを検索"
+        label: "page.home",
+        searchLabel: "page.homeSearch"
     },
     "/archive": {
-        label: "アーカイブ",
-        searchLabel: "アーカイブを検索"
+        label: "page.archive",
+        searchLabel: "page.archiveSearch"
+    },
+    "/login": {
+        label: "auth.loginTitle"
     },
     "/settings": {
-        label: "設定"
+        label: "page.settings"
+    },
+    "/share": {
+        label: "bookmark.addTitle"
+    },
+    "/signup": {
+        label: "auth.signupTitle"
     }
 } as const;
 
@@ -21,7 +30,23 @@ const getPage = (pathname: string): Page => {
         return pages["/archive"];
     }
 
-    return pathname.startsWith("/settings") ? pages["/settings"] : pages["/"];
+    if (pathname.startsWith("/settings")) {
+        return pages["/settings"];
+    }
+
+    if (pathname.startsWith("/login")) {
+        return pages["/login"];
+    }
+
+    if (pathname.startsWith("/signup")) {
+        return pages["/signup"];
+    }
+
+    if (pathname.startsWith("/share")) {
+        return pages["/share"];
+    }
+
+    return pages["/"];
 };
 
 // Only pages with a bookmark list define a search label; the home label covers any future page that
@@ -32,6 +57,6 @@ const getSearchLabel = (pathname: string): string => {
     return "searchLabel" in page ? page.searchLabel : pages["/"].searchLabel;
 };
 
-const getPageTitle = (label: string): string => `${label} | ${brand}`;
+const getPageTitle = (label: string, translate: TFunction): string => translate("page.title", { page: label });
 
-export { brand, getPage, getPageTitle, getSearchLabel, pages };
+export { getPage, getPageTitle, getSearchLabel };

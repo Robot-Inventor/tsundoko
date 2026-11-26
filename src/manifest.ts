@@ -2,6 +2,7 @@
 // oxlint-disable eslint-core-js/camelcase
 
 import type { AppTheme } from "./lib/appTheme";
+import type { Locale } from "./lib/locale";
 
 interface AppIcon {
     purpose?: "maskable";
@@ -78,14 +79,25 @@ const shortcutIcons = (theme: AppTheme): AppIcon[] => [
     }
 ];
 
-const appManifest = (theme: AppTheme): AppManifest => ({
+const shortcutNames = {
+    en: {
+        archive: "Archive",
+        home: "Home"
+    },
+    ja: {
+        archive: "アーカイブ",
+        home: "ホーム"
+    }
+} as const satisfies Record<Locale, { archive: string; home: string }>;
+
+const appManifest = (theme: AppTheme, locale: Locale): AppManifest => ({
     background_color: manifestColors[theme].background,
     description: "Lightweight, AI-first bookmarking app",
     dir: "ltr",
     display: "standalone",
     icons: appIcons(theme),
     id: "/",
-    lang: "ja",
+    lang: locale,
     name: "Tsundoko",
     scope: "/",
     share_target: {
@@ -101,12 +113,12 @@ const appManifest = (theme: AppTheme): AppManifest => ({
     shortcuts: [
         {
             icons: shortcutIcons(theme),
-            name: "ホーム",
+            name: shortcutNames[locale].home,
             url: "/"
         },
         {
             icons: shortcutIcons(theme),
-            name: "アーカイブ",
+            name: shortcutNames[locale].archive,
             url: "/archive"
         }
     ],

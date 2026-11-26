@@ -2,8 +2,8 @@ import { deletePasskey, listPasskeySummaries } from "./lib/passkeyStore";
 import { getPasskeyEditingDeadline, isPasskeyEditingAllowed } from "./lib/passkeyPolicy";
 import type { AuthEnv } from "./authMiddleware";
 import { Hono } from "hono";
+import { apiError } from "./lib/apiError";
 import { httpStatus } from "./lib/httpStatus";
-import { passkeyMessages } from "./lib/passkey";
 
 const passkeyApi = new Hono<AuthEnv>()
     .get("/api/passkeys", async (context) => {
@@ -13,35 +13,17 @@ const passkeyApi = new Hono<AuthEnv>()
     })
     .delete("/api/passkeys/:id", async (context) => {
         if (!isPasskeyEditingAllowed(getPasskeyEditingDeadline(context.get("sessionStartedAt")))) {
-            return context.json(
-                {
-                    code: "SESSION_NOT_FRESH",
-                    error: passkeyMessages.reauthenticate
-                },
-                httpStatus.forbidden
-            );
+            return context.json(apiError("passkey.reauthenticate"), httpStatus.forbidden);
         }
 
         const result = await deletePasskey(context.get("userId"), context.req.param("id"));
 
         if (result === "last") {
-            return context.json(
-                {
-                    code: "LAST_PASSKEY",
-                    error: passkeyMessages.deleteLast
-                },
-                httpStatus.badRequest
-            );
+            return context.json(apiError("passkey.deleteLast"), httpStatus.badRequest);
         }
 
         if (result === "not-found") {
-            return context.json(
-                {
-                    code: "PASSKEY_NOT_FOUND",
-                    error: passkeyMessages.notFound
-                },
-                httpStatus.notFound
-            );
+            return context.json(apiError("passkey.notFound"), httpStatus.notFound);
         }
 
         return context.body(null, httpStatus.noContent);

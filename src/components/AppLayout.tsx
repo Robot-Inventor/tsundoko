@@ -1,6 +1,7 @@
+// oxlint-disable import/max-dependencies -- The layout wires navigation, search, and account state.
 import { AccountProvider, MobileAccountMenu, SidebarAccountMenu } from "./AccountMenu";
 import { ArchiveIcon, HouseIcon } from "lucide-react";
-import { HeadContent, Link, Outlet, useLocation } from "@tanstack/react-router";
+import { Link, Outlet, useLocation } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { SearchContext, desktopLayout, useSearch } from "../hooks/useSearch";
 import { HeaderSearch } from "./HeaderSearch";
@@ -8,6 +9,8 @@ import { MobileMenu } from "./MobileMenu";
 import { cn } from "../lib/utils";
 import { getPage } from "../lib/page-title";
 import { useAccountState } from "../hooks/useAccount";
+import { useLocale } from "../hooks/useLocale";
+import { useTranslation } from "react-i18next";
 
 const navLinkClass =
     "flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold focus-visible:focus-outline data-[status=active]:bg-sidebar-accent data-[status=active]:text-sidebar-accent-foreground";
@@ -21,18 +24,28 @@ interface MainNavigationProps {
     onNavigate?: () => void;
 }
 
-const MainNavigation = ({ homeLinkRef, onNavigate }: MainNavigationProps): ReactNode => (
-    <nav aria-label="メインナビゲーション" className="px-3 py-2">
-        <Link activeOptions={homeActiveOptions} className={navLinkClass} onClick={onNavigate} ref={homeLinkRef} to="/">
-            <HouseIcon aria-hidden="true" className="size-4" />
-            ホーム
-        </Link>
-        <Link className={navLinkClass} onClick={onNavigate} to="/archive">
-            <ArchiveIcon aria-hidden="true" className="size-4" />
-            アーカイブ
-        </Link>
-    </nav>
-);
+const MainNavigation = ({ homeLinkRef, onNavigate }: MainNavigationProps): ReactNode => {
+    const { t: translate } = useTranslation();
+
+    return (
+        <nav aria-label={translate("common.mainNavigation")} className="px-3 py-2">
+            <Link
+                activeOptions={homeActiveOptions}
+                className={navLinkClass}
+                onClick={onNavigate}
+                ref={homeLinkRef}
+                to="/"
+            >
+                <HouseIcon aria-hidden="true" className="size-4" />
+                {translate("common.home")}
+            </Link>
+            <Link className={navLinkClass} onClick={onNavigate} to="/archive">
+                <ArchiveIcon aria-hidden="true" className="size-4" />
+                {translate("common.archive")}
+            </Link>
+        </nav>
+    );
+};
 
 const Logo = ({ className }: { className: string }): ReactNode => (
     <img alt="Tsundoko" className={className} height={370} src="/logo.svg" width={1666} />
@@ -42,6 +55,7 @@ const Logo = ({ className }: { className: string }): ReactNode => (
 // h1 is visible per breakpoint.
 const MobilePageTitle = ({ searchOpen }: { searchOpen: boolean }): ReactNode => {
     const { pathname } = useLocation();
+    const { t: translate } = useTranslation();
 
     return (
         <h1
@@ -51,7 +65,7 @@ const MobilePageTitle = ({ searchOpen }: { searchOpen: boolean }): ReactNode => 
             )}
             inert={searchOpen}
         >
-            {getPage(pathname).label}
+            {translate(getPage(pathname).label)}
         </h1>
     );
 };
@@ -65,10 +79,24 @@ const AppLayout = (): ReactNode => {
     const desktopHomeLink = useRef<HTMLAnchorElement>(null);
     const accountState = useAccountState();
     const { account } = accountState;
+    const { locale, setLocale } = useLocale();
+    const appliedAccountLocale = useRef(false);
 
     const closeMenu = (): void => {
         setMenuOpen(false);
     };
+
+    // Apply the server locale once when the account first loads. Later refreshes must not undo
+    // a locale the user just changed in settings while its save request is still in flight.
+    useEffect(() => {
+        if (account?.locale && !appliedAccountLocale.current) {
+            appliedAccountLocale.current = true;
+
+            if (account.locale !== locale) {
+                setLocale(account.locale);
+            }
+        }
+    }, [account?.locale, locale, setLocale]);
 
     useEffect(() => {
         // An open modal must release focus and scroll lock when the desktop navigation takes over.
@@ -88,7 +116,6 @@ const AppLayout = (): ReactNode => {
 
     return (
         <AccountProvider value={accountState}>
-            <HeadContent />
             <header className="sticky top-0 z-20 flex h-[calc(3.5rem_+_env(safe-area-inset-top))] items-center gap-2 border-b bg-background px-3 pt-[env(safe-area-inset-top)] md:px-4">
                 <MobileMenu
                     finalFocus={() => (window.matchMedia(desktopLayout).matches ? desktopHomeLink.current : true)}

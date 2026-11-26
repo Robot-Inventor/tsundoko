@@ -3,6 +3,7 @@ import { SearchIcon, XIcon } from "lucide-react";
 import { Input } from "./ui/Input";
 import { getSearchLabel } from "../lib/page-title";
 import { useLocation } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 
 interface SearchBarProps {
     className?: string;
@@ -22,7 +23,8 @@ const SearchBar = ({
     searchText
 }: SearchBarProps): ReactNode => {
     const { pathname } = useLocation();
-    const label = getSearchLabel(pathname);
+    const { t: translate } = useTranslation();
+    const label = translate(getSearchLabel(pathname));
 
     // A layout effect keeps focus inside the tap or keystroke that opened the bar, which iOS
     // requires to open the keyboard. The mobile bar stays mounted, so the same effect blurs on close.
@@ -81,7 +83,7 @@ const SearchBar = ({
                     // A plain button avoids the Button press animation, whose translate-y-px
                     // would stomp -translate-y-1/2 and visibly drop the button before it unmounts.
                     <button
-                        aria-label="検索ワードを消去"
+                        aria-label={translate("common.clearSearch")}
                         className="absolute end-1 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:focus-outline dark:hover:bg-muted/50"
                         onClick={() => {
                             onSearchTextChange("");

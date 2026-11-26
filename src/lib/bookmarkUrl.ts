@@ -2,8 +2,6 @@ import { type } from "arktype";
 
 // Keep URL bytes below PostgreSQL's btree limit for the unique URL index.
 const maxBookmarkUrlLength = 2000;
-const invalidBookmarkUrlMessage = "http://またはhttps://で始まるURLを入力してください。";
-
 const bookmarkUrl = type("string.trim")
     .to(type("string").atMostLength(maxBookmarkUrlLength))
     .to("string.url.parse")
@@ -27,4 +25,4 @@ const normalizeBookmarkUrl = (url: URL): string => {
     return normalized.href;
 };
 
-export { bookmarkUrl, invalidBookmarkUrlMessage, maxBookmarkUrlLength, normalizeBookmarkUrl, parseBookmarkUrl };
+export { bookmarkUrl, maxBookmarkUrlLength, normalizeBookmarkUrl, parseBookmarkUrl };

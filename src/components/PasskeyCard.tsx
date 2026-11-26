@@ -1,15 +1,24 @@
+// oxlint-disable import/max-dependencies -- The card handles rename, deletion, and locale-aware labels.
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
-import { type PasskeyError, type PasskeySummary, passkeyMessages, toPasskeyError } from "../lib/passkey";
+import { type PasskeyError, type PasskeySummary, toPasskeyError } from "../lib/passkey";
 import { type ReactNode, useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/Input";
 import { PencilIcon } from "lucide-react";
 import { authClient } from "../lib/authClient";
+import { authErrorMessage } from "../lib/errorMessage";
 import { formatDate } from "../lib/dateFormat";
+import { formatPasskeyName } from "../lib/localizedNames";
 import { meClient } from "../lib/meClient";
 import { type } from "arktype";
+import { useLocale } from "../hooks/useLocale";
+import { useTranslation } from "react-i18next";
 
-const deleteErrorBody = type({ code: "string", error: "string" });
+const deleteErrorBody = type({
+    error: {
+        code: "string"
+    }
+});
 
 interface RenameDialogProps {
     name: string;
@@ -23,6 +32,7 @@ const RenameDialog = ({ name, onClose, onRenamed, open, passkeyId }: RenameDialo
     const [value, setValue] = useState(name);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const { t: translate } = useTranslation();
 
     const save = async (): Promise<void> => {
         setBusy(true);
@@ -32,13 +42,13 @@ const RenameDialog = ({ name, onClose, onRenamed, open, passkeyId }: RenameDialo
             const result = await authClient.passkey.updatePasskey({ id: passkeyId, name: value.trim() });
 
             if (result.error) {
-                setError(toPasskeyError(result.error).message);
+                setError(authErrorMessage(toPasskeyError(result.error), "passkey.saveFailed"));
             } else {
                 onClose();
                 onRenamed();
             }
         } catch {
-            setError(passkeyMessages.saveFailed);
+            setError(translate("errors.passkey.saveFailed"));
         }
 
         setBusy(false);
@@ -61,7 +71,7 @@ const RenameDialog = ({ name, onClose, onRenamed, open, passkeyId }: RenameDialo
         >
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>パスキー名を変更</DialogTitle>
+                    <DialogTitle>{translate("passkey.renameTitle")}</DialogTitle>
                 </DialogHeader>
                 <form
                     className="space-y-4"
@@ -71,7 +81,7 @@ const RenameDialog = ({ name, onClose, onRenamed, open, passkeyId }: RenameDialo
                     }}
                 >
                     <Input
-                        aria-label="パスキー名"
+                        aria-label={translate("passkey.nameLabel")}
                         onChange={(event) => {
                             setValue(event.target.value);
                         }}
@@ -85,10 +95,10 @@ const RenameDialog = ({ name, onClose, onRenamed, open, passkeyId }: RenameDialo
                     ) : null}
                     <DialogFooter className="flex-row justify-end">
                         <Button onClick={close} type="button" variant="outline">
-                            キャンセル
+                            {translate("common.cancel")}
                         </Button>
                         <Button disabled={busy || value.trim() === ""} type="submit">
-                            保存
+                            {translate("common.save")}
                         </Button>
                     </DialogFooter>
                 </form>
@@ -108,6 +118,7 @@ interface DeleteDialogProps {
 
 const DeleteDialog = ({ name, onClose, onDeleted, onError, open, passkeyId }: DeleteDialogProps): ReactNode => {
     const [busy, setBusy] = useState(false);
+    const { t: translate } = useTranslation();
 
     const remove = async (): Promise<void> => {
         setBusy(true);
@@ -122,25 +133,15 @@ const DeleteDialog = ({ name, onClose, onDeleted, onError, open, passkeyId }: De
             if (response.ok) {
                 onDeleted();
             } else {
-                const failure = deleteErrorBody(await response.json());
+                const failure = deleteErrorBody(await response.json().catch(() => null));
 
-                onError(
-                    failure instanceof type.errors
-                        ? {
-                              code: "",
-                              message: passkeyMessages.saveFailed
-                          }
-                        : {
-                              code: failure.code,
-                              message: failure.error
-                          }
-                );
+                onError({
+                    code: failure instanceof type.errors ? "" : failure.error.code,
+                    message: ""
+                });
             }
         } catch {
-            onError({
-                code: "",
-                message: passkeyMessages.saveFailed
-            });
+            onError({ code: "", message: "" });
         }
 
         setBusy(false);
@@ -158,14 +159,12 @@ const DeleteDialog = ({ name, onClose, onDeleted, onError, open, passkeyId }: De
         >
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>パスキーを削除</DialogTitle>
-                    <DialogDescription>
-                        「{name}」を削除します。このパスキーではログインできなくなります。
-                    </DialogDescription>
+                    <DialogTitle>{translate("passkey.deleteTitle")}</DialogTitle>
+                    <DialogDescription>{translate("passkey.deleteDescription", { name })}</DialogDescription>
                 </DialogHeader>
                 <DialogFooter className="flex-row justify-end">
                     <Button onClick={onClose} type="button" variant="outline">
-                        キャンセル
+                        {translate("common.cancel")}
                     </Button>
                     <Button
                         disabled={busy}
@@ -174,7 +173,7 @@ const DeleteDialog = ({ name, onClose, onDeleted, onError, open, passkeyId }: De
                         }}
                         variant="destructive"
                     >
-                        削除
+                        {translate("common.delete")}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -194,14 +193,17 @@ interface PasskeyCardProps {
 const PasskeyCard = ({ canDelete, deleteAllowed, onChanged, onError, passkey }: PasskeyCardProps): ReactNode => {
     const [renaming, setRenaming] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const { locale } = useLocale();
+    const { t: translate } = useTranslation();
+    const name = formatPasskeyName(passkey.name, locale, translate("passkey.defaultName"));
 
     return (
         <div className="flex flex-wrap items-start justify-between gap-3 py-4">
             <div className="min-w-0 space-y-1">
                 <div className="flex items-center gap-1">
-                    <p className="truncate font-medium">{passkey.name}</p>
+                    <p className="truncate font-medium">{name}</p>
                     <Button
-                        aria-label={`${passkey.name}の名前を変更`}
+                        aria-label={translate("common.renamePasskeyLabel", { name })}
                         onClick={() => {
                             setRenaming(true);
                         }}
@@ -211,8 +213,16 @@ const PasskeyCard = ({ canDelete, deleteAllowed, onChanged, onError, passkey }: 
                         <PencilIcon aria-hidden="true" />
                     </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">作成日: {formatDate(passkey.createdAt)}</p>
-                <p className="text-xs text-muted-foreground">最終使用日: {formatDate(passkey.lastUsedAt, "未使用")}</p>
+                <p className="text-xs text-muted-foreground">
+                    {translate("common.createdAt", {
+                        date: formatDate(locale, passkey.createdAt, translate("common.unknownDate"))
+                    })}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                    {translate("common.lastUsedAt", {
+                        date: formatDate(locale, passkey.lastUsedAt, translate("common.neverUsed"))
+                    })}
+                </p>
             </div>
             {canDelete ? (
                 <Button
@@ -224,7 +234,7 @@ const PasskeyCard = ({ canDelete, deleteAllowed, onChanged, onError, passkey }: 
                     size="sm"
                     variant="ghost"
                 >
-                    削除
+                    {translate("common.delete")}
                 </Button>
             ) : null}
             <RenameDialog
@@ -237,7 +247,7 @@ const PasskeyCard = ({ canDelete, deleteAllowed, onChanged, onError, passkey }: 
                 passkeyId={passkey.id}
             />
             <DeleteDialog
-                name={passkey.name}
+                name={name}
                 onClose={() => {
                     setDeleting(false);
                 }}

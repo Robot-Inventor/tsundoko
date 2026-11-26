@@ -6,7 +6,9 @@ import { notifyError, notifyInfo, notifySuccess } from "../lib/appToast";
 import { useLoaderData, useNavigate } from "@tanstack/react-router";
 import { Button } from "./ui/button";
 import { LoaderCircleIcon } from "lucide-react";
+import type { TFunction } from "i18next";
 import { requestBookmark } from "../lib/addBookmark";
+import { useTranslation } from "react-i18next";
 
 interface ShareOutcome {
     added: number;
@@ -14,17 +16,17 @@ interface ShareOutcome {
     failed: number;
 }
 
-const summarize = ({ added, duplicate, failed }: ShareOutcome): string =>
+const summarize = (outcome: ShareOutcome, translate: TFunction, separator: string): string =>
     [
-        added ? `${String(added)}件を追加しました。` : "",
-        duplicate ? `${String(duplicate)}件は追加済みです。` : "",
-        failed ? `${String(failed)}件は取得できませんでした。` : ""
+        outcome.added ? translate("share.summaryAdded", { count: outcome.added }) : "",
+        outcome.duplicate ? translate("share.summaryDuplicate", { count: outcome.duplicate }) : "",
+        outcome.failed ? translate("share.summaryFailed", { count: outcome.failed }) : ""
     ]
         .filter(Boolean)
-        .join("");
+        .join(separator);
 
-const reportOutcome = (outcome: ShareOutcome): void => {
-    const summary = summarize(outcome);
+const reportOutcome = (outcome: ShareOutcome, translate: TFunction, separator: string): void => {
+    const summary = summarize(outcome, translate, separator);
 
     if (outcome.failed) {
         notifyError(summary);
@@ -43,38 +45,44 @@ interface ShareConfirmationProps {
 
 // A share target launch adds without asking. A link from another site opens the same route but
 // has a referrer, so the user confirms the URLs before anything is saved.
-const ShareConfirmation = ({ onCancel, onConfirm, urls }: ShareConfirmationProps): ReactNode => (
-    <Dialog
-        onOpenChange={(open) => {
-            if (!open) {
-                onCancel();
-            }
-        }}
-        open
-    >
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle>ブックマークを追加</DialogTitle>
-                <DialogDescription>{String(urls.length)}件のブックマークを追加しますか？</DialogDescription>
-            </DialogHeader>
-            <ul className="max-h-60 space-y-1 overflow-y-auto">
-                {urls.map((url) => (
-                    <li className="wrap-anywhere" key={url}>
-                        {url}
-                    </li>
-                ))}
-            </ul>
-            <DialogFooter className="flex-row justify-end">
-                <Button onClick={onCancel} type="button" variant="outline">
-                    キャンセル
-                </Button>
-                <Button onClick={onConfirm} type="button">
-                    追加
-                </Button>
-            </DialogFooter>
-        </DialogContent>
-    </Dialog>
-);
+const ShareConfirmation = ({ onCancel, onConfirm, urls }: ShareConfirmationProps): ReactNode => {
+    const { t: translate } = useTranslation();
+
+    return (
+        <Dialog
+            onOpenChange={(open) => {
+                if (!open) {
+                    onCancel();
+                }
+            }}
+            open
+        >
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{translate("share.confirmTitle")}</DialogTitle>
+                    <DialogDescription>
+                        {translate("share.confirmDescription", { count: urls.length })}
+                    </DialogDescription>
+                </DialogHeader>
+                <ul className="max-h-60 space-y-1 overflow-y-auto">
+                    {urls.map((url) => (
+                        <li className="wrap-anywhere" key={url}>
+                            {url}
+                        </li>
+                    ))}
+                </ul>
+                <DialogFooter className="flex-row justify-end">
+                    <Button onClick={onCancel} type="button" variant="outline">
+                        {translate("common.cancel")}
+                    </Button>
+                    <Button onClick={onConfirm} type="button">
+                        {translate("common.add")}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
 
 const SharePage = (): ReactNode => {
     const { requiresConfirmation, urls } = useLoaderData({ from: "/share" });
@@ -84,6 +92,8 @@ const SharePage = (): ReactNode => {
     const started = useRef(false);
     const answered = useRef(false);
     const waitsForConfirmation = requiresConfirmation && urls.length > 0 && !confirmed;
+    const { t: translate } = useTranslation();
+    const separator = translate("common.summarySeparator");
 
     const cancel = (): void => {
         if (answered.current) {
@@ -110,7 +120,7 @@ const SharePage = (): ReactNode => {
         started.current = true;
 
         if (!urls.length) {
-            notifyError("共有されたテキストからURLが見つかりませんでした。");
+            notifyError(translate("share.noUrls"));
             void navigate({ replace: true, to: "/" });
 
             return;
@@ -144,9 +154,9 @@ const SharePage = (): ReactNode => {
                 await navigate({ replace: true, to: "/" });
             }
 
-            reportOutcome(outcome);
+            reportOutcome(outcome, translate, separator);
         })();
-    }, [navigate, urls, waitsForConfirmation]);
+    }, [navigate, separator, translate, urls, waitsForConfirmation]);
 
     if (waitsForConfirmation) {
         return <ShareConfirmation onCancel={cancel} onConfirm={confirm} urls={urls} />;
@@ -160,7 +170,7 @@ const SharePage = (): ReactNode => {
         <div className="flex flex-col items-center gap-3 py-24">
             <LoaderCircleIcon aria-hidden="true" className="size-6 animate-spin text-muted-foreground" />
             <p className="text-sm text-muted-foreground" role="status">
-                追加しています…（{String(Math.min(done + 1, urls.length))}/{String(urls.length)}）
+                {translate("share.adding", { current: Math.min(done + 1, urls.length), total: urls.length })}
             </p>
         </div>
     );

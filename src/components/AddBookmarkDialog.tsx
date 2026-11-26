@@ -1,19 +1,23 @@
+// oxlint-disable import/max-dependencies -- The dialog wires form state, validation, and locale.
 import { type AddBookmarkFailure, requestBookmark } from "../lib/addBookmark";
-import { type Bookmark, bookmarkMessages } from "../lib/bookmark";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { type ReactNode, useRef, useState } from "react";
-import { invalidBookmarkUrlMessage, maxBookmarkUrlLength, parseBookmarkUrl } from "../lib/bookmarkUrl";
+import { maxBookmarkUrlLength, parseBookmarkUrl } from "../lib/bookmarkUrl";
+import type { Bookmark } from "../lib/bookmark";
 import { Button } from "./ui/button";
 import { Input } from "./ui/Input";
 import { PlusIcon } from "lucide-react";
 import { cn } from "../lib/utils";
+import { i18n } from "../lib/i18n";
 import { useSearchContext } from "../hooks/useSearch";
+import { useTranslation } from "react-i18next";
 
-const formErrors = {
-    duplicate: bookmarkMessages.duplicate,
-    fetch: bookmarkMessages.fetchFailed,
-    invalid: invalidBookmarkUrlMessage,
-    save: bookmarkMessages.saveFailed
+const formErrorKeys = {
+    duplicate: "errors.bookmark.duplicate",
+    fetch: "errors.bookmark.fetchFailed",
+    invalid: "errors.bookmark.invalidUrl",
+    rateLimit: "errors.rateLimit",
+    save: "errors.bookmark.saveFailed"
 } as const satisfies Record<AddBookmarkFailure, string>;
 
 const errorId = "add-bookmark-error";
@@ -28,6 +32,7 @@ const BookmarkUrlForm = ({ onAdded, onCancel }: BookmarkUrlFormProps): ReactNode
     const [error, setError] = useState("");
     const [adding, setAdding] = useState(false);
     const urlInput = useRef<HTMLInputElement>(null);
+    const { t: translate } = useTranslation();
 
     const addBookmark = async (): Promise<void> => {
         if (adding) {
@@ -38,7 +43,7 @@ const BookmarkUrlForm = ({ onAdded, onCancel }: BookmarkUrlFormProps): ReactNode
         const url = parseBookmarkUrl(input);
 
         if (!url) {
-            setError(formErrors.invalid);
+            setError(i18n.t("errors.bookmark.invalidUrl"));
             urlInput.current?.focus();
 
             return;
@@ -49,7 +54,7 @@ const BookmarkUrlForm = ({ onAdded, onCancel }: BookmarkUrlFormProps): ReactNode
         setAdding(false);
 
         if ("failure" in result) {
-            setError(formErrors[result.failure]);
+            setError(i18n.t(formErrorKeys[result.failure]));
 
             return;
         }
@@ -70,7 +75,7 @@ const BookmarkUrlForm = ({ onAdded, onCancel }: BookmarkUrlFormProps): ReactNode
             <Input
                 aria-describedby={error ? errorId : ""}
                 aria-invalid={Boolean(error)}
-                aria-label="追加するページのURL"
+                aria-label={translate("bookmark.urlLabel")}
                 autoCapitalize="none"
                 autoComplete="url"
                 autoCorrect="off"
@@ -80,7 +85,7 @@ const BookmarkUrlForm = ({ onAdded, onCancel }: BookmarkUrlFormProps): ReactNode
                     setInput(event.currentTarget.value);
                     setError("");
                 }}
-                placeholder="追加するURLを入力"
+                placeholder={translate("bookmark.urlPlaceholder")}
                 readOnly={adding}
                 ref={urlInput}
                 required
@@ -94,14 +99,14 @@ const BookmarkUrlForm = ({ onAdded, onCancel }: BookmarkUrlFormProps): ReactNode
                 </p>
             ) : null}
             <p aria-live="polite" className="sr-only">
-                {adding ? "ページの情報を取得しています。" : ""}
+                {adding ? translate("bookmark.fetchingStatus") : ""}
             </p>
             <DialogFooter className="flex-row justify-end">
                 <Button onClick={onCancel} type="button" variant="outline">
-                    キャンセル
+                    {translate("common.cancel")}
                 </Button>
                 <Button disabled={adding} type="submit">
-                    {adding ? "取得中…" : "追加"}
+                    {adding ? translate("bookmark.fetchingButton") : translate("common.add")}
                 </Button>
             </DialogFooter>
         </form>
@@ -116,15 +121,16 @@ const AddBookmarkDialog = ({ onAdd }: AddBookmarkDialogProps): ReactNode => {
     const search = useSearchContext();
     const [open, setOpen] = useState(false);
     const inactive = open || search.searchOpen;
+    const { t: translate } = useTranslation();
 
     return (
         <Dialog onOpenChange={setOpen} open={open}>
             <DialogTrigger render=<Button className="hidden md:inline-flex" />>
                 <PlusIcon aria-hidden="true" />
-                追加
+                {translate("common.add")}
             </DialogTrigger>
             <DialogTrigger
-                aria-label="ブックマークを追加"
+                aria-label={translate("bookmark.addTitle")}
                 inert={inactive}
                 render=<Button
                     className={cn(
@@ -138,7 +144,7 @@ const AddBookmarkDialog = ({ onAdd }: AddBookmarkDialogProps): ReactNode => {
             </DialogTrigger>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>ブックマークを追加</DialogTitle>
+                    <DialogTitle>{translate("bookmark.addTitle")}</DialogTitle>
                 </DialogHeader>
                 <BookmarkUrlForm
                     onAdded={(bookmark) => {

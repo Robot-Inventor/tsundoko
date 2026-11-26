@@ -16,7 +16,12 @@ beforeAll(() => {
 describe("signup context token", () => {
     it("rejects a tampered token", async () => {
         const { createSignupToken, readSignupToken } = await import("./signupToken");
-        const token = createSignupToken({ email: "a@example.com", name: "A" });
+        const token = createSignupToken({
+            email: "a@example.com",
+            locale: "en",
+            name: "A"
+        });
+
         const [payload, signature] = token.split(".");
 
         if (!payload || !signature) {
@@ -31,7 +36,11 @@ describe("signup context token", () => {
 
     it("rejects an expired token", async () => {
         const { createSignupToken, readSignupToken } = await import("./signupToken");
-        const token = createSignupToken({ email: "a@example.com", name: "A" });
+        const token = createSignupToken({
+            email: "a@example.com",
+            locale: "en",
+            name: "A"
+        });
 
         vi.useFakeTimers();
         vi.setSystemTime(Date.now() + sixMinutesMs);
@@ -43,8 +52,16 @@ describe("signup context token", () => {
 
     it("accepts a valid token", async () => {
         const { createSignupToken, readSignupToken } = await import("./signupToken");
-        const token = createSignupToken({ email: "a@example.com", name: "A" });
+        const token = createSignupToken({
+            email: "a@example.com",
+            locale: "en",
+            name: "A"
+        });
 
-        expect(readSignupToken(token)).toStrictEqual({ email: "a@example.com", name: "A" });
+        expect(readSignupToken(token)).toStrictEqual({
+            email: "a@example.com",
+            locale: "en",
+            name: "A"
+        });
     });
 });

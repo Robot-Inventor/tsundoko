@@ -23,13 +23,13 @@ const loadAuthState = async (): Promise<AuthState> => {
     const response = await fetch("/api/auth/status");
 
     if (!response.ok) {
-        throw new Error("認証状態を取得できませんでした。");
+        throw new Error("Could not load the authentication state.");
     }
 
     const status = authStatus(await response.json());
 
     if (status instanceof type.errors) {
-        throw new Error("認証状態を取得できませんでした。");
+        throw new Error("Could not load the authentication state.");
     }
 
     const session = await authClient.getSession();

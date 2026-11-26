@@ -4,6 +4,7 @@ import { Button } from "./ui/button";
 import { SearchBar } from "./SearchBar";
 import type { UseSearchResult } from "../hooks/useSearch";
 import { cn } from "../lib/utils";
+import { useTranslation } from "react-i18next";
 
 // Stays mounted so both the entrance and the exit animate; inert keeps the hidden input unreachable.
 // start-4 matches the bookmark thumbnails' inset; end-16 covers the header's 12px padding,
@@ -30,6 +31,7 @@ const MobileSearch = ({ search }: { search: UseSearchResult }): ReactNode => (
 const MobileSearchToggle = ({ search }: { search: UseSearchResult }): ReactNode => {
     const buttonRef = useRef<HTMLButtonElement>(null);
     const wasOpen = useRef(false);
+    const { t: translate } = useTranslation();
 
     useLayoutEffect(() => {
         // Enter runs the search without touching this button, so give keyboard users their place back.
@@ -42,7 +44,7 @@ const MobileSearchToggle = ({ search }: { search: UseSearchResult }): ReactNode 
 
     return (
         <Button
-            aria-label={search.searchOpen ? "検索を閉じる" : "検索を開く"}
+            aria-label={translate(search.searchOpen ? "common.closeSearch" : "common.openSearch")}
             className="ms-auto size-11 md:hidden"
             onClick={search.searchOpen ? search.closeSearch : search.openSearch}
             ref={buttonRef}
