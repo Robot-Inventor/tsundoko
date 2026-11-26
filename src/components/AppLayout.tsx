@@ -53,20 +53,25 @@ const Logo = ({ className }: { className: string }): ReactNode => (
 );
 
 // The mobile header carries the page title; each page hides its own h1 on mobile so exactly one
-// h1 is visible per breakpoint.
-const MobilePageTitle = ({ searchOpen }: { searchOpen: boolean }): ReactNode => {
+// h1 is visible per breakpoint. On a list page an active query is more important than the page name,
+// so the title states which keyword the displayed results belong to.
+const MobilePageTitle = ({ query, searchOpen }: { query: string; searchOpen: boolean }): ReactNode => {
     const { pathname } = useLocation();
     const { t: translate } = useTranslation();
+    const page = getPage(pathname);
+    const label = query === "" ? translate(page.label) : translate("search.resultsFor", { query });
 
     return (
         <h1
+            aria-label={label}
             className={cn(
-                "absolute left-1/2 top-[calc(env(safe-area-inset-top)_+_1.75rem)] -translate-x-1/2 -translate-y-1/2 text-base font-semibold transition-opacity duration-200 md:hidden motion-reduce:transition-none",
+                "absolute left-1/2 top-[calc(env(safe-area-inset-top)_+_1.75rem)] max-w-[calc(100%_-_8rem)] -translate-x-1/2 -translate-y-1/2 truncate text-base font-semibold transition-opacity duration-200 md:hidden motion-reduce:transition-none",
                 searchOpen && "opacity-0"
             )}
             inert={searchOpen}
+            title={label}
         >
-            {translate(getPage(pathname).label)}
+            {label}
         </h1>
     );
 };
@@ -75,7 +80,8 @@ const AppLayout = (): ReactNode => {
     const { pathname } = useLocation();
     // Settings has no bookmark list, so it must not offer a search box or its keyboard shortcuts.
     const showsSearch = !pathname.startsWith("/settings");
-    const search = useSearch(showsSearch);
+    const isListPage = pathname === "/" || pathname === "/archive";
+    const search = useSearch(showsSearch, pathname);
     const [menuOpen, setMenuOpen] = useState(false);
     const desktopHomeLink = useRef<HTMLAnchorElement>(null);
     const accountState = useAccountState();
@@ -98,13 +104,6 @@ const AppLayout = (): ReactNode => {
             }
         }
     }, [account?.locale, locale, setLocale]);
-
-    const { finishSearch } = search;
-
-    useEffect(() => {
-        // A search started on another page must not keep its bar on a page without a search box.
-        finishSearch();
-    }, [finishSearch, pathname]);
 
     useEffect(() => {
         // An open modal must release focus and scroll lock when the desktop navigation takes over.
@@ -138,10 +137,10 @@ const AppLayout = (): ReactNode => {
                     <MainNavigation onNavigate={closeMenu} />
                 </MobileMenu>
                 <Logo className="hidden h-auto w-32 md:block" />
-                <MobilePageTitle searchOpen={search.searchOpen} />
+                <MobilePageTitle query={isListPage ? search.query : ""} searchOpen={search.searchOpen} />
                 {showsSearch && <HeaderSearch search={search} />}
                 {/* Only Home and Archive fetch a bookmark list, so a search from /share has no request to finish. */}
-                {pathname === "/" || pathname === "/archive" ? <SearchProgress searching={search.isSearching} /> : null}
+                {isListPage ? <SearchProgress searching={search.isSearching} /> : null}
             </header>
 
             <div className="flex min-h-[calc(100dvh_-_3.5rem_-_env(safe-area-inset-top))]">

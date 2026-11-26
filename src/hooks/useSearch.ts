@@ -56,13 +56,32 @@ const useSearchShortcuts = (searchEnabled: boolean, closeSearch: () => void, foc
     }, [closeSearch, focusSearch, searchEnabled]);
 };
 
-const useSearch = (searchEnabled: boolean): UseSearchResult => {
+const useResetOnRouteChange = (pathname: string, reset: () => void): void => {
+    const [previousPathname, setPreviousPathname] = useState(pathname);
+
+    // Clear during render so a newly mounted page never fetches with the previous page's keyword.
+    if (previousPathname !== pathname) {
+        setPreviousPathname(pathname);
+        reset();
+    }
+};
+
+const useSearch = (searchEnabled: boolean, pathname: string): UseSearchResult => {
     const [searchOpen, setSearchOpen] = useState(false);
     const [query, setQuery] = useState("");
     const [searchText, setSearchText] = useState("");
     const [isSearching, setIsSearching] = useState(false);
     const desktopSearchInput = useRef<HTMLInputElement>(null);
     const mobileSearchInput = useRef<HTMLInputElement>(null);
+
+    const resetSearch = useCallback((): void => {
+        setSearchOpen(false);
+        setQuery("");
+        setSearchText("");
+        setIsSearching(false);
+    }, []);
+
+    useResetOnRouteChange(pathname, resetSearch);
 
     const openSearch = useCallback((): void => {
         setSearchOpen(true);
