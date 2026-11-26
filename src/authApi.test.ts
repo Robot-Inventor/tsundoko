@@ -26,3 +26,23 @@ describe("signup context endpoint", () => {
         expect(response.status).toBe(payloadTooLarge);
     });
 });
+
+describe("auth catch-all endpoint", () => {
+    it("rejects a body larger than the limit before forwarding it", async () => {
+        const { authApi } = await import("./authApi");
+        const response = await authApi.request("/api/auth/sign-in/email", {
+            body: JSON.stringify({ email: "a@example.com", password: oversizedName }),
+            headers: {
+                "content-type": "application/json"
+            },
+            method: "POST"
+        });
+
+        expect(response.status).toBe(payloadTooLarge);
+        expect(await response.json()).toMatchObject({
+            error: {
+                code: "auth.tooLong"
+            }
+        });
+    });
+});

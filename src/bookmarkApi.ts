@@ -5,15 +5,14 @@ import { bookmarkUrl, normalizeBookmarkUrl } from "./lib/bookmarkUrl";
 import { isXPostUrl, renderXPost } from "./lib/xPost";
 import { Hono } from "hono";
 import { apiError } from "./lib/apiError";
-import { bodyLimit } from "hono/body-limit";
 import { createRateLimit } from "./lib/rateLimit";
 import { getPreview } from "./lib/preview";
 import { parseContentType } from "./lib/mediaType";
+import { requestBodyLimit } from "./lib/requestBodyLimit";
 import { runOutbound } from "./lib/outboundLimit";
 import { type } from "arktype";
 import { validator } from "hono/validator";
 
-const maxRequestBytes = 16_384;
 const bookmarkSaveLimit = 30;
 const bookmarkListLimit = 60;
 
@@ -76,75 +75,64 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
             return context.json(apiError("bookmark.loadFailed"), httpStatus.internalServerError);
         }
     })
-    .post(
-        "/api/bookmarks",
-        bookmarkSaveRateLimit,
-        bodyLimit({
-            maxSize: maxRequestBytes,
-            onError: (context) => context.json(apiError("bookmark.tooLong"), httpStatus.payloadTooLarge)
-        }),
-        async (context) => {
-            context.header("Cache-Control", "no-store");
+    .post("/api/bookmarks", bookmarkSaveRateLimit, requestBodyLimit("bookmark.tooLong"), async (context) => {
+        context.header("Cache-Control", "no-store");
 
-            if (parseContentType(context.req.header("content-type"))?.essence !== "application/json") {
-                return context.json(apiError("bookmark.invalidJson"), httpStatus.unsupportedMediaType);
-            }
-
-            const input = previewRequest(await context.req.text());
-
-            if (input instanceof type.errors) {
-                return context.json(apiError("bookmark.invalidUrl"), httpStatus.badRequest);
-            }
-
-            try {
-                if (await bookmarkExists(normalizeBookmarkUrl(input.url), context.get("userId"))) {
-                    return context.json(apiError("bookmark.duplicate"), httpStatus.conflict);
-                }
-            } catch {
-                return context.json(apiError("bookmark.saveFailed"), httpStatus.internalServerError);
-            }
-
-            // X post pages are fetched by xeet instead of the OG pipeline, so both are tried independently:
-            // either one succeeding is enough to save the bookmark, and the OG result fills the rest.
-            const [xPost, preview] = await Promise.all([
-                isXPostUrl(input.url)
-                    ? runOutbound(context.get("userId"), () => renderXPost(input.url)).catch((error: unknown) => {
-                          // A busy pool and a failed render both degrade to the OG result.
-                          // oxlint-disable-next-line no-console -- Server-side diagnostics are console's legitimate use.
-                          console.warn("X post thumbnail rendering failed:", error);
-
-                          return null;
-                      })
-                    : null,
-                runOutbound(context.get("userId"), () => getPreview(input.url)).catch(() => null)
-            ]);
-
-            if (!preview && !xPost) {
-                return context.json(apiError("bookmark.fetchFailed"), httpStatus.badGateway);
-            }
-
-            try {
-                const saved = await saveBookmark({
-                    preview,
-                    url: input.url,
-                    userId: context.get("userId"),
-                    xPost
-                });
-
-                return saved
-                    ? context.json(saved, httpStatus.created)
-                    : context.json(apiError("bookmark.duplicate"), httpStatus.conflict);
-            } catch {
-                return context.json(apiError("bookmark.saveFailed"), httpStatus.internalServerError);
-            }
+        if (parseContentType(context.req.header("content-type"))?.essence !== "application/json") {
+            return context.json(apiError("bookmark.invalidJson"), httpStatus.unsupportedMediaType);
         }
-    )
+
+        const input = previewRequest(await context.req.text());
+
+        if (input instanceof type.errors) {
+            return context.json(apiError("bookmark.invalidUrl"), httpStatus.badRequest);
+        }
+
+        try {
+            if (await bookmarkExists(normalizeBookmarkUrl(input.url), context.get("userId"))) {
+                return context.json(apiError("bookmark.duplicate"), httpStatus.conflict);
+            }
+        } catch {
+            return context.json(apiError("bookmark.saveFailed"), httpStatus.internalServerError);
+        }
+
+        // X post pages are fetched by xeet instead of the OG pipeline, so both are tried independently:
+        // either one succeeding is enough to save the bookmark, and the OG result fills the rest.
+        const [xPost, preview] = await Promise.all([
+            isXPostUrl(input.url)
+                ? runOutbound(context.get("userId"), () => renderXPost(input.url)).catch((error: unknown) => {
+                      // A busy pool and a failed render both degrade to the OG result.
+                      // oxlint-disable-next-line no-console -- Server-side diagnostics are console's legitimate use.
+                      console.warn("X post thumbnail rendering failed:", error);
+
+                      return null;
+                  })
+                : null,
+            runOutbound(context.get("userId"), () => getPreview(input.url)).catch(() => null)
+        ]);
+
+        if (!preview && !xPost) {
+            return context.json(apiError("bookmark.fetchFailed"), httpStatus.badGateway);
+        }
+
+        try {
+            const saved = await saveBookmark({
+                preview,
+                url: input.url,
+                userId: context.get("userId"),
+                xPost
+            });
+
+            return saved
+                ? context.json(saved, httpStatus.created)
+                : context.json(apiError("bookmark.duplicate"), httpStatus.conflict);
+        } catch {
+            return context.json(apiError("bookmark.saveFailed"), httpStatus.internalServerError);
+        }
+    })
     .patch(
         "/api/bookmarks/:id",
-        bodyLimit({
-            maxSize: maxRequestBytes,
-            onError: (context) => context.json(apiError("bookmark.tooLong"), httpStatus.payloadTooLarge)
-        }),
+        requestBodyLimit("bookmark.tooLong"),
         bookmarkIdParam,
         archivePayload,
         async (context) => {
