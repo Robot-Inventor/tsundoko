@@ -1,4 +1,7 @@
+// oxlint-disable id-length -- "q" is the search parameter name defined by the URL.
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "@tanstack/react-router";
+import { parseSearchQuery } from "../lib/searchQuery";
 
 const desktopLayout = "(min-width: 48rem)";
 
@@ -66,29 +69,68 @@ const useResetOnRouteChange = (pathname: string, reset: () => void): void => {
     }
 };
 
+interface SearchState {
+    finishSearch: () => void;
+    isSearching: boolean;
+    searchText: string;
+    setSearchText: (value: string) => void;
+}
+
+// Back/Forward and direct links change the query outside the search bar, so the input follows the
+// URL while an unfinished fetch keeps the progress indicator on until the results settle.
+const useSearchState = (query: string): SearchState => {
+    const queryRef = useRef(query);
+    const [draft, setDraft] = useState({ query, text: query });
+    const [progressQuery, setProgressQuery] = useState(query);
+
+    // A history navigation replaces the committed query; discard any draft typed against the old one.
+    if (draft.query !== query) {
+        setDraft({ query, text: query });
+    }
+
+    useEffect(() => {
+        queryRef.current = query;
+    }, [query]);
+
+    const setSearchText = useCallback(
+        (value: string): void => {
+            setDraft({ query, text: value });
+        },
+        [query]
+    );
+
+    const finishSearch = useCallback((): void => {
+        setProgressQuery(queryRef.current);
+    }, []);
+
+    return {
+        finishSearch,
+        isSearching: progressQuery !== query,
+        searchText: draft.text,
+        setSearchText
+    };
+};
+
 const useSearch = (searchEnabled: boolean, pathname: string): UseSearchResult => {
+    const navigate = useNavigate();
+    // useLocation exposes the parsed but unvalidated search, so route validation alone is not enough.
+    const query = useLocation({
+        select: (location) => parseSearchQuery({ ...location.search }).q ?? ""
+    });
+
+    const { finishSearch, isSearching, searchText, setSearchText } = useSearchState(query);
     const [searchOpen, setSearchOpen] = useState(false);
-    const [query, setQuery] = useState("");
-    const [searchText, setSearchText] = useState("");
-    const [isSearching, setIsSearching] = useState(false);
     const desktopSearchInput = useRef<HTMLInputElement>(null);
     const mobileSearchInput = useRef<HTMLInputElement>(null);
 
     const resetSearch = useCallback((): void => {
         setSearchOpen(false);
-        setQuery("");
-        setSearchText("");
-        setIsSearching(false);
     }, []);
 
     useResetOnRouteChange(pathname, resetSearch);
 
     const openSearch = useCallback((): void => {
         setSearchOpen(true);
-    }, []);
-
-    const finishSearch = useCallback((): void => {
-        setIsSearching(false);
     }, []);
 
     const runSearch = useCallback((): void => {
@@ -102,9 +144,15 @@ const useSearch = (searchEnabled: boolean, pathname: string): UseSearchResult =>
             return;
         }
 
-        setQuery(trimmed);
-        setIsSearching(true);
-    }, [query, searchText]);
+        void navigate({
+            search: trimmed
+                ? {
+                      q: trimmed
+                  }
+                : {},
+            to: "."
+        });
+    }, [navigate, query, searchText, setSearchText]);
 
     const clearSearch = useCallback((): void => {
         setSearchText("");
@@ -113,15 +161,17 @@ const useSearch = (searchEnabled: boolean, pathname: string): UseSearchResult =>
             return;
         }
 
-        setQuery("");
-        setIsSearching(true);
-    }, [query]);
+        void navigate({
+            search: {},
+            to: "."
+        });
+    }, [navigate, query, setSearchText]);
 
     const closeSearch = useCallback((): void => {
         // Discard uncommitted edits; the last executed query stays active.
         setSearchText(query);
         setSearchOpen(false);
-    }, [query]);
+    }, [query, setSearchText]);
 
     const focusSearch = useCallback((): void => {
         if (window.matchMedia(desktopLayout).matches) {

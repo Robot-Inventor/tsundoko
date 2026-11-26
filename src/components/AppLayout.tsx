@@ -78,9 +78,9 @@ const MobilePageTitle = ({ query, searchOpen }: { query: string; searchOpen: boo
 
 const AppLayout = (): ReactNode => {
     const { pathname } = useLocation();
-    // Settings has no bookmark list, so it must not offer a search box or its keyboard shortcuts.
-    const showsSearch = !pathname.startsWith("/settings");
+    // Only the bookmark list pages can show results, so search is limited to them.
     const isListPage = pathname === "/" || pathname === "/archive";
+    const showsSearch = isListPage;
     const search = useSearch(showsSearch, pathname);
     const [menuOpen, setMenuOpen] = useState(false);
     const desktopHomeLink = useRef<HTMLAnchorElement>(null);
@@ -137,9 +137,9 @@ const AppLayout = (): ReactNode => {
                     <MainNavigation onNavigate={closeMenu} />
                 </MobileMenu>
                 <Logo className="hidden h-auto w-32 md:block" />
-                <MobilePageTitle query={isListPage ? search.query : ""} searchOpen={search.searchOpen} />
-                {showsSearch && <HeaderSearch search={search} />}
-                {/* Only Home and Archive fetch a bookmark list, so a search from /share has no request to finish. */}
+                <MobilePageTitle query={search.query} searchOpen={search.searchOpen} />
+                <HeaderSearch search={search} visible={showsSearch} />
+                {/* Only Home and Archive fetch a bookmark list, so only they can show search progress. */}
                 {isListPage ? <SearchProgress searching={search.isSearching} /> : null}
             </header>
 
