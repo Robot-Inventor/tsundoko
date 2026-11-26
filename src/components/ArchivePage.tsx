@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 
 const ArchivePage = (): ReactNode => {
     const search = useSearchContext();
-    const list = useBookmarkList("archived", search.query);
+    const list = useBookmarkList("archived", search.query, search.finishSearch);
     const navigate = useNavigate();
     const { t: translate } = useTranslation();
 

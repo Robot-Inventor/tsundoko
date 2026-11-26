@@ -6,6 +6,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { SearchContext, desktopLayout, useSearch } from "../hooks/useSearch";
 import { HeaderSearch } from "./HeaderSearch";
 import { MobileMenu } from "./MobileMenu";
+import { SearchProgress } from "./SearchProgress";
 import { cn } from "../lib/utils";
 import { getPage } from "../lib/page-title";
 import { useAccountState } from "../hooks/useAccount";
@@ -98,6 +99,13 @@ const AppLayout = (): ReactNode => {
         }
     }, [account?.locale, locale, setLocale]);
 
+    const { finishSearch } = search;
+
+    useEffect(() => {
+        // A search started on another page must not keep its bar on a page without a search box.
+        finishSearch();
+    }, [finishSearch, pathname]);
+
     useEffect(() => {
         // An open modal must release focus and scroll lock when the desktop navigation takes over.
         const desktop = window.matchMedia(desktopLayout);
@@ -132,6 +140,8 @@ const AppLayout = (): ReactNode => {
                 <Logo className="hidden h-auto w-32 md:block" />
                 <MobilePageTitle searchOpen={search.searchOpen} />
                 {showsSearch && <HeaderSearch search={search} />}
+                {/* Only Home and Archive fetch a bookmark list, so a search from /share has no request to finish. */}
+                {pathname === "/" || pathname === "/archive" ? <SearchProgress searching={search.isSearching} /> : null}
             </header>
 
             <div className="flex min-h-[calc(100dvh_-_3.5rem_-_env(safe-area-inset-top))]">

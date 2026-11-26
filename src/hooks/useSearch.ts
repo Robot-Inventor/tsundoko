@@ -6,6 +6,8 @@ interface UseSearchResult {
     clearSearch: () => void;
     closeSearch: () => void;
     desktopSearchInput: React.RefObject<HTMLInputElement | null>;
+    finishSearch: () => void;
+    isSearching: boolean;
     mobileSearchInput: React.RefObject<HTMLInputElement | null>;
     openSearch: () => void;
     query: string;
@@ -15,10 +17,50 @@ interface UseSearchResult {
     setSearchText: (value: string) => void;
 }
 
+const useSearchShortcuts = (searchEnabled: boolean, closeSearch: () => void, focusSearch: () => void): void => {
+    useEffect(() => {
+        const onKeyDown = (event: KeyboardEvent): void => {
+            const { target } = event;
+            const typing =
+                target instanceof HTMLElement &&
+                (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+
+            const modifier = event.ctrlKey || event.metaKey;
+            const isSearchShortcut =
+                searchEnabled && modifier && !event.altKey && !event.shiftKey && event.code === "KeyK";
+
+            const isSlashShortcut = searchEnabled && event.key === "/" && !modifier && !event.altKey && !typing;
+
+            if (isSearchShortcut || isSlashShortcut) {
+                event.preventDefault();
+                focusSearch();
+            }
+        };
+
+        window.addEventListener("keydown", onKeyDown);
+
+        // The swapped bar is unreachable on desktop and would reappear stale on smaller screens.
+        const desktop = window.matchMedia(desktopLayout);
+        const closeOnDesktop = (event: MediaQueryListEvent): void => {
+            if (event.matches) {
+                closeSearch();
+            }
+        };
+
+        desktop.addEventListener("change", closeOnDesktop);
+
+        return (): void => {
+            window.removeEventListener("keydown", onKeyDown);
+            desktop.removeEventListener("change", closeOnDesktop);
+        };
+    }, [closeSearch, focusSearch, searchEnabled]);
+};
+
 const useSearch = (searchEnabled: boolean): UseSearchResult => {
     const [searchOpen, setSearchOpen] = useState(false);
     const [query, setQuery] = useState("");
     const [searchText, setSearchText] = useState("");
+    const [isSearching, setIsSearching] = useState(false);
     const desktopSearchInput = useRef<HTMLInputElement>(null);
     const mobileSearchInput = useRef<HTMLInputElement>(null);
 
@@ -26,18 +68,35 @@ const useSearch = (searchEnabled: boolean): UseSearchResult => {
         setSearchOpen(true);
     }, []);
 
+    const finishSearch = useCallback((): void => {
+        setIsSearching(false);
+    }, []);
+
     const runSearch = useCallback((): void => {
         const trimmed = searchText.trim();
 
-        setQuery(trimmed);
         setSearchText(trimmed);
         setSearchOpen(false);
-    }, [searchText]);
+
+        // An unchanged query does not refetch, so the bar must not be left on screen.
+        if (trimmed === query) {
+            return;
+        }
+
+        setQuery(trimmed);
+        setIsSearching(true);
+    }, [query, searchText]);
 
     const clearSearch = useCallback((): void => {
-        setQuery("");
         setSearchText("");
-    }, []);
+
+        if (query === "") {
+            return;
+        }
+
+        setQuery("");
+        setIsSearching(true);
+    }, [query]);
 
     const closeSearch = useCallback((): void => {
         // Discard uncommitted edits; the last executed query stays active.
@@ -62,50 +121,14 @@ const useSearch = (searchEnabled: boolean): UseSearchResult => {
         setSearchOpen(true);
     }, [searchOpen]);
 
-    useEffect(() => {
-        const onKeyDown = (event: KeyboardEvent): void => {
-            const { target } = event;
-            const typing =
-                target instanceof HTMLElement &&
-                (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
-
-            const modifier = event.ctrlKey || event.metaKey;
-            const isSearchShortcut =
-                searchEnabled && modifier && !event.altKey && !event.shiftKey && event.code === "KeyK";
-
-            const isSlashShortcut = searchEnabled && event.key === "/" && !modifier && !event.altKey && !typing;
-
-            if (isSearchShortcut) {
-                event.preventDefault();
-                focusSearch();
-            } else if (isSlashShortcut) {
-                event.preventDefault();
-                focusSearch();
-            }
-        };
-
-        window.addEventListener("keydown", onKeyDown);
-
-        // The swapped bar is unreachable on desktop and would reappear stale on smaller screens.
-        const desktop = window.matchMedia(desktopLayout);
-        const closeOnDesktop = (event: MediaQueryListEvent): void => {
-            if (event.matches) {
-                closeSearch();
-            }
-        };
-
-        desktop.addEventListener("change", closeOnDesktop);
-
-        return (): void => {
-            window.removeEventListener("keydown", onKeyDown);
-            desktop.removeEventListener("change", closeOnDesktop);
-        };
-    }, [closeSearch, focusSearch, searchEnabled]);
+    useSearchShortcuts(searchEnabled, closeSearch, focusSearch);
 
     return {
         clearSearch,
         closeSearch,
         desktopSearchInput,
+        finishSearch,
+        isSearching,
         mobileSearchInput,
         openSearch,
         query,

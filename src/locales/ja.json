@@ -20,6 +20,7 @@
     "common.renamePasskeyLabel": "{{name}}の名前を変更",
     "common.retry": "再試行",
     "common.save": "保存",
+    "common.searching": "検索中…",
     "common.settings": "設定",
     "common.summarySeparator": "",
     "common.unknownDate": "不明",
