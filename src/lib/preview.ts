@@ -7,10 +7,9 @@ import { parseBookmarkUrl } from "./bookmarkUrl";
 import { parseContentType } from "./mediaType";
 import { publicFetch } from "./publicFetch";
 import { readCappedBody } from "./cappedBody";
+import { userAgent } from "./userAgent";
 
 const fetchTimeout = 8000;
-const userAgent =
-    "Mozilla/5.0 (compatible; tsundoko/1.0; +https://github.com/Robot-Inventor/tsundoko; purpose=link-preview; like-twitterbot)";
 
 const maxHtmlBytes = 2_097_152;
 const maxDescriptionLength = 1000;
