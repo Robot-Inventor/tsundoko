@@ -81,6 +81,8 @@
     "bookmark.urlLabel": "追加するページのURL",
     "bookmark.urlPlaceholder": "追加するURLを入力",
 
+    "search.resultsFor": "「{{query}}」の検索結果",
+
     "share.adding": "追加しています…（{{current}}/{{total}}）",
     "share.confirmDescription_one": "{{count}}件のブックマークを追加しますか？",
     "share.confirmDescription_other": "{{count}}件のブックマークを追加しますか？",
