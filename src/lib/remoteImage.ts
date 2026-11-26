@@ -2,6 +2,7 @@ import { parseBookmarkUrl } from "./bookmarkUrl";
 import { parseContentType } from "./mediaType";
 import { publicFetch } from "./publicFetch";
 import { readCappedBody } from "./cappedBody";
+import { userAgent } from "./userAgent";
 
 const fetchTimeout = 8000;
 const maxImageBytes = 10_485_760;
@@ -24,7 +25,8 @@ const fetchValidImage = async (imageUrl: string): Promise<RemoteImage | null> =>
     const { response } = await publicFetch(url, {
         credentials: "omit",
         headers: {
-            accept: "image/*"
+            accept: "image/*",
+            "user-agent": userAgent
         },
         signal: AbortSignal.timeout(fetchTimeout)
     });
