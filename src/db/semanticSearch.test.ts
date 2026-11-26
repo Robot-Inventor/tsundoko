@@ -112,7 +112,7 @@ const saveSemanticBookmark = async ({ content, owner, path, title }: SemanticBoo
 const searchBookmarks = async (query: string): Promise<SavedBookmark[]> => {
     const { listBookmarks } = await import("./bookmarks");
 
-    return listBookmarks(query, "active", semanticUserId);
+    return listBookmarks({ query, scope: "active" }, semanticUserId);
 };
 
 const bookmarkIds = async (query: string): Promise<string[]> =>

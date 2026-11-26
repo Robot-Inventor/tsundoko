@@ -30,6 +30,18 @@ let snapshot: ReadonlyMap<string, PendingBookmarkAction> = new Map();
 let toastOwner: PendingBookmarkAction | null = null;
 
 const listeners = new Set<() => void>();
+type ActionCommitListener = (kind: BookmarkActionKind) => void;
+const commitListeners = new Set<ActionCommitListener>();
+
+// Deleting the last bookmark that uses a tag removes it from the sidebar, so tag consumers
+// listen for committed deletes instead of guessing when the list might have changed.
+const onActionCommitted = (listener: ActionCommitListener): (() => void) => {
+    commitListeners.add(listener);
+
+    return (): void => {
+        commitListeners.delete(listener);
+    };
+};
 
 const replaceSnapshot = (next: ReadonlyMap<string, PendingBookmarkAction>): void => {
     snapshot = next;
@@ -137,14 +149,18 @@ const commitAction = async (id: string, action: PendingBookmarkAction): Promise<
         return;
     }
 
-    if (!response?.ok) {
+    if (response?.ok) {
+        commitListeners.forEach((listener) => {
+            listener(action.kind);
+        });
+        // On success the entry stays: it keeps hiding the stale copy in already-loaded lists.
+    } else {
         // Roll the optimistic update back so the bookmark reappears in its original place.
         const next = new Map(snapshot);
         next.delete(id);
         replaceSnapshot(next);
         notifyError(errorMessage("bookmark.actionFailed"), errorToastId);
     }
-    // On success the entry stays: it keeps hiding the stale copy in already-loaded lists.
 };
 
 const undoBookmarkAction = (id: string): void => {
@@ -212,4 +228,10 @@ const requestBookmarkAction = (kind: BookmarkActionKind, bookmark: Bookmark): vo
     toastOwner = action;
 };
 
-export { type BookmarkActionKind, applyPendingActions, requestBookmarkAction, usePendingBookmarkActions };
+export {
+    type BookmarkActionKind,
+    applyPendingActions,
+    onActionCommitted,
+    requestBookmarkAction,
+    usePendingBookmarkActions
+};

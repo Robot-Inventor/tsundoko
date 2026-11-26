@@ -14,6 +14,7 @@ interface BookmarkPreview {
 interface SavedBookmark extends Omit<BookmarkPreview, "thumbnailFile"> {
     addedAt: string;
     id: string;
+    tags: string[];
     // "top" for locally stored renders: tall post screenshots are cropped from the top in the card.
     thumbnailFit: "top" | "center";
 }
@@ -24,5 +25,18 @@ interface Bookmark extends Omit<SavedBookmark, "addedAt"> {
 
 type BookmarkScope = "active" | "archived";
 
+interface BookmarkListFilter {
+    query: string;
+    scope: BookmarkScope;
+    tag?: string;
+}
+
 // Re-exported so bookmark modules can use shared status codes without adding another import dependency.
-export { type Bookmark, type BookmarkPreview, type BookmarkScope, type SavedBookmark, httpStatus };
+export {
+    type Bookmark,
+    type BookmarkListFilter,
+    type BookmarkPreview,
+    type BookmarkScope,
+    type SavedBookmark,
+    httpStatus
+};

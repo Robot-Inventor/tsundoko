@@ -82,8 +82,8 @@ describe("bookmark ownership", () => {
         });
 
         expect(saved).not.toBeNull();
-        expect(await listBookmarks("", "active", userId)).toHaveLength(oneBookmark);
-        expect(await listBookmarks("", "active", otherUserId)).toHaveLength(noBookmarks);
+        expect(await listBookmarks({ query: "", scope: "active" }, userId)).toHaveLength(oneBookmark);
+        expect(await listBookmarks({ query: "", scope: "active" }, otherUserId)).toHaveLength(noBookmarks);
     });
 
     it("allows the same URL for different users", async () => {
@@ -156,5 +156,91 @@ describe("bookmark ownership", () => {
         expect(await setBookmarkArchived(id, new Date(), otherUserId)).toBeNull();
         expect(await deleteBookmark(id, otherUserId)).toBe(false);
         expect(await getBookmarkImageUrls(id, userId)).not.toBeNull();
+    });
+});
+
+describe("bookmark tags", () => {
+    it("attaches reusable tags with their first spelling", async () => {
+        const { listBookmarks, saveBookmark } = await import("./bookmarks");
+        const first = await saveBookmark({
+            preview: null,
+            tagNames: ["  Work  ", "work", " Review "],
+            url: new URL("https://example.com/tag-first"),
+            userId,
+            xPost: null
+        });
+
+        const second = await saveBookmark({
+            preview: null,
+            tagNames: ["WORK", "News"],
+            url: new URL("https://example.com/tag-second"),
+            userId,
+            xPost: null
+        });
+
+        expect(first?.tags).toEqual(["Work", "Review"]);
+        expect(second?.tags).toEqual(["Work", "News"]);
+
+        const saved = await listBookmarks({ query: "", scope: "active" }, userId);
+        // List responses use a stable alphabetical order; only the save response keeps input order.
+        expect(saved.find((bookmark) => bookmark.id === first?.id)?.tags).toEqual(["Review", "Work"]);
+    });
+
+    it("filters by tag without exposing another user's tags", async () => {
+        const { listBookmarks, saveBookmark } = await import("./bookmarks");
+        const { listTags } = await import("./tags");
+        const saved = await saveBookmark({
+            preview: null,
+            tagNames: ["PrivateTag"],
+            url: new URL("https://example.com/tag-private"),
+            userId,
+            xPost: null
+        });
+
+        expect(saved).not.toBeNull();
+        const filtered = await listBookmarks(
+            {
+                query: "",
+                scope: "active",
+                tag: "privatetag"
+            },
+            userId
+        );
+
+        expect(filtered.map((bookmark) => bookmark.id)).toEqual([saved?.id]);
+
+        expect(
+            await listBookmarks(
+                {
+                    query: "",
+                    scope: "active",
+                    tag: "PrivateTag"
+                },
+                otherUserId
+            )
+        ).toEqual([]);
+
+        expect(await listTags(userId)).toContainEqual({
+            count: 1,
+            name: "PrivateTag"
+        });
+
+        expect(await listTags(otherUserId)).toEqual([]);
+    });
+
+    it("matches a tag name in keyword search", async () => {
+        const { listBookmarks, saveBookmark } = await import("./bookmarks");
+        const saved = await saveBookmark({
+            preview: null,
+            tagNames: ["FindableTag"],
+            url: new URL("https://example.com/tag-search"),
+            userId,
+            xPost: null
+        });
+
+        expect(saved).not.toBeNull();
+        expect(
+            (await listBookmarks({ query: "findable", scope: "active" }, userId)).map((bookmark) => bookmark.id)
+        ).toContain(saved?.id);
     });
 });

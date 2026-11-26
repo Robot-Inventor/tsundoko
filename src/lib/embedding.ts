@@ -17,14 +17,17 @@ const embeddingsEnabled = Boolean(env.EMBEDDING_API_KEY);
 interface EmbeddingSource {
     content: string | null;
     description: string | null;
+    tags?: string[];
     title: string;
 }
 
-const embeddingInput = ({ content, description, title }: EmbeddingSource): string => {
+const embeddingInput = ({ content, description, tags = [], title }: EmbeddingSource): string => {
     // oxlint-disable-next-line no-magic-numbers -- Keep the first `maxContentLength` characters.
     const contentPrefix = content?.slice(0, maxContentLength);
 
-    return [title, description, contentPrefix].filter((part) => part?.trim()).join("\n");
+    return [title, description, contentPrefix, tags.length ? `Tags: ${tags.join(", ")}` : null]
+        .filter((part) => part?.trim())
+        .join("\n");
 };
 
 // Search and save both treat an unavailable embedding as "no vector": the caller falls back to

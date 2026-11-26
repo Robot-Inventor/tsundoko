@@ -1,4 +1,4 @@
-import type { Bookmark, BookmarkScope } from "../lib/bookmark";
+import type { Bookmark, BookmarkListFilter } from "../lib/bookmark";
 import { applyPendingActions, usePendingBookmarkActions } from "../lib/bookmarkActions";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { bookmarkClient } from "../lib/bookmarkClient";
@@ -13,7 +13,10 @@ interface UseBookmarkListResult {
 }
 
 // onSettled must be stable: it is part of the fetch effect's dependencies.
-const useBookmarkList = (scope: BookmarkScope, query: string, onSettled?: () => void): UseBookmarkListResult => {
+const useBookmarkList = (
+    { query, scope, tag = "" }: BookmarkListFilter,
+    onSettled?: () => void
+): UseBookmarkListResult => {
     const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
     const [loadState, setLoadState] = useState<LoadState>("loading");
     const [reload, setReload] = useState(false);
@@ -30,7 +33,8 @@ const useBookmarkList = (scope: BookmarkScope, query: string, onSettled?: () => 
                     query: {
                         // oxlint-disable-next-line id-length -- "q" is the search parameter name defined by the API.
                         q: query,
-                        scope
+                        scope,
+                        tag
                     }
                 });
 
@@ -50,8 +54,8 @@ const useBookmarkList = (scope: BookmarkScope, query: string, onSettled?: () => 
 
                 if (!request.cancelled) {
                     setBookmarks((current) => {
-                        // Search results must replace the list; merging would keep bookmarks that no longer match.
-                        if (query) {
+                        // Search and tag results must replace the list; merging would keep bookmarks that no longer match.
+                        if (query || tag) {
                             return loaded;
                         }
 
@@ -74,7 +78,7 @@ const useBookmarkList = (scope: BookmarkScope, query: string, onSettled?: () => 
         return (): void => {
             request.cancelled = true;
         };
-    }, [onSettled, query, reload, scope]);
+    }, [onSettled, query, reload, scope, tag]);
 
     const displayedBookmarks = useMemo(
         () => applyPendingActions(bookmarks, pendingActions, scope),

@@ -4,11 +4,13 @@ import { BookmarkList } from "./BookmarkList";
 import type { ReactNode } from "react";
 import { useBookmarkList } from "../hooks/useBookmarkList";
 import { useSearchContext } from "../hooks/useSearch";
+import { useTagListContext } from "../hooks/useTagList";
 import { useTranslation } from "react-i18next";
 
 const HomePage = (): ReactNode => {
     const search = useSearchContext();
-    const list = useBookmarkList("active", search.query, search.finishSearch);
+    const tags = useTagListContext();
+    const list = useBookmarkList({ query: search.query, scope: "active" }, search.finishSearch);
     const { t: translate } = useTranslation();
 
     return (
@@ -20,6 +22,7 @@ const HomePage = (): ReactNode => {
                 <AddBookmarkDialog
                     onAdd={(bookmark: Bookmark) => {
                         search.clearSearch();
+                        tags.reload();
                         list.addBookmark(bookmark);
                     }}
                 />

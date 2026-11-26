@@ -7,6 +7,7 @@ import { Hono } from "hono";
 import { apiError } from "./lib/apiError";
 import { createRateLimit } from "./lib/rateLimit";
 import { getPreview } from "./lib/preview";
+import { normalizeTagNames } from "./lib/tags";
 import { parseContentType } from "./lib/mediaType";
 import { requestBodyLimit } from "./lib/requestBodyLimit";
 import { runOutbound } from "./lib/outboundLimit";
@@ -20,6 +21,7 @@ const bookmarkSaveRateLimit = createRateLimit({ limit: bookmarkSaveLimit });
 const bookmarkListRateLimit = createRateLimit({ limit: bookmarkListLimit });
 
 const previewRequest = type("string.json.parse").to({
+    tags: type("string[]").optional(),
     url: bookmarkUrl
 });
 
@@ -30,9 +32,10 @@ const archiveRequest = type({
 const bookmarkId = type("string.uuid");
 
 // oxlint-disable id-length -- "q" is the search parameter name defined by the API.
-const listQuery = validator("query", (value): { q: string; scope: BookmarkScope } => {
+const listQuery = validator("query", (value): { q: string; scope: BookmarkScope; tag: string } => {
     // A repeated parameter arrives as an array; treat the first value as the query.
     const q = (Array.isArray(value["q"]) ? value["q"][0] : value["q"])?.trim() ?? "";
+    const tag = (Array.isArray(value["tag"]) ? value["tag"][0] : value["tag"])?.trim() ?? "";
 
     // An unknown scope falls back to the default instead of failing, so stale clients keep working.
     const rawScope = Array.isArray(value["scope"]) ? value["scope"][0] : value["scope"];
@@ -40,7 +43,8 @@ const listQuery = validator("query", (value): { q: string; scope: BookmarkScope 
 
     return {
         q,
-        scope
+        scope,
+        tag
     };
 });
 // oxlint-enable id-length
@@ -70,7 +74,17 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
         const query = context.req.valid("query");
 
         try {
-            return context.json(await listBookmarks(query.q, query.scope, context.get("userId")), httpStatus.ok);
+            return context.json(
+                await listBookmarks(
+                    {
+                        query: query.q,
+                        scope: query.scope,
+                        tag: query.tag
+                    },
+                    context.get("userId")
+                ),
+                httpStatus.ok
+            );
         } catch {
             return context.json(apiError("bookmark.loadFailed"), httpStatus.internalServerError);
         }
@@ -86,6 +100,12 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
 
         if (input instanceof type.errors) {
             return context.json(apiError("bookmark.invalidUrl"), httpStatus.badRequest);
+        }
+
+        const tagNames = normalizeTagNames(input.tags ?? []);
+
+        if (!tagNames) {
+            return context.json(apiError("tag.invalid"), httpStatus.badRequest);
         }
 
         try {
@@ -118,6 +138,7 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
         try {
             const saved = await saveBookmark({
                 preview,
+                tagNames,
                 url: input.url,
                 userId: context.get("userId"),
                 xPost
