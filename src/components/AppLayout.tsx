@@ -1,9 +1,10 @@
-// oxlint-disable import/max-dependencies -- The layout wires navigation, search, and account state.
+// oxlint-disable import/max-dependencies -- The layout wires navigation, search, tags, and account state.
 import { AccountProvider, MobileAccountMenu, SidebarAccountMenu } from "./AccountMenu";
-import { ArchiveIcon, HouseIcon } from "lucide-react";
-import { Link, Outlet, useLocation } from "@tanstack/react-router";
+import { ArchiveIcon, HouseIcon, TagIcon } from "lucide-react";
+import { Link, Outlet, useLocation, useParams } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { SearchContext, desktopLayout, useSearch } from "../hooks/useSearch";
+import { TagListContext, useTagList, useTagListContext } from "../hooks/useTagList";
 import { HeaderSearch } from "./HeaderSearch";
 import { MobileMenu } from "./MobileMenu";
 import { SearchProgress } from "./SearchProgress";
@@ -26,6 +27,7 @@ interface MainNavigationProps {
 }
 
 const MainNavigation = ({ homeLinkRef, onNavigate }: MainNavigationProps): ReactNode => {
+    const { tags } = useTagListContext();
     const { t: translate } = useTranslation();
 
     return (
@@ -44,6 +46,23 @@ const MainNavigation = ({ homeLinkRef, onNavigate }: MainNavigationProps): React
                 <ArchiveIcon aria-hidden="true" className="size-4" />
                 {translate("common.archive")}
             </Link>
+            {tags.length ? (
+                <div className="mt-4">
+                    <p className="px-3 pb-1 text-xs font-semibold text-muted-foreground">{translate("common.tags")}</p>
+                    {tags.map((tag) => (
+                        <Link
+                            className={navLinkClass}
+                            key={tag.name}
+                            onClick={onNavigate}
+                            params={{ tag: tag.name }}
+                            to="/tags/$tag"
+                        >
+                            <TagIcon aria-hidden="true" className="size-4 shrink-0" />
+                            <span className="truncate">{tag.name}</span>
+                        </Link>
+                    ))}
+                </div>
+            ) : null}
         </nav>
     );
 };
@@ -57,9 +76,11 @@ const Logo = ({ className }: { className: string }): ReactNode => (
 // so the title states which keyword the displayed results belong to.
 const MobilePageTitle = ({ query, searchOpen }: { query: string; searchOpen: boolean }): ReactNode => {
     const { pathname } = useLocation();
+    const params = useParams({ strict: false });
     const { t: translate } = useTranslation();
     const page = getPage(pathname);
-    const label = query === "" ? translate(page.label) : translate("search.resultsFor", { query });
+    const pageLabel = params.tag ?? translate(page.label);
+    const label = query === "" ? pageLabel : translate("search.resultsFor", { query });
 
     return (
         <h1
@@ -78,10 +99,11 @@ const MobilePageTitle = ({ query, searchOpen }: { query: string; searchOpen: boo
 
 const AppLayout = (): ReactNode => {
     const { pathname } = useLocation();
-    // Only the bookmark list pages can show results, so search is limited to them.
-    const isListPage = pathname === "/" || pathname === "/archive";
+    // Tag pages list bookmarks too, so they keep the same search bar and progress indicator.
+    const isListPage = pathname === "/" || pathname === "/archive" || pathname.startsWith("/tags/");
     const showsSearch = isListPage;
     const search = useSearch(showsSearch, pathname);
+    const tagList = useTagList(pathname);
     const [menuOpen, setMenuOpen] = useState(false);
     const desktopHomeLink = useRef<HTMLAnchorElement>(null);
     const accountState = useAccountState();
@@ -122,43 +144,45 @@ const AppLayout = (): ReactNode => {
     }, []);
 
     return (
-        <AccountProvider value={accountState}>
-            <header className="sticky top-0 z-20 flex h-[calc(3.5rem_+_env(safe-area-inset-top))] items-center gap-2 border-b bg-background px-3 pt-[env(safe-area-inset-top)] md:px-4">
-                <MobileMenu
-                    finalFocus={() => (window.matchMedia(desktopLayout).matches ? desktopHomeLink.current : true)}
-                    onOpenChange={setMenuOpen}
-                    open={menuOpen}
-                    searchOpen={search.searchOpen}
-                >
-                    <div className="mb-6 flex items-center justify-between gap-3 ps-6 pe-3">
-                        <Logo className="block h-auto w-1/2" />
-                        {account && <MobileAccountMenu account={account} onNavigate={closeMenu} />}
-                    </div>
-                    <MainNavigation onNavigate={closeMenu} />
-                </MobileMenu>
-                <Logo className="hidden h-auto w-32 md:block" />
-                <MobilePageTitle query={search.query} searchOpen={search.searchOpen} />
-                <HeaderSearch search={search} visible={showsSearch} />
-                {/* Only Home and Archive fetch a bookmark list, so only they can show search progress. */}
-                {isListPage ? <SearchProgress searching={search.isSearching} /> : null}
-            </header>
-
-            <div className="flex min-h-[calc(100dvh_-_3.5rem_-_env(safe-area-inset-top))]">
-                <aside className="sticky top-[calc(3.5rem_+_env(safe-area-inset-top))] hidden h-[calc(100dvh_-_3.5rem_-_env(safe-area-inset-top))] w-56 shrink-0 flex-col overflow-y-auto border-e bg-sidebar text-sidebar-foreground md:flex">
-                    <MainNavigation homeLinkRef={desktopHomeLink} />
-                    {account && (
-                        <div className="mt-auto border-t p-3">
-                            <SidebarAccountMenu account={account} />
+        <TagListContext.Provider value={tagList}>
+            <AccountProvider value={accountState}>
+                <header className="sticky top-0 z-20 flex h-[calc(3.5rem_+_env(safe-area-inset-top))] items-center gap-2 border-b bg-background px-3 pt-[env(safe-area-inset-top)] md:px-4">
+                    <MobileMenu
+                        finalFocus={() => (window.matchMedia(desktopLayout).matches ? desktopHomeLink.current : true)}
+                        onOpenChange={setMenuOpen}
+                        open={menuOpen}
+                        searchOpen={search.searchOpen}
+                    >
+                        <div className="mb-6 flex items-center justify-between gap-3 ps-6 pe-3">
+                            <Logo className="block h-auto w-1/2" />
+                            {account && <MobileAccountMenu account={account} onNavigate={closeMenu} />}
                         </div>
-                    )}
-                </aside>
-                <main className="min-w-0 flex-1 p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))] md:p-6 md:pb-6">
-                    <SearchContext value={search}>
-                        <Outlet />
-                    </SearchContext>
-                </main>
-            </div>
-        </AccountProvider>
+                        <MainNavigation onNavigate={closeMenu} />
+                    </MobileMenu>
+                    <Logo className="hidden h-auto w-32 md:block" />
+                    <MobilePageTitle query={search.query} searchOpen={search.searchOpen} />
+                    <HeaderSearch search={search} visible={showsSearch} />
+                    {/* Only bookmark list pages fetch a list, so only they can show search progress. */}
+                    {isListPage ? <SearchProgress searching={search.isSearching} /> : null}
+                </header>
+
+                <div className="flex min-h-[calc(100dvh_-_3.5rem_-_env(safe-area-inset-top))]">
+                    <aside className="sticky top-[calc(3.5rem_+_env(safe-area-inset-top))] hidden h-[calc(100dvh_-_3.5rem_-_env(safe-area-inset-top))] w-56 shrink-0 flex-col overflow-y-auto border-e bg-sidebar text-sidebar-foreground md:flex">
+                        <MainNavigation homeLinkRef={desktopHomeLink} />
+                        {account && (
+                            <div className="mt-auto border-t p-3">
+                                <SidebarAccountMenu account={account} />
+                            </div>
+                        )}
+                    </aside>
+                    <main className="min-w-0 flex-1 p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))] md:p-6 md:pb-6">
+                        <SearchContext value={search}>
+                            <Outlet />
+                        </SearchContext>
+                    </main>
+                </div>
+            </AccountProvider>
+        </TagListContext.Provider>
     );
 };
 

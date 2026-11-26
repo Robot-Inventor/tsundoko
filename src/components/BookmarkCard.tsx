@@ -11,6 +11,7 @@ import {
     thumbnailLayoutClass
 } from "./bookmarkCardLayout";
 import type { Bookmark } from "../lib/bookmark";
+import { Link } from "@tanstack/react-router";
 import { formatDate } from "../lib/dateFormat";
 import { formatSiteName } from "../lib/localizedNames";
 import { getBookmarkCardActions } from "./bookmarkCardActions";
@@ -21,6 +22,8 @@ import { useTranslation } from "react-i18next";
 // h-full keeps the img stretched to the wrapper so wide screens keep the center crop; the
 // wrapper owns the rounding because overflow-hidden clips it from the children.
 const thumbnailClass = "aspect-video h-full w-full bg-muted object-cover";
+const maxVisibleTags = 3;
+const firstTagIndex = 0;
 
 interface BookmarkCardMenuProps {
     archived: boolean;
@@ -50,6 +53,33 @@ const BookmarkCardMenu = ({ archived, bookmark }: BookmarkCardMenuProps): ReactN
                 ))}
             </DropdownMenuContent>
         </DropdownMenu>
+    );
+};
+
+interface BookmarkCardTagsProps {
+    tags: string[];
+}
+
+const BookmarkCardTags = ({ tags }: BookmarkCardTagsProps): ReactNode => {
+    if (!tags.length) {
+        return null;
+    }
+
+    return (
+        <div className="mt-1 hidden flex-wrap gap-x-2 gap-y-1 text-muted-foreground sm:flex">
+            {tags.slice(firstTagIndex, maxVisibleTags).map((tag) => (
+                <Link
+                    className="relative z-10 inline-block max-w-full truncate rounded-sm hover:text-foreground focus-visible:focus-outline"
+                    key={tag}
+                    params={{ tag }}
+                    title={tag}
+                    to="/tags/$tag"
+                >
+                    #{tag}
+                </Link>
+            ))}
+            {tags.length > maxVisibleTags ? <span>+{tags.length - maxVisibleTags}</span> : null}
+        </div>
     );
 };
 
@@ -111,6 +141,8 @@ const BookmarkCard = ({ archived, bookmark }: BookmarkCardProps): ReactNode => {
                             {bookmark.description}
                         </p>
                     )}
+                    {/* Inside the header so the first tag shares the title's left edge. Compact mobile rows hide it. */}
+                    <BookmarkCardTags tags={bookmark.tags} />
                 </CardHeader>
 
                 <CardFooter className={footerLayoutClass}>

@@ -15,6 +15,7 @@ import { RootComponent } from "./components/RootComponent";
 import { SettingsPage } from "./components/SettingsPage";
 import { SharePage } from "./components/SharePage";
 import { SignupPage } from "./components/SignupPage";
+import { TagPage } from "./components/TagPage";
 import { getAuthState } from "./lib/authClient";
 import { parseSearchQuery } from "./lib/searchQuery";
 
@@ -168,6 +169,14 @@ const settingsRoute = createRoute({
     path: "/settings"
 });
 
+const tagRoute = createRoute({
+    beforeLoad: requireSignedIn,
+    component: TagPage,
+    getParentRoute: () => rootRoute,
+    path: "/tags/$tag",
+    validateSearch: parseSearchQuery
+});
+
 const loginRedirects = ["/settings", "/share"] as const;
 
 const loginRoute = createRoute({
@@ -199,7 +208,15 @@ const signupRoute = createRoute({
     path: "/signup"
 });
 
-const routeTree = rootRoute.addChildren([archiveRoute, homeRoute, loginRoute, settingsRoute, shareRoute, signupRoute]);
+const routeTree = rootRoute.addChildren([
+    archiveRoute,
+    homeRoute,
+    loginRoute,
+    settingsRoute,
+    shareRoute,
+    signupRoute,
+    tagRoute
+]);
 
 const router = createRouter({
     routeTree,
