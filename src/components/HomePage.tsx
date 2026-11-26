@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 
 const HomePage = (): ReactNode => {
     const search = useSearchContext();
-    const list = useBookmarkList("active", search.query);
+    const list = useBookmarkList("active", search.query, search.finishSearch);
     const { t: translate } = useTranslation();
 
     return (

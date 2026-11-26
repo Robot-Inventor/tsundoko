@@ -127,6 +127,19 @@
     outline-offset: 2px;
 }
 
+@theme {
+    --animate-search-progress: search-progress 1.2s ease-in-out infinite;
+
+    @keyframes search-progress {
+        from {
+            transform: translateX(-100%);
+        }
+        to {
+            transform: translateX(400%);
+        }
+    }
+}
+
 @layer base {
     * {
         @apply border-border outline-ring/50;

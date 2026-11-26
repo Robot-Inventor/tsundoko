@@ -12,7 +12,8 @@ interface UseBookmarkListResult {
     retry: () => void;
 }
 
-const useBookmarkList = (scope: BookmarkScope, query: string): UseBookmarkListResult => {
+// onSettled must be stable: it is part of the fetch effect's dependencies.
+const useBookmarkList = (scope: BookmarkScope, query: string, onSettled?: () => void): UseBookmarkListResult => {
     const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
     const [loadState, setLoadState] = useState<LoadState>("loading");
     const [reload, setReload] = useState(false);
@@ -36,6 +37,7 @@ const useBookmarkList = (scope: BookmarkScope, query: string): UseBookmarkListRe
                 if (!response.ok) {
                     if (!request.cancelled) {
                         setLoadState("error");
+                        onSettled?.();
                     }
 
                     return;
@@ -59,10 +61,12 @@ const useBookmarkList = (scope: BookmarkScope, query: string): UseBookmarkListRe
                     });
 
                     setLoadState("ready");
+                    onSettled?.();
                 }
             } catch {
                 if (!request.cancelled) {
                     setLoadState("error");
+                    onSettled?.();
                 }
             }
         })();
@@ -70,7 +74,7 @@ const useBookmarkList = (scope: BookmarkScope, query: string): UseBookmarkListRe
         return (): void => {
             request.cancelled = true;
         };
-    }, [query, reload, scope]);
+    }, [onSettled, query, reload, scope]);
 
     const displayedBookmarks = useMemo(
         () => applyPendingActions(bookmarks, pendingActions, scope),
