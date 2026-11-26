@@ -9,9 +9,10 @@ const swipeActivationPx = 32;
 // visualViewport.scale starts at 1; anything above it means the user has pinch-zoomed.
 const unzoomedScale = 1;
 
-// Elements that own the pointer stream: controls, bookmark rows, and the skeletons standing in for rows.
+// Elements that own the pointer stream: controls, bookmark rows and their skeletons, and toasts.
+// Base UI dismisses a toast on a right/down swipe, so the menu must not claim that same gesture.
 const gestureOwnerSelector =
-    'a, button, label, summary, input, textarea, select, [contenteditable], [role="button"], [role="checkbox"], [role="link"], [role="menuitem"], [role="option"], [role="switch"], [role="tab"], [data-swipe-zone]';
+    'a, button, label, summary, input, textarea, select, [contenteditable], [role="button"], [role="checkbox"], [role="link"], [role="menuitem"], [role="option"], [role="switch"], [role="tab"], [data-swipe-zone], [data-slot="toast"]';
 
 // Base UI unmounts overlays on close, so any match means a modal currently owns the screen.
 const openOverlaySelector = '[data-slot="sheet-viewport"], [data-slot="drawer-viewport"], [data-slot="dialog-content"]';
