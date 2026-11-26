@@ -14,7 +14,7 @@ import type { Bookmark } from "../lib/bookmark";
 import { formatDate } from "../lib/dateFormat";
 import { formatSiteName } from "../lib/localizedNames";
 import { getBookmarkCardActions } from "./bookmarkCardActions";
-import { useLocale } from "./LocaleProvider";
+import { useLocale } from "../hooks/useLocale";
 import { useTranslation } from "react-i18next";
 
 // Mobile: Feedly/X-style media object (thumbnail left, cropped to card height); sm and up: full-width thumbnail on top.

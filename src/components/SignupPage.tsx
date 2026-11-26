@@ -6,7 +6,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/Input";
 import { hasPendingShare } from "../lib/pendingShare";
 import { type } from "arktype";
-import { useLocale } from "./LocaleProvider";
+import { useLocale } from "../hooks/useLocale";
 import { useTranslation } from "react-i18next";
 
 const tokenResponse = type({ token: "string" });

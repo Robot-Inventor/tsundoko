@@ -11,7 +11,7 @@ import { formatDate } from "../lib/dateFormat";
 import { formatPasskeyName } from "../lib/localizedNames";
 import { meClient } from "../lib/meClient";
 import { type } from "arktype";
-import { useLocale } from "./LocaleProvider";
+import { useLocale } from "../hooks/useLocale";
 import { useTranslation } from "react-i18next";
 
 const deleteErrorBody = type({

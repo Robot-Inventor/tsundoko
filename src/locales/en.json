@@ -139,6 +139,7 @@
     "errors.bookmark.loadFailed": "Could not load bookmarks.",
     "errors.bookmark.notFound": "Bookmark not found.",
     "errors.bookmark.saveFailed": "Could not save the bookmark.",
+    "errors.bookmark.tooLong": "The input is too long.",
     "errors.generic": "Could not complete the operation.",
     "errors.notFound": "Not found",
     "errors.passkey.deleteLast": "You can't delete your last passkey.",

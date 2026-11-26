@@ -1,6 +1,6 @@
+import i18n, { use as registerPlugin } from "i18next";
 import { detectLocale } from "./locale";
 import en from "../locales/en.json";
-import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import ja from "../locales/ja.json";
 
@@ -13,7 +13,7 @@ const resources = {
     }
 } as const;
 
-i18n.use(initReactI18next)
+registerPlugin(initReactI18next)
     .init({
         fallbackLng: "en",
         interpolation: {

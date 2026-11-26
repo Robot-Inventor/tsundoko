@@ -139,6 +139,7 @@
     "errors.bookmark.loadFailed": "ブックマークを読み込めませんでした。",
     "errors.bookmark.notFound": "ブックマークが見つかりませんでした。",
     "errors.bookmark.saveFailed": "ブックマークを保存できませんでした。",
+    "errors.bookmark.tooLong": "入力が長すぎます。",
     "errors.generic": "操作を完了できませんでした。",
     "errors.notFound": "見つかりませんでした。",
     "errors.passkey.deleteLast": "最後のパスキーは削除できません。",

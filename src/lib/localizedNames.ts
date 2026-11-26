@@ -1,6 +1,7 @@
 import type { Locale } from "./locale";
 
-const xHandle = /^X (?<open>[（(])@(?<handle>[^)）]+)[)）]$/u;
+// Legacy entries use full-width parentheses with no space; newer ones use ASCII with one space.
+const xHandle = /^X ?[（(]@(?<handle>[^)）]+)[)）]$/u;
 
 // Bookmarks saved before English support carry full-width parentheses. Normalize either stored
 // form to the form the current locale expects.

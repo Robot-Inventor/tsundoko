@@ -81,7 +81,7 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
         bookmarkSaveRateLimit,
         bodyLimit({
             maxSize: maxRequestBytes,
-            onError: (context) => context.json(apiError("auth.tooLong"), httpStatus.payloadTooLarge)
+            onError: (context) => context.json(apiError("bookmark.tooLong"), httpStatus.payloadTooLarge)
         }),
         async (context) => {
             context.header("Cache-Control", "no-store");
@@ -143,7 +143,7 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
         "/api/bookmarks/:id",
         bodyLimit({
             maxSize: maxRequestBytes,
-            onError: (context) => context.json(apiError("auth.tooLong"), httpStatus.payloadTooLarge)
+            onError: (context) => context.json(apiError("bookmark.tooLong"), httpStatus.payloadTooLarge)
         }),
         bookmarkIdParam,
         archivePayload,

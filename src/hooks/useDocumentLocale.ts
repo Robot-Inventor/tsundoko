@@ -1,6 +1,6 @@
 import { getPage, getPageTitle } from "../lib/page-title";
 import { useEffect } from "react";
-import { useLocale } from "../components/LocaleProvider";
+import { useLocale } from "./useLocale";
 import { useLocation } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 

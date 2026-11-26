@@ -9,7 +9,7 @@ import { MobileMenu } from "./MobileMenu";
 import { cn } from "../lib/utils";
 import { getPage } from "../lib/page-title";
 import { useAccountState } from "../hooks/useAccount";
-import { useLocale } from "./LocaleProvider";
+import { useLocale } from "../hooks/useLocale";
 import { useTranslation } from "react-i18next";
 
 const navLinkClass =

@@ -9,23 +9,19 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/Input";
 import { authClient } from "../lib/authClient";
 import { useAccountContext } from "../hooks/useAccount";
-import { useLocale } from "./LocaleProvider";
+import { useLocale } from "../hooks/useLocale";
 import { useTranslation } from "react-i18next";
 
 const avatarAccept = "image/png,image/jpeg,image/webp";
 
 const sendAvatar = async (request: RequestInit): Promise<string | null> => {
-    try {
-        const response = await fetch("/api/me/avatar", request);
+    const response = await fetch("/api/me/avatar", request);
 
-        if (!response.ok) {
-            return apiErrorMessage(await response.json().catch(() => null), "avatar.changeFailed");
-        }
-
-        return null;
-    } catch {
-        return apiErrorMessage(null, "avatar.changeFailed");
+    if (!response.ok) {
+        return apiErrorMessage(await response.json().catch(() => null), "avatar.changeFailed");
     }
+
+    return null;
 };
 
 interface AvatarFormProps {
@@ -48,13 +44,17 @@ const AvatarForm = ({ account, onSaved }: AvatarFormProps): ReactNode => {
         setBusy(true);
         setError(null);
 
-        const failure = await sendAvatar(request);
+        try {
+            const failure = await sendAvatar(request);
 
-        if (failure) {
-            setError(failure);
-        } else {
-            onSaved();
-            notifySuccess(translate("settings.avatarChanged"));
+            if (failure) {
+                setError(failure);
+            } else {
+                onSaved();
+                notifySuccess(translate("settings.avatarChanged"));
+            }
+        } catch {
+            setError(errorMessage("avatar.changeFailed"));
         }
 
         setBusy(false);
