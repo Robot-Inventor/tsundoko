@@ -3,6 +3,7 @@ import { type AuthEnv, requireAuth } from "./authMiddleware";
 import { serveAppAssets, serveAppHtml, serveShareGate } from "./spaStatic";
 import { Hono } from "hono";
 import { accountApi } from "./accountApi";
+import { apiError } from "./lib/apiError";
 import { apiPort } from "./apiPort";
 import { authApi } from "./authApi";
 import { bookmarkApi } from "./bookmarkApi";
@@ -45,7 +46,7 @@ app.route("/", imageApi);
 app.route("/", accountApi);
 
 // Unknown API paths must not fall through to the SPA fallback below.
-app.get("/api/*", (context) => context.json({ error: "Not found" }, httpStatus.notFound));
+app.get("/api/*", (context) => context.json(apiError("notFound"), httpStatus.notFound));
 
 // The SPA is served for every asset that exists; any other path is a client-side route.
 app.get("*", serveAppAssets);

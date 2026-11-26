@@ -2,6 +2,8 @@ import { Link, useLoaderData, useRouter, useSearch } from "@tanstack/react-route
 import { type ReactNode, useState } from "react";
 import { authClient, clearAuthState } from "../lib/authClient";
 import { Button } from "./ui/button";
+import { authErrorMessage } from "../lib/errorMessage";
+import { useTranslation } from "react-i18next";
 
 const LoginPage = (): ReactNode => {
     const { needsSetup, signupEnabled } = useLoaderData({ from: "/login" });
@@ -9,6 +11,7 @@ const LoginPage = (): ReactNode => {
     const router = useRouter();
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+    const { t: translate } = useTranslation();
 
     const login = async (): Promise<void> => {
         setBusy(true);
@@ -18,7 +21,7 @@ const LoginPage = (): ReactNode => {
             const result = await authClient.signIn.passkey();
 
             if (result.error) {
-                setError(result.error.message ?? "ログインできませんでした。");
+                setError(authErrorMessage(result.error, "auth.loginFailed"));
             } else {
                 clearAuthState();
                 // Navigating first lets the target route's guard read the fresh session; invalidating here
@@ -28,7 +31,7 @@ const LoginPage = (): ReactNode => {
                 });
             }
         } catch {
-            setError("ログインできませんでした。");
+            setError(translate("auth.loginFailed"));
         }
 
         setBusy(false);
@@ -41,17 +44,17 @@ const LoginPage = (): ReactNode => {
     return (
         <div className="space-y-6">
             <div className="space-y-2">
-                <h1 className="text-xl font-semibold">ログイン</h1>
-                <p className="text-muted-foreground">パスキーでログインします。</p>
+                <h1 className="text-xl font-semibold">{translate("auth.loginTitle")}</h1>
+                <p className="text-muted-foreground">{translate("auth.loginDescription")}</p>
             </div>
             <Button className="w-full" disabled={busy} onClick={handleLogin}>
-                ログイン
+                {translate("auth.loginButton")}
             </Button>
             {needsSetup || signupEnabled ? (
                 <p className="text-center text-sm text-muted-foreground">
-                    アカウントをお持ちでない場合は{" "}
+                    {translate("auth.noAccount")}{" "}
                     <Link className="underline" to="/signup">
-                        新規登録
+                        {translate("auth.signupLink")}
                     </Link>
                 </p>
             ) : null}

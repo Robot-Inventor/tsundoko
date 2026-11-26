@@ -1,44 +1,48 @@
+// oxlint-disable import/max-dependencies -- Account settings cover avatar, name, and language.
+import { type Account, meClient } from "../lib/meClient";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { type ReactNode, useRef, useState } from "react";
-import type { Account } from "../lib/meClient";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { apiErrorMessage, errorMessage } from "../lib/errorMessage";
+import { notifyError, notifySuccess } from "../lib/appToast";
 import { Button } from "./ui/button";
 import { Input } from "./ui/Input";
 import { authClient } from "../lib/authClient";
-import { notifySuccess } from "../lib/appToast";
-import { type } from "arktype";
 import { useAccountContext } from "../hooks/useAccount";
-
-const errorResponse = type({ error: "string" });
+import { useLocale } from "./LocaleProvider";
+import { useTranslation } from "react-i18next";
 
 const avatarAccept = "image/png,image/jpeg,image/webp";
-
-const avatarFailureMessage = "画像を変更できませんでした。";
 
 const sendAvatar = async (request: RequestInit): Promise<string | null> => {
     try {
         const response = await fetch("/api/me/avatar", request);
 
         if (!response.ok) {
-            const failure = errorResponse(await response.json());
-
-            return failure instanceof type.errors ? avatarFailureMessage : failure.error;
+            return apiErrorMessage(await response.json().catch(() => null), "avatar.changeFailed");
         }
 
         return null;
     } catch {
-        return avatarFailureMessage;
+        return apiErrorMessage(null, "avatar.changeFailed");
     }
 };
+
+interface AvatarFormProps {
+    account: Account;
+    onSaved: () => void;
+}
 
 interface AccountFormProps {
     account: Account;
     onSaved: () => void;
 }
 
-const AvatarForm = ({ account, onSaved }: AccountFormProps): ReactNode => {
+const AvatarForm = ({ account, onSaved }: AvatarFormProps): ReactNode => {
     const fileInput = useRef<HTMLInputElement>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const { t: translate } = useTranslation();
 
     const run = async (request: RequestInit): Promise<void> => {
         setBusy(true);
@@ -50,7 +54,7 @@ const AvatarForm = ({ account, onSaved }: AccountFormProps): ReactNode => {
             setError(failure);
         } else {
             onSaved();
-            notifySuccess("アイコンを変更しました");
+            notifySuccess(translate("settings.avatarChanged"));
         }
 
         setBusy(false);
@@ -74,7 +78,7 @@ const AvatarForm = ({ account, onSaved }: AccountFormProps): ReactNode => {
                         size="sm"
                         variant="outline"
                     >
-                        画像を変更
+                        {translate("settings.changeAvatar")}
                     </Button>
                     {hasCustomAvatar ? (
                         <Button
@@ -87,13 +91,13 @@ const AvatarForm = ({ account, onSaved }: AccountFormProps): ReactNode => {
                             size="sm"
                             variant="ghost"
                         >
-                            Gravatarに戻す
+                            {translate("settings.useGravatar")}
                         </Button>
                     ) : null}
                 </div>
                 <input
                     accept={avatarAccept}
-                    aria-label="アイコン画像を選択"
+                    aria-label={translate("settings.avatarInputLabel")}
                     className="sr-only"
                     onChange={(event) => {
                         const file = event.target.files?.[0];
@@ -131,6 +135,7 @@ const NameForm = ({ account, onSaved }: AccountFormProps): ReactNode => {
     const name = edit ?? account.name;
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const { t: translate } = useTranslation();
 
     const save = async (): Promise<void> => {
         setBusy(true);
@@ -140,13 +145,13 @@ const NameForm = ({ account, onSaved }: AccountFormProps): ReactNode => {
             const result = await authClient.updateUser({ name: name.trim() });
 
             if (result.error) {
-                setError("ユーザー名を保存できませんでした。");
+                setError(translate("errors.auth.updateFailed"));
             } else {
                 onSaved();
-                notifySuccess("保存しました");
+                notifySuccess(translate("settings.saveSuccess"));
             }
         } catch {
-            setError("ユーザー名を保存できませんでした。");
+            setError(translate("errors.auth.updateFailed"));
         }
 
         setBusy(false);
@@ -161,7 +166,7 @@ const NameForm = ({ account, onSaved }: AccountFormProps): ReactNode => {
             }}
         >
             <label className="block text-sm font-medium" htmlFor="account-name">
-                ユーザー名
+                {translate("auth.usernameLabel")}
             </label>
             <div className="flex gap-2">
                 <Input
@@ -174,7 +179,7 @@ const NameForm = ({ account, onSaved }: AccountFormProps): ReactNode => {
                     value={name}
                 />
                 <Button disabled={busy || name.trim() === ""} type="submit">
-                    保存
+                    {translate("common.save")}
                 </Button>
             </div>
             {error ? (
@@ -186,19 +191,64 @@ const NameForm = ({ account, onSaved }: AccountFormProps): ReactNode => {
     );
 };
 
+const LanguageForm = (): ReactNode => {
+    const { locale, setLocale } = useLocale();
+    const { refresh } = useAccountContext();
+    const { t: translate } = useTranslation();
+
+    const change = (next: string | null): void => {
+        if (next !== "ja" && next !== "en") {
+            return;
+        }
+
+        setLocale(next);
+        meClient.api.me
+            .$patch({
+                json: {
+                    locale: next
+                }
+            })
+            .then((response) => {
+                if (response.ok) {
+                    refresh();
+                }
+            })
+            .catch(() => {
+                notifyError(errorMessage("auth.localeSaveFailed"));
+            });
+    };
+
+    return (
+        <div className="space-y-2">
+            <p className="text-sm font-medium">{translate("settings.languageLabel")}</p>
+            <Select onValueChange={change} value={locale}>
+                <SelectTrigger aria-label={translate("settings.languageLabel")} className="w-40">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="ja">{translate("settings.languageJa")}</SelectItem>
+                    <SelectItem value="en">{translate("settings.languageEn")}</SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
+    );
+};
+
 const AccountSettings = (): ReactNode => {
     const { account, refresh } = useAccountContext();
+    const { t: translate } = useTranslation();
 
     return (
         <section className="space-y-4">
-            <h2 className="text-lg font-semibold">アカウント</h2>
+            <h2 className="text-lg font-semibold">{translate("settings.accountTitle")}</h2>
             {account ? (
                 <>
                     <AvatarForm account={account} onSaved={refresh} />
                     <NameForm account={account} onSaved={refresh} />
+                    <LanguageForm />
                 </>
             ) : (
-                <p className="text-muted-foreground">読み込み中です。</p>
+                <p className="text-muted-foreground">{translate("common.loading")}</p>
             )}
         </section>
     );

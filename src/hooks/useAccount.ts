@@ -1,6 +1,7 @@
 import { type Account, meClient } from "../lib/meClient";
 import { authClient, clearAuthState } from "../lib/authClient";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { errorMessage } from "../lib/errorMessage";
 import { notifyError } from "../lib/appToast";
 import { useRouter } from "@tanstack/react-router";
 
@@ -89,7 +90,7 @@ const useRelogin = (): (() => Promise<void>) => {
                 to: "/login"
             });
         } catch {
-            notifyError("再ログインできませんでした。");
+            notifyError(errorMessage("auth.reloginFailed"));
         }
     }, [router]);
 };

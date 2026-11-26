@@ -14,8 +14,8 @@ describe("resolvePasskeyName", () => {
     });
 
     it("falls back when the authenticator cannot be identified", () => {
-        expect(resolvePasskeyName(null, anonymousAaguid)).toBe("パスキー");
-        expect(resolvePasskeyName("  ", null)).toBe("パスキー");
+        expect(resolvePasskeyName(null, anonymousAaguid)).toBe("Passkey");
+        expect(resolvePasskeyName("  ", null)).toBe("Passkey");
     });
 });
 

@@ -1,19 +1,21 @@
 import { Link, useLoaderData, useRouter } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
+import { apiErrorMessage, authErrorMessage } from "../lib/errorMessage";
 import { authClient, clearAuthState } from "../lib/authClient";
 import { Button } from "./ui/button";
 import { Input } from "./ui/Input";
 import { hasPendingShare } from "../lib/pendingShare";
 import { type } from "arktype";
+import { useLocale } from "./LocaleProvider";
+import { useTranslation } from "react-i18next";
 
-const errorResponse = type({ error: "string" });
 const tokenResponse = type({ token: "string" });
 
 type SignupTokenResult = { kind: "error"; message: string } | { kind: "token"; token: string };
 
-const requestSignupToken = async (email: string, name: string): Promise<SignupTokenResult> => {
+const requestSignupToken = async (email: string, locale: "ja" | "en", name: string): Promise<SignupTokenResult> => {
     const response = await fetch("/api/auth/signup-context", {
-        body: JSON.stringify({ email, name }),
+        body: JSON.stringify({ email, locale, name }),
         headers: {
             "content-type": "application/json"
         },
@@ -21,11 +23,9 @@ const requestSignupToken = async (email: string, name: string): Promise<SignupTo
     });
 
     if (!response.ok) {
-        const failure = errorResponse(await response.json());
-
         return {
             kind: "error",
-            message: failure instanceof type.errors ? "サインアップを開始できませんでした。" : failure.error
+            message: apiErrorMessage(await response.json().catch(() => null), "signup.startFailed")
         };
     }
 
@@ -34,7 +34,7 @@ const requestSignupToken = async (email: string, name: string): Promise<SignupTo
     return token instanceof type.errors
         ? {
               kind: "error",
-              message: "サインアップを開始できませんでした。"
+              message: apiErrorMessage(null, "signup.startFailed")
           }
         : {
               kind: "token",
@@ -60,42 +60,46 @@ const SignupForm = ({
     onEmailChange,
     onSubmit,
     onNameChange
-}: SignupFormProps): ReactNode => (
-    <form className="space-y-6" onSubmit={onSubmit}>
-        <div className="space-y-2">
-            <label className="block text-sm font-medium" htmlFor="email">
-                メールアドレス
-            </label>
-            <Input
-                autoComplete="email"
-                id="email"
-                onChange={(event) => {
-                    onEmailChange(event.target.value);
-                }}
-                required
-                type="email"
-                value={email}
-            />
-        </div>
-        <div className="space-y-2">
-            <label className="block text-sm font-medium" htmlFor="name">
-                ユーザー名
-            </label>
-            <Input
-                autoComplete="nickname"
-                id="name"
-                onChange={(event) => {
-                    onNameChange(event.target.value);
-                }}
-                required
-                value={name}
-            />
-        </div>
-        <Button className="w-full" disabled={busy} type="submit">
-            {needsSetup ? "アカウントを作成" : "登録してパスキーを作成"}
-        </Button>
-    </form>
-);
+}: SignupFormProps): ReactNode => {
+    const { t: translate } = useTranslation();
+
+    return (
+        <form className="space-y-6" onSubmit={onSubmit}>
+            <div className="space-y-2">
+                <label className="block text-sm font-medium" htmlFor="email">
+                    {translate("auth.emailLabel")}
+                </label>
+                <Input
+                    autoComplete="email"
+                    id="email"
+                    onChange={(event) => {
+                        onEmailChange(event.target.value);
+                    }}
+                    required
+                    type="email"
+                    value={email}
+                />
+            </div>
+            <div className="space-y-2">
+                <label className="block text-sm font-medium" htmlFor="name">
+                    {translate("auth.usernameLabel")}
+                </label>
+                <Input
+                    autoComplete="nickname"
+                    id="name"
+                    onChange={(event) => {
+                        onNameChange(event.target.value);
+                    }}
+                    required
+                    value={name}
+                />
+            </div>
+            <Button className="w-full" disabled={busy} type="submit">
+                {needsSetup ? translate("auth.createAccount") : translate("auth.registerPasskey")}
+            </Button>
+        </form>
+    );
+};
 
 const SignupPage = (): ReactNode => {
     const { needsSetup } = useLoaderData({ from: "/signup" });
@@ -104,13 +108,15 @@ const SignupPage = (): ReactNode => {
     const [name, setName] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+    const { locale } = useLocale();
+    const { t: translate } = useTranslation();
 
     const signup = async (): Promise<void> => {
         setBusy(true);
         setError(null);
 
         try {
-            const token = await requestSignupToken(email, name);
+            const token = await requestSignupToken(email, locale, name);
 
             if (token.kind === "error") {
                 setError(token.message);
@@ -121,7 +127,7 @@ const SignupPage = (): ReactNode => {
                 });
 
                 if (result.error) {
-                    setError(result.error.message ?? "アカウントを作成できませんでした。");
+                    setError(authErrorMessage(result.error, "auth.signupFailed"));
                 } else {
                     clearAuthState();
                     await router.navigate({
@@ -130,7 +136,7 @@ const SignupPage = (): ReactNode => {
                 }
             }
         } catch {
-            setError("アカウントを作成できませんでした。");
+            setError(translate("auth.signupFailed"));
         }
 
         setBusy(false);
@@ -144,8 +150,10 @@ const SignupPage = (): ReactNode => {
     return (
         <div className="space-y-6">
             <div className="space-y-2">
-                <h1 className="text-xl font-semibold">{needsSetup ? "最初のアカウントを作成" : "新規登録"}</h1>
-                <p className="text-muted-foreground">メールアドレスとユーザー名を入力し、パスキーを登録します。</p>
+                <h1 className="text-xl font-semibold">
+                    {needsSetup ? translate("auth.setupTitle") : translate("auth.signupTitle")}
+                </h1>
+                <p className="text-muted-foreground">{translate("auth.signupDescription")}</p>
             </div>
             <SignupForm
                 busy={busy}
@@ -159,7 +167,7 @@ const SignupPage = (): ReactNode => {
             {needsSetup ? null : (
                 <p className="text-center text-sm text-muted-foreground">
                     <Link className="underline" to="/login">
-                        ログインに戻る
+                        {translate("auth.backToLogin")}
                     </Link>
                 </p>
             )}

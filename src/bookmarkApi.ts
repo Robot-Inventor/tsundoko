@@ -1,9 +1,10 @@
 // oxlint-disable import/max-dependencies -- The route module legitimately wires validation, storage, previews, and rate limiting.
-import { type BookmarkScope, bookmarkMessages, httpStatus } from "./lib/bookmark";
+import { type BookmarkScope, httpStatus } from "./lib/bookmark";
 import { bookmarkExists, deleteBookmark, listBookmarks, saveBookmark, setBookmarkArchived } from "./db/bookmarks";
-import { bookmarkUrl, invalidBookmarkUrlMessage, normalizeBookmarkUrl } from "./lib/bookmarkUrl";
+import { bookmarkUrl, normalizeBookmarkUrl } from "./lib/bookmarkUrl";
 import { isXPostUrl, renderXPost } from "./lib/xPost";
 import { Hono } from "hono";
+import { apiError } from "./lib/apiError";
 import { bodyLimit } from "hono/body-limit";
 import { createRateLimit } from "./lib/rateLimit";
 import { getPreview } from "./lib/preview";
@@ -58,7 +59,7 @@ const archivePayload = validator("json", (value, context) => {
     const parsed = archiveRequest(value);
 
     if (parsed instanceof type.errors) {
-        return context.json({ error: bookmarkMessages.invalidArchivedAt }, httpStatus.badRequest);
+        return context.json(apiError("bookmark.invalidArchivedAt"), httpStatus.badRequest);
     }
 
     return parsed;
@@ -72,7 +73,7 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
         try {
             return context.json(await listBookmarks(query.q, query.scope, context.get("userId")), httpStatus.ok);
         } catch {
-            return context.json({ error: bookmarkMessages.loadFailed }, httpStatus.internalServerError);
+            return context.json(apiError("bookmark.loadFailed"), httpStatus.internalServerError);
         }
     })
     .post(
@@ -80,27 +81,27 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
         bookmarkSaveRateLimit,
         bodyLimit({
             maxSize: maxRequestBytes,
-            onError: (context) => context.json({ error: "入力が長すぎます。" }, httpStatus.payloadTooLarge)
+            onError: (context) => context.json(apiError("auth.tooLong"), httpStatus.payloadTooLarge)
         }),
         async (context) => {
             context.header("Cache-Control", "no-store");
 
             if (parseContentType(context.req.header("content-type"))?.essence !== "application/json") {
-                return context.json({ error: "JSONでURLを送信してください。" }, httpStatus.unsupportedMediaType);
+                return context.json(apiError("bookmark.invalidJson"), httpStatus.unsupportedMediaType);
             }
 
             const input = previewRequest(await context.req.text());
 
             if (input instanceof type.errors) {
-                return context.json({ error: invalidBookmarkUrlMessage }, httpStatus.badRequest);
+                return context.json(apiError("bookmark.invalidUrl"), httpStatus.badRequest);
             }
 
             try {
                 if (await bookmarkExists(normalizeBookmarkUrl(input.url), context.get("userId"))) {
-                    return context.json({ error: bookmarkMessages.duplicate }, httpStatus.conflict);
+                    return context.json(apiError("bookmark.duplicate"), httpStatus.conflict);
                 }
             } catch {
-                return context.json({ error: bookmarkMessages.saveFailed }, httpStatus.internalServerError);
+                return context.json(apiError("bookmark.saveFailed"), httpStatus.internalServerError);
             }
 
             // X post pages are fetched by xeet instead of the OG pipeline, so both are tried independently:
@@ -119,7 +120,7 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
             ]);
 
             if (!preview && !xPost) {
-                return context.json({ error: bookmarkMessages.fetchFailed }, httpStatus.badGateway);
+                return context.json(apiError("bookmark.fetchFailed"), httpStatus.badGateway);
             }
 
             try {
@@ -132,9 +133,9 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
 
                 return saved
                     ? context.json(saved, httpStatus.created)
-                    : context.json({ error: bookmarkMessages.duplicate }, httpStatus.conflict);
+                    : context.json(apiError("bookmark.duplicate"), httpStatus.conflict);
             } catch {
-                return context.json({ error: bookmarkMessages.saveFailed }, httpStatus.internalServerError);
+                return context.json(apiError("bookmark.saveFailed"), httpStatus.internalServerError);
             }
         }
     )
@@ -142,7 +143,7 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
         "/api/bookmarks/:id",
         bodyLimit({
             maxSize: maxRequestBytes,
-            onError: (context) => context.json({ error: "入力が長すぎます。" }, httpStatus.payloadTooLarge)
+            onError: (context) => context.json(apiError("auth.tooLong"), httpStatus.payloadTooLarge)
         }),
         bookmarkIdParam,
         archivePayload,
@@ -156,9 +157,9 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
 
                 return updated
                     ? context.json(updated, httpStatus.ok)
-                    : context.json({ error: bookmarkMessages.notFound }, httpStatus.notFound);
+                    : context.json(apiError("bookmark.notFound"), httpStatus.notFound);
             } catch {
-                return context.json({ error: bookmarkMessages.saveFailed }, httpStatus.internalServerError);
+                return context.json(apiError("bookmark.saveFailed"), httpStatus.internalServerError);
             }
         }
     )
@@ -171,9 +172,9 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
 
             return deleted
                 ? context.body(null, httpStatus.noContent)
-                : context.json({ error: bookmarkMessages.notFound }, httpStatus.notFound);
+                : context.json(apiError("bookmark.notFound"), httpStatus.notFound);
         } catch {
-            return context.json({ error: bookmarkMessages.saveFailed }, httpStatus.internalServerError);
+            return context.json(apiError("bookmark.saveFailed"), httpStatus.internalServerError);
         }
     });
 

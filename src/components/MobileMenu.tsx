@@ -5,6 +5,7 @@ import { MenuIcon } from "lucide-react";
 import { cn } from "../lib/utils";
 import { desktopLayout } from "../hooks/useSearch";
 import { useSwipeToOpenMenu } from "../hooks/useSwipeToOpenMenu";
+import { useTranslation } from "react-i18next";
 
 interface MobileMenuProps {
     children: ReactNode;
@@ -20,6 +21,7 @@ const MobileMenu = ({ children, finalFocus, onOpenChange, open, searchOpen }: Mo
     // Stays set after closing: Base UI reads finalFocus while the popup unmounts, so clearing it
     // on close would restore focus to the trigger again. The next trigger open clears it.
     const [openedBySwipe, setOpenedBySwipe] = useState(false);
+    const { t: translate } = useTranslation();
 
     const openBySwipe = useCallback((): void => {
         setOpenedBySwipe(true);
@@ -55,7 +57,7 @@ const MobileMenu = ({ children, finalFocus, onOpenChange, open, searchOpen }: Mo
     return (
         <Sheet onOpenChange={handleOpenChange} open={open}>
             <SheetTrigger
-                aria-label="メニューを開く"
+                aria-label={translate("common.openMenu")}
                 render=<Button
                     className={cn(
                         "size-11 transition-opacity duration-200 md:hidden motion-reduce:transition-none",
@@ -69,7 +71,7 @@ const MobileMenu = ({ children, finalFocus, onOpenChange, open, searchOpen }: Mo
                 <MenuIcon aria-hidden="true" />
             </SheetTrigger>
             <SheetContent className="pt-[calc(2rem_+_env(safe-area-inset-top))]" finalFocus={resolveFinalFocus}>
-                <SheetTitle>メニュー</SheetTitle>
+                <SheetTitle>{translate("common.menu")}</SheetTitle>
                 {children}
             </SheetContent>
         </Sheet>

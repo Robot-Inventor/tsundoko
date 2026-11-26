@@ -1,6 +1,8 @@
-import { type Bookmark, type BookmarkScope, bookmarkMessages } from "./bookmark";
+import type { Bookmark, BookmarkScope } from "./bookmark";
 import { appToastManager, notifyError, toastTimeoutMs } from "./appToast";
 import { bookmarkClient } from "./bookmarkClient";
+import { errorMessage } from "./errorMessage";
+import { i18n } from "./i18n";
 import { useSyncExternalStore } from "react";
 
 // The undo toast is shared by every action, so it needs a fixed id; errors dedupe under their own.
@@ -15,11 +17,11 @@ interface PendingBookmarkAction {
     timer: number;
 }
 
-const actionToasts: Record<BookmarkActionKind, string> = {
-    archive: "アーカイブしました",
-    delete: "削除しました",
-    unarchive: "アーカイブから戻しました"
-};
+const actionToasts = {
+    archive: "bookmark.toastArchive",
+    delete: "bookmark.toastDelete",
+    unarchive: "bookmark.toastUnarchive"
+} as const satisfies Record<BookmarkActionKind, string>;
 
 let snapshot: ReadonlyMap<string, PendingBookmarkAction> = new Map();
 
@@ -140,7 +142,7 @@ const commitAction = async (id: string, action: PendingBookmarkAction): Promise<
         const next = new Map(snapshot);
         next.delete(id);
         replaceSnapshot(next);
-        notifyError(bookmarkMessages.actionFailed, errorToastId);
+        notifyError(errorMessage("bookmark.actionFailed"), errorToastId);
     }
     // On success the entry stays: it keeps hiding the stale copy in already-loaded lists.
 };
@@ -184,7 +186,7 @@ const requestBookmarkAction = (kind: BookmarkActionKind, bookmark: Bookmark): vo
 
     appToastManager.add({
         actionProps: {
-            children: "元に戻す",
+            children: i18n.t("common.undo"),
             onClick: () => {
                 undoBookmarkAction(bookmark.id);
             }
@@ -204,7 +206,7 @@ const requestBookmarkAction = (kind: BookmarkActionKind, bookmark: Bookmark): vo
         // Base UI would pause its own dismissal while hovered; timeout: 0 hands the
         // whole visibility window over to the commit timer above.
         timeout: 0,
-        title: `「${bookmark.title}」を${actionToasts[kind]}`
+        title: i18n.t(actionToasts[kind], { title: bookmark.title })
     });
 
     toastOwner = action;

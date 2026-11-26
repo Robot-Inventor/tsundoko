@@ -1,3 +1,4 @@
+// oxlint-disable import/max-dependencies -- The card composes layout, menu, and locale concerns.
 import { Card, CardFooter, CardHeader } from "./ui/Card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
 import { EllipsisVerticalIcon, GlobeIcon, ImageOffIcon } from "lucide-react";
@@ -10,9 +11,11 @@ import {
     thumbnailLayoutClass
 } from "./bookmarkCardLayout";
 import type { Bookmark } from "../lib/bookmark";
+import { formatDate } from "../lib/dateFormat";
+import { formatSiteName } from "../lib/localizedNames";
 import { getBookmarkCardActions } from "./bookmarkCardActions";
-
-const dateFormat = new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" });
+import { useLocale } from "./LocaleProvider";
+import { useTranslation } from "react-i18next";
 
 // Mobile: Feedly/X-style media object (thumbnail left, cropped to card height); sm and up: full-width thumbnail on top.
 // h-full keeps the img stretched to the wrapper so wide screens keep the center crop; the
@@ -24,27 +27,31 @@ interface BookmarkCardMenuProps {
     bookmark: Bookmark;
 }
 
-const BookmarkCardMenu = ({ archived, bookmark }: BookmarkCardMenuProps): ReactNode => (
-    // Hover-only action menu (touch devices use the long-press drawer); the stretched title
-    // link sits underneath, so the trigger needs its own stacking level.
-    <DropdownMenu>
-        <DropdownMenuTrigger
-            aria-label={`「${bookmark.title}」のメニューを開く`}
-            // Top-left on the mobile thumbnail, top-right on the desktop thumbnail.
-            className="pointer-events-none absolute left-1.5 top-1.5 z-10 grid size-7 place-items-center rounded-full bg-black/50 text-white opacity-0 transition-[background-color,opacity] hover:bg-black/70 right-auto focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:focus-outline aria-expanded:pointer-events-auto aria-expanded:opacity-100 group-hover/card:pointer-events-auto group-hover/card:opacity-100 sm:left-auto sm:right-1.5 [@media(hover:none)]:hidden"
-        >
-            <EllipsisVerticalIcon aria-hidden="true" className="size-4" />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-            {getBookmarkCardActions(archived, bookmark).map(({ icon: Icon, label, onSelect, variant }) => (
-                <DropdownMenuItem key={label} onClick={onSelect} variant={variant ?? "default"}>
-                    <Icon aria-hidden="true" />
-                    {label}
-                </DropdownMenuItem>
-            ))}
-        </DropdownMenuContent>
-    </DropdownMenu>
-);
+const BookmarkCardMenu = ({ archived, bookmark }: BookmarkCardMenuProps): ReactNode => {
+    const { t: translate } = useTranslation();
+
+    return (
+        // Hover-only action menu (touch devices use the long-press drawer); the stretched title
+        // link sits underneath, so the trigger needs its own stacking level.
+        <DropdownMenu>
+            <DropdownMenuTrigger
+                aria-label={translate("common.bookmarkMenuLabel", { title: bookmark.title })}
+                // Top-left on the mobile thumbnail, top-right on the desktop thumbnail.
+                className="pointer-events-none absolute left-1.5 top-1.5 z-10 grid size-7 place-items-center rounded-full bg-black/50 text-white opacity-0 transition-[background-color,opacity] hover:bg-black/70 right-auto focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:focus-outline aria-expanded:pointer-events-auto aria-expanded:opacity-100 group-hover/card:pointer-events-auto group-hover/card:opacity-100 sm:left-auto sm:right-1.5 [@media(hover:none)]:hidden"
+            >
+                <EllipsisVerticalIcon aria-hidden="true" className="size-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                {getBookmarkCardActions(archived, bookmark).map(({ icon: Icon, label, onSelect, variant }) => (
+                    <DropdownMenuItem key={label} onClick={onSelect} variant={variant ?? "default"}>
+                        <Icon aria-hidden="true" />
+                        {label}
+                    </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+};
 
 interface BookmarkCardProps {
     archived: boolean;
@@ -54,6 +61,8 @@ interface BookmarkCardProps {
 const BookmarkCard = ({ archived, bookmark }: BookmarkCardProps): ReactNode => {
     const [thumbnailFailed, setThumbnailFailed] = useState(false);
     const [faviconFailed, setFaviconFailed] = useState(false);
+    const { locale } = useLocale();
+    const { t: translate } = useTranslation();
     const hasThumbnail = bookmark.thumbnailFit === "top" || bookmark.thumbnailUrl !== null;
 
     // sm:border instead of the base ring: the grid item's overflow-clip cuts a ring painted
@@ -94,7 +103,7 @@ const BookmarkCard = ({ archived, bookmark }: BookmarkCardProps): ReactNode => {
                             target="_blank"
                         >
                             <span className="line-clamp-3 wrap-anywhere sm:line-clamp-2">{bookmark.title}</span>
-                            <span className="sr-only">（新しいタブで開きます）</span>
+                            <span className="sr-only">{translate("common.opensInNewTab")}</span>
                         </a>
                     </h2>
                     {bookmark.description && (
@@ -122,10 +131,10 @@ const BookmarkCard = ({ archived, bookmark }: BookmarkCardProps): ReactNode => {
                                 width={16}
                             />
                         )}
-                        <span className="truncate">{bookmark.siteName}</span>
+                        <span className="truncate">{formatSiteName(bookmark.siteName, locale)}</span>
                     </span>
                     <time className="shrink-0" dateTime={bookmark.addedAt.toISOString()}>
-                        {dateFormat.format(bookmark.addedAt)}
+                        {formatDate(locale, bookmark.addedAt.toISOString(), "")}
                     </time>
                 </CardFooter>
             </div>

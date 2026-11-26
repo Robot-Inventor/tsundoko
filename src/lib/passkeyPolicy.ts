@@ -1,6 +1,6 @@
 import { getAuthenticatorName } from "@better-auth/passkey";
 
-const fallbackPasskeyName = "パスキー";
+const fallbackPasskeyName = "Passkey";
 
 const secondsPerMinute = 60;
 const millisecondsPerSecond = 1000;

@@ -1,5 +1,6 @@
-import { type PasskeySummary, passkeyMessages } from "../lib/passkey";
 import { useCallback, useEffect, useState } from "react";
+import type { PasskeySummary } from "../lib/passkey";
+import { errorMessage } from "../lib/errorMessage";
 import { meClient } from "../lib/meClient";
 import { type } from "arktype";
 
@@ -36,14 +37,14 @@ const usePasskeys = (): UsePasskeysResult => {
                 }
 
                 if (parsed instanceof type.errors) {
-                    setError(passkeyMessages.loadFailed);
+                    setError(errorMessage("passkey.loadFailed"));
                 } else {
                     setPasskeys(parsed);
                     setError(null);
                 }
             } catch {
                 if (!request.cancelled) {
-                    setError(passkeyMessages.loadFailed);
+                    setError(errorMessage("passkey.loadFailed"));
                 }
             }
         })();

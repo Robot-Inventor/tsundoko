@@ -9,22 +9,25 @@ const tokenTtlMs = tokenTtlMinutes * millisecondsPerMinute;
 const tokenPayload = type({
     email: "string >= 1",
     expiresAt: "number",
+    locale: '"ja" | "en"',
     name: "string >= 1"
 });
 
 interface SignupInfo {
     email: string;
+    locale: "ja" | "en";
     name: string;
 }
 
 const sign = (payload: string): string =>
     createHmac("sha256", env.BETTER_AUTH_SECRET).update(payload).digest("base64url");
 
-const createSignupToken = ({ email, name }: SignupInfo): string => {
+const createSignupToken = ({ email, locale, name }: SignupInfo): string => {
     const payload = Buffer.from(
         JSON.stringify({
             email,
             expiresAt: Date.now() + tokenTtlMs,
+            locale,
             name
         })
     ).toString("base64url");
@@ -62,6 +65,7 @@ const readSignupToken = (token: string): SignupInfo | null => {
 
     return {
         email: parsed.email,
+        locale: parsed.locale,
         name: parsed.name
     };
 };

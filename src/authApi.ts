@@ -1,5 +1,6 @@
 import { needsSetup, signupAllowed } from "./lib/signupPolicy";
 import { Hono } from "hono";
+import { apiError } from "./lib/apiError";
 import { auth } from "./lib/auth";
 import { bodyLimit } from "hono/body-limit";
 import { createSignupToken } from "./lib/signupToken";
@@ -11,6 +12,7 @@ const maxRequestBytes = 16_384;
 
 const signupRequest = type({
     email: type("string.trim").to("string.email"),
+    locale: '"ja" | "en"',
     name: type("string.trim").to("string >= 1")
 });
 
@@ -30,7 +32,7 @@ const authApi = new Hono()
         "/api/auth/signup-context",
         bodyLimit({
             maxSize: maxRequestBytes,
-            onError: (context) => context.json({ error: "入力が長すぎます。" }, httpStatus.payloadTooLarge)
+            onError: (context) => context.json(apiError("auth.tooLong"), httpStatus.payloadTooLarge)
         }),
         async (context) => {
             context.header("Cache-Control", "no-store");
@@ -38,11 +40,11 @@ const authApi = new Hono()
             const parsed = signupRequest(await context.req.json().catch(() => null));
 
             if (parsed instanceof type.errors) {
-                return context.json({ error: "メールアドレスとユーザー名を入力してください。" }, httpStatus.badRequest);
+                return context.json(apiError("auth.invalidSignupInput"), httpStatus.badRequest);
             }
 
             if (!(await signupAllowed())) {
-                return context.json({ error: "現在は新規サインアップを受け付けていません。" }, httpStatus.forbidden);
+                return context.json(apiError("auth.signupClosed"), httpStatus.forbidden);
             }
 
             const email = parsed.email.toLowerCase();
@@ -51,7 +53,7 @@ const authApi = new Hono()
             // A duplicate address is rejected when the user row is inserted: createSignupUser re-checks
             // emailTaken, and the unique index on user.email catches a concurrent signup. Reporting it
             // here would let an unauthenticated caller enumerate registered addresses through the status.
-            return context.json({ token: createSignupToken({ email, name }) }, httpStatus.ok);
+            return context.json({ token: createSignupToken({ email, locale: parsed.locale, name }) }, httpStatus.ok);
         }
     )
     .on(["POST", "GET"], "/api/auth/*", (context) => auth.handler(context.req.raw));

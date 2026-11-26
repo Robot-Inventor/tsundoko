@@ -6,7 +6,6 @@ import {
     isExternalReferrer,
     pickSharedContent
 } from "./lib/shareTarget";
-import { brand, getPageTitle, pages } from "./lib/page-title";
 import { createRootRoute, createRoute, createRouter, redirect } from "@tanstack/react-router";
 import { savePendingShare, takePendingShare } from "./lib/pendingShare";
 import { ArchivePage } from "./components/ArchivePage";
@@ -19,14 +18,7 @@ import { SignupPage } from "./components/SignupPage";
 import { getAuthState } from "./lib/authClient";
 
 const rootRoute = createRootRoute({
-    component: RootComponent,
-    head: () => ({
-        meta: [
-            {
-                title: brand
-            }
-        ]
-    })
+    component: RootComponent
 });
 
 const requireSignedIn = async (): Promise<void> => {
@@ -156,13 +148,6 @@ const homeRoute = createRoute({
     beforeLoad: requireSignedIn,
     component: HomePage,
     getParentRoute: () => rootRoute,
-    head: () => ({
-        meta: [
-            {
-                title: getPageTitle(pages["/"].label)
-            }
-        ]
-    }),
     path: "/"
 });
 
@@ -170,13 +155,6 @@ const archiveRoute = createRoute({
     beforeLoad: requireSignedIn,
     component: ArchivePage,
     getParentRoute: () => rootRoute,
-    head: () => ({
-        meta: [
-            {
-                title: getPageTitle(pages["/archive"].label)
-            }
-        ]
-    }),
     path: "/archive"
 });
 
@@ -184,13 +162,6 @@ const settingsRoute = createRoute({
     beforeLoad: requireSignedIn,
     component: SettingsPage,
     getParentRoute: () => rootRoute,
-    head: () => ({
-        meta: [
-            {
-                title: getPageTitle(pages["/settings"].label)
-            }
-        ]
-    }),
     path: "/settings"
 });
 
@@ -200,13 +171,6 @@ const loginRoute = createRoute({
     beforeLoad: requireGuest,
     component: LoginPage,
     getParentRoute: () => rootRoute,
-    head: () => ({
-        meta: [
-            {
-                title: getPageTitle("ログイン")
-            }
-        ]
-    }),
     loader: (): Promise<AuthLoaderData> => getAuthState(),
     path: "/login",
     // Only the pages that ask to return after signing in are accepted; keeping the union closed
@@ -228,13 +192,6 @@ const signupRoute = createRoute({
     beforeLoad: requireSignupAvailable,
     component: SignupPage,
     getParentRoute: () => rootRoute,
-    head: () => ({
-        meta: [
-            {
-                title: getPageTitle("新規登録")
-            }
-        ]
-    }),
     loader: (): Promise<AuthLoaderData> => getAuthState(),
     path: "/signup"
 });

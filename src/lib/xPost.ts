@@ -55,7 +55,7 @@ const renderXPost = async (url: URL): Promise<XPostThumbnail> => {
 
     return {
         png,
-        siteName: post.author?.handle ? `X（@${post.author.handle}）` : "X",
+        siteName: post.author?.handle ? `X (@${post.author.handle})` : "X",
         title: text ? firstGraphemes(text, maxXPostTitleLength) : null
     };
 };

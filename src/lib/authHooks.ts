@@ -3,7 +3,6 @@ import { getPasskeyEditingDeadline, isPasskeyEditingAllowed } from "./passkeyPol
 import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { passkey } from "../db/auth-schema";
-import { passkeyMessages } from "./passkey";
 import { type } from "arktype";
 
 // The registration ceremony is two calls: options (which starts the browser prompt) and verification
@@ -34,8 +33,8 @@ const guardPasskeyChanges = createAuthMiddleware(async (context) => {
     // one transaction; the plugin's own endpoint would allow a concurrent check-then-delete race.
     if (context.path === "/passkey/delete-passkey") {
         throw APIError.from("BAD_REQUEST", {
-            code: "PASSKEY_DELETE_UNAVAILABLE",
-            message: passkeyMessages.saveFailed
+            code: "auth.passkeyDeleteUnavailable",
+            message: "auth.passkeyDeleteUnavailable"
         });
     }
 
@@ -53,8 +52,8 @@ const guardPasskeyChanges = createAuthMiddleware(async (context) => {
 
         if (!signup) {
             throw APIError.from("UNAUTHORIZED", {
-                code: "SESSION_REQUIRED",
-                message: passkeyMessages.reauthenticate
+                code: "passkey.reauthenticate",
+                message: "passkey.reauthenticate"
             });
         }
 
@@ -63,8 +62,8 @@ const guardPasskeyChanges = createAuthMiddleware(async (context) => {
 
     if (!isPasskeyEditingAllowed(getPasskeyEditingDeadline(new Date(session.session.createdAt)))) {
         throw APIError.from("FORBIDDEN", {
-            code: "SESSION_NOT_FRESH",
-            message: passkeyMessages.reauthenticate
+            code: "passkey.reauthenticate",
+            message: "passkey.reauthenticate"
         });
     }
 });

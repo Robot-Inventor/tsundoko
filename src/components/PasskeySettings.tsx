@@ -1,12 +1,15 @@
-import { type PasskeyError, minimumPasskeysForDeletion, passkeyMessages, toPasskeyError } from "../lib/passkey";
+// oxlint-disable import/max-dependencies -- Settings wires account, passkey, and toast concerns.
+import { type PasskeyError, minimumPasskeysForDeletion, toPasskeyError } from "../lib/passkey";
 import { type ReactNode, useState } from "react";
 import { notifyError, notifySuccess } from "../lib/appToast";
 import { useAccountContext, useRelogin } from "../hooks/useAccount";
 import { Button } from "./ui/button";
 import { PasskeyCard } from "./PasskeyCard";
 import { authClient } from "../lib/authClient";
+import { authErrorMessage } from "../lib/errorMessage";
 import { usePasskeyEditingAllowed } from "../hooks/usePasskeyEditing";
 import { usePasskeys } from "../hooks/usePasskeys";
+import { useTranslation } from "react-i18next";
 
 const PasskeySettings = (): ReactNode => {
     const { account } = useAccountContext();
@@ -16,15 +19,16 @@ const PasskeySettings = (): ReactNode => {
     const [sessionStale, setSessionStale] = useState(false);
     const [busy, setBusy] = useState(false);
     const relogin = useRelogin();
+    const { t: translate } = useTranslation();
 
     const addAllowed = withinWindow && !sessionStale;
 
     const handleError = (failure: PasskeyError): void => {
-        if (failure.code === "SESSION_NOT_FRESH") {
+        if (failure.code === "passkey.reauthenticate") {
             setSessionStale(true);
         }
 
-        notifyError(failure.message);
+        notifyError(authErrorMessage(failure, "passkey.saveFailed"));
     };
 
     const addPasskey = async (): Promise<void> => {
@@ -37,10 +41,10 @@ const PasskeySettings = (): ReactNode => {
                 handleError(toPasskeyError(result.error));
             } else {
                 refresh();
-                notifySuccess("パスキーを追加しました");
+                notifySuccess(translate("passkey.added"));
             }
         } catch {
-            notifyError(passkeyMessages.saveFailed);
+            notifyError(translate("errors.passkey.saveFailed"));
         }
 
         setBusy(false);
@@ -48,13 +52,13 @@ const PasskeySettings = (): ReactNode => {
 
     return (
         <section className="space-y-4">
-            <h2 className="text-lg font-semibold">パスキー</h2>
+            <h2 className="text-lg font-semibold">{translate("passkey.title")}</h2>
             {account && !addAllowed ? (
                 <div
                     className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/50 p-3"
                     role="status"
                 >
-                    <p className="text-sm">{passkeyMessages.reauthenticate}</p>
+                    <p className="text-sm">{translate("passkey.reauthenticate")}</p>
                     <Button
                         onClick={() => {
                             void relogin();
@@ -62,7 +66,7 @@ const PasskeySettings = (): ReactNode => {
                         size="sm"
                         variant="outline"
                     >
-                        再ログイン
+                        {translate("passkey.relogin")}
                     </Button>
                 </div>
             ) : null}
@@ -72,7 +76,7 @@ const PasskeySettings = (): ReactNode => {
                 </p>
             ) : null}
             {passkeys && !passkeys.length ? (
-                <p className="text-sm text-muted-foreground">パスキーがありません。</p>
+                <p className="text-sm text-muted-foreground">{translate("passkey.empty")}</p>
             ) : null}
             <ul className="divide-y">
                 {passkeys?.map((passkey) => (
@@ -94,7 +98,7 @@ const PasskeySettings = (): ReactNode => {
                 }}
                 variant="outline"
             >
-                パスキーを追加
+                {translate("passkey.add")}
             </Button>
         </section>
     );
