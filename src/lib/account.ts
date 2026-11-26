@@ -1,4 +1,5 @@
 import { type Locale, isLocale } from "./locale";
+import { type SortBy, parseSortBy } from "./bookmarkSort";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { getGravatarUrl } from "./gravatar";
@@ -16,6 +17,8 @@ interface Account extends AccountSummary {
     // to disable those actions before the server has to reject them.
     passkeyEditableUntil: string;
     locale: Locale;
+    sortByActive: SortBy;
+    sortByArchived: SortBy;
 }
 
 const readAccount = async (userId: string, sessionStartedAt: Date): Promise<Account | null> => {
@@ -24,7 +27,9 @@ const readAccount = async (userId: string, sessionStartedAt: Date): Promise<Acco
             email: user.email,
             image: user.image,
             locale: user.locale,
-            name: user.name
+            name: user.name,
+            sortByActive: user.sortByActive,
+            sortByArchived: user.sortByArchived
         })
         .from(user)
         .where(eq(user.id, userId));
@@ -39,7 +44,9 @@ const readAccount = async (userId: string, sessionStartedAt: Date): Promise<Acco
         email: row.email,
         locale: isLocale(row.locale) ? row.locale : "en",
         name: row.name,
-        passkeyEditableUntil: getPasskeyEditingDeadline(sessionStartedAt).toISOString()
+        passkeyEditableUntil: getPasskeyEditingDeadline(sessionStartedAt).toISOString(),
+        sortByActive: parseSortBy(row.sortByActive),
+        sortByArchived: parseSortBy(row.sortByArchived)
     };
 };
 

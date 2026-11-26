@@ -9,7 +9,8 @@ interface UseSearchResult {
     clearSearch: () => void;
     closeSearch: () => void;
     desktopSearchInput: React.RefObject<HTMLInputElement | null>;
-    finishSearch: () => void;
+    finishLoading: () => void;
+    isListLoading: boolean;
     isSearching: boolean;
     mobileSearchInput: React.RefObject<HTMLInputElement | null>;
     openSearch: () => void;
@@ -18,6 +19,7 @@ interface UseSearchResult {
     searchOpen: boolean;
     searchText: string;
     setSearchText: (value: string) => void;
+    startListLoading: () => void;
 }
 
 const useSearchShortcuts = (searchEnabled: boolean, closeSearch: () => void, focusSearch: () => void): void => {
@@ -70,10 +72,12 @@ const useResetOnRouteChange = (pathname: string, reset: () => void): void => {
 };
 
 interface SearchState {
-    finishSearch: () => void;
+    finishLoading: () => void;
+    isListLoading: boolean;
     isSearching: boolean;
     searchText: string;
     setSearchText: (value: string) => void;
+    startListLoading: () => void;
 }
 
 // Back/Forward and direct links change the query outside the search bar, so the input follows the
@@ -82,6 +86,7 @@ const useSearchState = (query: string): SearchState => {
     const queryRef = useRef(query);
     const [draft, setDraft] = useState({ query, text: query });
     const [progressQuery, setProgressQuery] = useState(query);
+    const [isListLoading, setIsListLoading] = useState(false);
 
     // A history navigation replaces the committed query; discard any draft typed against the old one.
     if (draft.query !== query) {
@@ -99,33 +104,46 @@ const useSearchState = (query: string): SearchState => {
         [query]
     );
 
-    const finishSearch = useCallback((): void => {
+    const finishLoading = useCallback((): void => {
         setProgressQuery(queryRef.current);
+        setIsListLoading(false);
+    }, []);
+
+    const startListLoading = useCallback((): void => {
+        setIsListLoading(true);
     }, []);
 
     return {
-        finishSearch,
+        finishLoading,
+        isListLoading,
         isSearching: progressQuery !== query,
         searchText: draft.text,
-        setSearchText
+        setSearchText,
+        startListLoading
     };
 };
 
-const useSearch = (searchEnabled: boolean, pathname: string): UseSearchResult => {
-    const navigate = useNavigate();
+const useSearchQuery = (): string =>
     // useLocation exposes the parsed but unvalidated search, so route validation alone is not enough.
-    const query = useLocation({
+    useLocation({
         select: (location) => parseSearchQuery({ ...location.search }).q ?? ""
     });
 
-    const { finishSearch, isSearching, searchText, setSearchText } = useSearchState(query);
+const useSearch = (searchEnabled: boolean, pathname: string): UseSearchResult => {
+    const navigate = useNavigate();
+    const query = useSearchQuery();
+
+    const { finishLoading, isListLoading, isSearching, searchText, setSearchText, startListLoading } =
+        useSearchState(query);
+
     const [searchOpen, setSearchOpen] = useState(false);
     const desktopSearchInput = useRef<HTMLInputElement>(null);
     const mobileSearchInput = useRef<HTMLInputElement>(null);
 
     const resetSearch = useCallback((): void => {
         setSearchOpen(false);
-    }, []);
+        finishLoading();
+    }, [finishLoading]);
 
     useResetOnRouteChange(pathname, resetSearch);
 
@@ -196,7 +214,8 @@ const useSearch = (searchEnabled: boolean, pathname: string): UseSearchResult =>
         clearSearch,
         closeSearch,
         desktopSearchInput,
-        finishSearch,
+        finishLoading,
+        isListLoading,
         isSearching,
         mobileSearchInput,
         openSearch,
@@ -204,7 +223,8 @@ const useSearch = (searchEnabled: boolean, pathname: string): UseSearchResult =>
         runSearch,
         searchOpen: searchEnabled && searchOpen,
         searchText,
-        setSearchText
+        setSearchText,
+        startListLoading
     };
 };
 

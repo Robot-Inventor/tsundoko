@@ -163,7 +163,9 @@ const AppLayout = (): ReactNode => {
                     <MobilePageTitle query={search.query} searchOpen={search.searchOpen} />
                     <HeaderSearch search={search} visible={showsSearch} />
                     {/* Only bookmark list pages fetch a list, so only they can show search progress. */}
-                    {isListPage ? <SearchProgress searching={search.isSearching} /> : null}
+                    {isListPage ? (
+                        <SearchProgress loading={search.isListLoading} searching={search.isSearching} />
+                    ) : null}
                 </header>
 
                 <div className="flex min-h-[calc(100dvh_-_3.5rem_-_env(safe-area-inset-top))]">

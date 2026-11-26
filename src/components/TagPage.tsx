@@ -1,5 +1,7 @@
 import { BookmarkList } from "./BookmarkList";
 import type { ReactNode } from "react";
+import { defaultSortBy } from "../lib/bookmarkSort";
+import { useAccountContext } from "../hooks/useAccount";
 import { useBookmarkList } from "../hooks/useBookmarkList";
 import { useParams } from "@tanstack/react-router";
 import { useSearchContext } from "../hooks/useSearch";
@@ -8,7 +10,16 @@ import { useTranslation } from "react-i18next";
 const TagPage = (): ReactNode => {
     const { tag } = useParams({ from: "/tags/$tag" });
     const search = useSearchContext();
-    const list = useBookmarkList({ query: search.query, scope: "active", tag }, search.finishSearch);
+    const { account, failed } = useAccountContext();
+    const list = useBookmarkList({
+        onSettled: search.finishLoading,
+        onSortStart: search.startListLoading,
+        query: search.query,
+        scope: "active",
+        sortBy: account?.sortByActive ?? (failed ? defaultSortBy : null),
+        tag
+    });
+
     const { t: translate } = useTranslation();
 
     return (

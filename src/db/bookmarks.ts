@@ -1,5 +1,7 @@
+// oxlint-disable import/max-dependencies -- Storage, search, tags, and previews legitimately meet here.
 import type { BookmarkListFilter, BookmarkPreview, SavedBookmark } from "../lib/bookmark";
-import { and, cosineDistance, desc, eq, isNotNull, isNull } from "drizzle-orm";
+import { type SQL, and, asc, cosineDistance, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import { type SortBy, defaultSortBy } from "../lib/bookmarkSort";
 import { attachTags, getBookmarkTags, tagFilterCondition, textSearchCondition } from "./bookmarkTags";
 import { deleteThumbnail, saveThumbnail } from "../lib/thumbnailStore";
 import { embed, embeddingInput } from "../lib/embedding";
@@ -56,8 +58,31 @@ const likePattern = (query: string): string => `%${query.replace(/[\\%_]/gu, "\\
 // when a query matches none of the stored text but is still near everything in the embedding space.
 const vectorResultLimit = 20;
 
+// A saved sort option applies to the plain list only. Search results keep their relevance order.
+// Japanese titles need ICU collation; the addedAt/id tail keeps equal titles in a stable order.
+const keywordOrderBy = (sortBy: SortBy): SQL[] => {
+    const title = sql`${bookmarks.title} collate "ja-x-icu"`;
+
+    switch (sortBy) {
+        case "newest":
+            return [desc(bookmarks.addedAt), desc(bookmarks.id)];
+        case "oldest":
+            return [asc(bookmarks.addedAt), asc(bookmarks.id)];
+        case "titleAsc":
+            return [sql`${title} asc`, asc(bookmarks.addedAt), desc(bookmarks.id)];
+        case "titleDesc":
+            return [sql`${title} desc`, asc(bookmarks.addedAt), desc(bookmarks.id)];
+        default:
+            return [desc(bookmarks.addedAt), desc(bookmarks.id)];
+    }
+};
+
+interface ListBookmarksFilter extends BookmarkListFilter {
+    sortBy?: SortBy;
+}
+
 const listBookmarks = async (
-    { query, scope, tag = "" }: BookmarkListFilter,
+    { query, scope, sortBy = defaultSortBy, tag = "" }: ListBookmarksFilter,
     userId: string
 ): Promise<SavedBookmark[]> => {
     const pattern = query ? likePattern(query) : null;
@@ -73,7 +98,7 @@ const listBookmarks = async (
         .select(bookmarkListItemColumns)
         .from(bookmarks)
         .where(and(eq(bookmarks.userId, userId), searchCondition, scopeCondition, tagCondition))
-        .orderBy(desc(bookmarks.addedAt), desc(bookmarks.id));
+        .orderBy(...keywordOrderBy(query ? defaultSortBy : sortBy));
 
     let rows = keywordRows;
     const queryEmbedding = await embeddingRequest;
