@@ -8,6 +8,7 @@ import { notifyError, notifySuccess } from "../lib/appToast";
 import { Button } from "./ui/button";
 import { Input } from "./ui/Input";
 import { authClient } from "../lib/authClient";
+import { isLocale } from "../lib/locale";
 import { useAccountContext } from "../hooks/useAccount";
 import { useLocale } from "../hooks/useLocale";
 import { useTranslation } from "react-i18next";
@@ -197,7 +198,7 @@ const LanguageForm = (): ReactNode => {
     const { t: translate } = useTranslation();
 
     const change = (next: string | null): void => {
-        if (next !== "ja" && next !== "en") {
+        if (!isLocale(next)) {
             return;
         }
 
@@ -218,16 +219,31 @@ const LanguageForm = (): ReactNode => {
             });
     };
 
+    // Base UI resolves the trigger text from Root's items, so the raw value is shown without them.
+    const languages = [
+        {
+            label: translate("settings.languageJa"),
+            value: "ja"
+        },
+        {
+            label: translate("settings.languageEn"),
+            value: "en"
+        }
+    ] as const;
+
     return (
         <div className="space-y-2">
             <p className="text-sm font-medium">{translate("settings.languageLabel")}</p>
-            <Select onValueChange={change} value={locale}>
+            <Select items={languages} onValueChange={change} value={locale}>
                 <SelectTrigger aria-label={translate("settings.languageLabel")} className="w-40">
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="ja">{translate("settings.languageJa")}</SelectItem>
-                    <SelectItem value="en">{translate("settings.languageEn")}</SelectItem>
+                    {languages.map((language) => (
+                        <SelectItem key={language.value} value={language.value}>
+                            {language.label}
+                        </SelectItem>
+                    ))}
                 </SelectContent>
             </Select>
         </div>
