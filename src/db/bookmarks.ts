@@ -1,5 +1,6 @@
 import type { BookmarkPreview, BookmarkScope, SavedBookmark } from "../lib/bookmark";
-import { and, cosineDistance, desc, eq, ilike, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { type SQL, and, asc, cosineDistance, desc, eq, ilike, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { type SortBy, defaultSortBy } from "../lib/bookmarkSort";
 import { deleteThumbnail, saveThumbnail } from "../lib/thumbnailStore";
 import { embed, embeddingInput } from "../lib/embedding";
 import type { PreviewData } from "../lib/preview";
@@ -54,7 +55,38 @@ const likePattern = (query: string): string => `%${query.replace(/[\\%_]/gu, "\\
 // when a query matches none of the stored text but is still near everything in the embedding space.
 const vectorResultLimit = 20;
 
-const listBookmarks = async (query: string, scope: BookmarkScope, userId: string): Promise<SavedBookmark[]> => {
+// A saved sort option applies to the plain list only. Search results keep their relevance order.
+// Japanese titles need ICU collation; the addedAt/id tail keeps equal titles in a stable order.
+const keywordOrderBy = (sortBy: SortBy): SQL[] => {
+    const title = sql`${bookmarks.title} collate "ja-x-icu"`;
+
+    switch (sortBy) {
+        case "newest":
+            return [desc(bookmarks.addedAt), desc(bookmarks.id)];
+        case "oldest":
+            return [asc(bookmarks.addedAt), asc(bookmarks.id)];
+        case "titleAsc":
+            return [sql`${title} asc`, asc(bookmarks.addedAt), desc(bookmarks.id)];
+        case "titleDesc":
+            return [sql`${title} desc`, asc(bookmarks.addedAt), desc(bookmarks.id)];
+        default:
+            return [desc(bookmarks.addedAt), desc(bookmarks.id)];
+    }
+};
+
+interface ListBookmarksInput {
+    query: string;
+    scope: BookmarkScope;
+    sortBy?: SortBy;
+    userId: string;
+}
+
+const listBookmarks = async ({
+    query,
+    scope,
+    sortBy = defaultSortBy,
+    userId
+}: ListBookmarksInput): Promise<SavedBookmark[]> => {
     const searchCondition = query
         ? or(
               ilike(bookmarks.title, likePattern(query)),
@@ -74,7 +106,7 @@ const listBookmarks = async (query: string, scope: BookmarkScope, userId: string
         .select(bookmarkListItemColumns)
         .from(bookmarks)
         .where(and(eq(bookmarks.userId, userId), searchCondition, scopeCondition))
-        .orderBy(desc(bookmarks.addedAt), desc(bookmarks.id));
+        .orderBy(...keywordOrderBy(query ? defaultSortBy : sortBy));
 
     const queryEmbedding = await embeddingRequest;
 

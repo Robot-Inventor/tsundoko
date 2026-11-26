@@ -9,12 +9,17 @@ import { db } from "./db";
 import { eq } from "drizzle-orm";
 import { httpStatus } from "./lib/httpStatus";
 import { passkeyApi } from "./passkeyApi";
+import { sortByValues } from "./lib/bookmarkSort";
 import { type } from "arktype";
 import { user } from "./db/auth-schema";
 
 const maxAvatarBytes = 5_242_880;
 
-const localeRequest = type({ locale: '"ja" | "en"' });
+const accountPatchRequest = type({
+    "locale?": '"ja" | "en"',
+    "sortByActive?": type.enumerated(...sortByValues),
+    "sortByArchived?": type.enumerated(...sortByValues)
+});
 
 const accountApi = new Hono<AuthEnv>()
     .get("/api/me", async (context) => {
@@ -31,16 +36,38 @@ const accountApi = new Hono<AuthEnv>()
     .patch("/api/me", async (context) => {
         context.header("Cache-Control", "no-store");
 
-        const parsed = localeRequest(await context.req.json().catch(() => null));
+        const body: unknown = await context.req.json().catch(() => null);
+        const parsed = accountPatchRequest(body);
 
         if (parsed instanceof type.errors) {
-            return context.json(apiError("auth.invalidLocale"), httpStatus.badRequest);
+            const invalidLocale = typeof body === "object" && body !== null && "locale" in body;
+
+            return context.json(
+                apiError(invalidLocale ? "auth.invalidLocale" : "auth.invalidSortBy"),
+                httpStatus.badRequest
+            );
         }
 
-        await db
-            .update(user)
-            .set({ locale: parsed.locale })
-            .where(eq(user.id, context.get("userId")));
+        const update: Partial<Pick<typeof user.$inferInsert, "locale" | "sortByActive" | "sortByArchived">> = {};
+
+        if ("locale" in parsed) {
+            update.locale = parsed.locale;
+        }
+
+        if ("sortByActive" in parsed) {
+            update.sortByActive = parsed.sortByActive;
+        }
+
+        if ("sortByArchived" in parsed) {
+            update.sortByArchived = parsed.sortByArchived;
+        }
+
+        if (Object.keys(update).length) {
+            await db
+                .update(user)
+                .set(update)
+                .where(eq(user.id, context.get("userId")));
+        }
 
         return context.body(null, httpStatus.noContent);
     })

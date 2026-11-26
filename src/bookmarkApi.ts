@@ -1,5 +1,6 @@
 // oxlint-disable import/max-dependencies -- The route module legitimately wires validation, storage, previews, and rate limiting.
 import { type BookmarkScope, httpStatus } from "./lib/bookmark";
+import { type SortBy, parseSortBy } from "./lib/bookmarkSort";
 import { bookmarkExists, deleteBookmark, listBookmarks, saveBookmark, setBookmarkArchived } from "./db/bookmarks";
 import { bookmarkUrl, normalizeBookmarkUrl } from "./lib/bookmarkUrl";
 import { isXPostUrl, renderXPost } from "./lib/xPost";
@@ -30,7 +31,7 @@ const archiveRequest = type({
 const bookmarkId = type("string.uuid");
 
 // oxlint-disable id-length -- "q" is the search parameter name defined by the API.
-const listQuery = validator("query", (value): { q: string; scope: BookmarkScope } => {
+const listQuery = validator("query", (value): { q: string; scope: BookmarkScope; sortBy: SortBy } => {
     // A repeated parameter arrives as an array; treat the first value as the query.
     const q = (Array.isArray(value["q"]) ? value["q"][0] : value["q"])?.trim() ?? "";
 
@@ -38,9 +39,13 @@ const listQuery = validator("query", (value): { q: string; scope: BookmarkScope 
     const rawScope = Array.isArray(value["scope"]) ? value["scope"][0] : value["scope"];
     const scope: BookmarkScope = rawScope === "archived" ? "archived" : "active";
 
+    // An invalid sort value falls back to the default, like an unknown scope does.
+    const rawSortBy = Array.isArray(value["sortBy"]) ? value["sortBy"][0] : value["sortBy"];
+
     return {
         q,
-        scope
+        scope,
+        sortBy: parseSortBy(rawSortBy)
     };
 });
 // oxlint-enable id-length
@@ -70,7 +75,15 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
         const query = context.req.valid("query");
 
         try {
-            return context.json(await listBookmarks(query.q, query.scope, context.get("userId")), httpStatus.ok);
+            return context.json(
+                await listBookmarks({
+                    query: query.q,
+                    scope: query.scope,
+                    sortBy: query.sortBy,
+                    userId: context.get("userId")
+                }),
+                httpStatus.ok
+            );
         } catch {
             return context.json(apiError("bookmark.loadFailed"), httpStatus.internalServerError);
         }

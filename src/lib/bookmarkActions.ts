@@ -1,4 +1,5 @@
 import type { Bookmark, BookmarkScope } from "./bookmark";
+import { type SortBy, insertBySortBy } from "./bookmarkSort";
 import { appToastManager, notifyError, toastTimeoutMs } from "./appToast";
 import { bookmarkClient } from "./bookmarkClient";
 import { errorMessage } from "./errorMessage";
@@ -62,11 +63,14 @@ const usePendingBookmarkActions = (): ReadonlyMap<string, PendingBookmarkAction>
 
 // Applies the pending actions to a fetched list: bookmarks acted on leave the list at once,
 // and ones moved into this scope appear even before their commit reaches the server.
-const applyPendingActions = (
-    bookmarks: Bookmark[],
-    pending: ReadonlyMap<string, PendingBookmarkAction>,
-    scope: BookmarkScope
-): Bookmark[] => {
+interface ApplyPendingActionsInput {
+    bookmarks: Bookmark[];
+    pending: ReadonlyMap<string, PendingBookmarkAction>;
+    scope: BookmarkScope;
+    sortBy: SortBy;
+}
+
+const applyPendingActions = ({ bookmarks, pending, scope, sortBy }: ApplyPendingActionsInput): Bookmark[] => {
     if (!pending.size) {
         return bookmarks;
     }
@@ -89,10 +93,9 @@ const applyPendingActions = (
     // A committed action's entry keeps hiding the stale copy that fetched lists may still contain.
     const movedInIds = new Set(movedIn.map((bookmark) => bookmark.id));
 
-    return [
-        ...movedIn,
-        ...bookmarks.filter((bookmark) => !movedOutIds.has(bookmark.id) && !movedInIds.has(bookmark.id))
-    ];
+    const kept = bookmarks.filter((bookmark) => !movedOutIds.has(bookmark.id) && !movedInIds.has(bookmark.id));
+
+    return movedIn.reduce((list, bookmark) => insertBySortBy(list, bookmark, sortBy), kept);
 };
 
 const sendActionRequest = (action: PendingBookmarkAction): Promise<{ ok: boolean }> => {

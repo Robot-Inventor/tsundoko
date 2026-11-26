@@ -6,7 +6,8 @@ interface UseSearchResult {
     clearSearch: () => void;
     closeSearch: () => void;
     desktopSearchInput: React.RefObject<HTMLInputElement | null>;
-    finishSearch: () => void;
+    finishLoading: () => void;
+    isListLoading: boolean;
     isSearching: boolean;
     mobileSearchInput: React.RefObject<HTMLInputElement | null>;
     openSearch: () => void;
@@ -15,6 +16,7 @@ interface UseSearchResult {
     searchOpen: boolean;
     searchText: string;
     setSearchText: (value: string) => void;
+    startListLoading: () => void;
 }
 
 const useSearchShortcuts = (searchEnabled: boolean, closeSearch: () => void, focusSearch: () => void): void => {
@@ -66,11 +68,46 @@ const useResetOnRouteChange = (pathname: string, reset: () => void): void => {
     }
 };
 
+interface LoadingFlags {
+    finishLoading: () => void;
+    isListLoading: boolean;
+    isSearching: boolean;
+    startListLoading: () => void;
+    startSearch: () => void;
+}
+
+// Search and sorting share one progress bar; keeping both flags together prevents one from lingering.
+const useLoadingFlags = (): LoadingFlags => {
+    const [isSearching, setIsSearching] = useState(false);
+    const [isListLoading, setIsListLoading] = useState(false);
+
+    const finishLoading = useCallback((): void => {
+        setIsSearching(false);
+        setIsListLoading(false);
+    }, []);
+
+    const startListLoading = useCallback((): void => {
+        setIsListLoading(true);
+    }, []);
+
+    const startSearch = useCallback((): void => {
+        setIsSearching(true);
+    }, []);
+
+    return {
+        finishLoading,
+        isListLoading,
+        isSearching,
+        startListLoading,
+        startSearch
+    };
+};
+
 const useSearch = (searchEnabled: boolean, pathname: string): UseSearchResult => {
     const [searchOpen, setSearchOpen] = useState(false);
     const [query, setQuery] = useState("");
     const [searchText, setSearchText] = useState("");
-    const [isSearching, setIsSearching] = useState(false);
+    const { finishLoading, isListLoading, isSearching, startListLoading, startSearch } = useLoadingFlags();
     const desktopSearchInput = useRef<HTMLInputElement>(null);
     const mobileSearchInput = useRef<HTMLInputElement>(null);
 
@@ -78,17 +115,13 @@ const useSearch = (searchEnabled: boolean, pathname: string): UseSearchResult =>
         setSearchOpen(false);
         setQuery("");
         setSearchText("");
-        setIsSearching(false);
-    }, []);
+        finishLoading();
+    }, [finishLoading]);
 
     useResetOnRouteChange(pathname, resetSearch);
 
     const openSearch = useCallback((): void => {
         setSearchOpen(true);
-    }, []);
-
-    const finishSearch = useCallback((): void => {
-        setIsSearching(false);
     }, []);
 
     const runSearch = useCallback((): void => {
@@ -103,8 +136,8 @@ const useSearch = (searchEnabled: boolean, pathname: string): UseSearchResult =>
         }
 
         setQuery(trimmed);
-        setIsSearching(true);
-    }, [query, searchText]);
+        startSearch();
+    }, [query, searchText, startSearch]);
 
     const clearSearch = useCallback((): void => {
         setSearchText("");
@@ -114,8 +147,8 @@ const useSearch = (searchEnabled: boolean, pathname: string): UseSearchResult =>
         }
 
         setQuery("");
-        setIsSearching(true);
-    }, [query]);
+        startSearch();
+    }, [query, startSearch]);
 
     const closeSearch = useCallback((): void => {
         // Discard uncommitted edits; the last executed query stays active.
@@ -146,7 +179,8 @@ const useSearch = (searchEnabled: boolean, pathname: string): UseSearchResult =>
         clearSearch,
         closeSearch,
         desktopSearchInput,
-        finishSearch,
+        finishLoading,
+        isListLoading,
         isSearching,
         mobileSearchInput,
         openSearch,
@@ -154,7 +188,8 @@ const useSearch = (searchEnabled: boolean, pathname: string): UseSearchResult =>
         runSearch,
         searchOpen: searchEnabled && searchOpen,
         searchText,
-        setSearchText
+        setSearchText,
+        startListLoading
     };
 };
 

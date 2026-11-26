@@ -140,7 +140,7 @@ const AppLayout = (): ReactNode => {
                 <MobilePageTitle query={isListPage ? search.query : ""} searchOpen={search.searchOpen} />
                 {showsSearch && <HeaderSearch search={search} />}
                 {/* Only Home and Archive fetch a bookmark list, so a search from /share has no request to finish. */}
-                {isListPage ? <SearchProgress searching={search.isSearching} /> : null}
+                {isListPage ? <SearchProgress loading={search.isListLoading} searching={search.isSearching} /> : null}
             </header>
 
             <div className="flex min-h-[calc(100dvh_-_3.5rem_-_env(safe-area-inset-top))]">

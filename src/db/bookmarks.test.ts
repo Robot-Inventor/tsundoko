@@ -1,6 +1,8 @@
 import { type TestDatabase, containerTimeoutMs, startTestDatabase } from "./testDatabase";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { user, verification } from "./auth-schema";
+import type { SortBy } from "../lib/bookmarkSort";
+import { bookmarks } from "./schema";
 
 const oneBookmark = 1;
 const noBookmarks = 0;
@@ -82,8 +84,14 @@ describe("bookmark ownership", () => {
         });
 
         expect(saved).not.toBeNull();
-        expect(await listBookmarks("", "active", userId)).toHaveLength(oneBookmark);
-        expect(await listBookmarks("", "active", otherUserId)).toHaveLength(noBookmarks);
+        expect(await listBookmarks({ query: "", scope: "active", userId })).toHaveLength(oneBookmark);
+        expect(
+            await listBookmarks({
+                query: "",
+                scope: "active",
+                userId: otherUserId
+            })
+        ).toHaveLength(noBookmarks);
     });
 
     it("allows the same URL for different users", async () => {
@@ -156,5 +164,61 @@ describe("bookmark ownership", () => {
         expect(await setBookmarkArchived(id, new Date(), otherUserId)).toBeNull();
         expect(await deleteBookmark(id, otherUserId)).toBe(false);
         expect(await getBookmarkImageUrls(id, userId)).not.toBeNull();
+    });
+});
+
+describe("bookmark sorting", () => {
+    it("orders the list by the requested sort option", async () => {
+        const { database } = getSetup();
+
+        await database.delete(bookmarks);
+        await database.insert(bookmarks).values([
+            {
+                addedAt: new Date("2024-01-01T00:00:00.000Z"),
+                siteName: "example.com",
+                title: "zebra",
+                url: "https://example.com/sort-zebra",
+                userId
+            },
+            {
+                addedAt: new Date("2024-02-01T00:00:00.000Z"),
+                siteName: "example.com",
+                title: "alpha",
+                url: "https://example.com/sort-alpha",
+                userId
+            },
+            {
+                addedAt: new Date("2024-03-01T00:00:00.000Z"),
+                siteName: "example.com",
+                title: "middle",
+                url: "https://example.com/sort-middle",
+                userId
+            }
+        ]);
+
+        const { listBookmarks } = await import("./bookmarks");
+
+        const sortedTitles = async (sortBy: SortBy): Promise<string[]> => {
+            const listed = await listBookmarks({ query: "", scope: "active", sortBy, userId });
+
+            return listed.map((bookmark) => bookmark.title);
+        };
+
+        expect(await sortedTitles("newest")).toEqual(["middle", "alpha", "zebra"]);
+        expect(await sortedTitles("oldest")).toEqual(["zebra", "alpha", "middle"]);
+        expect(await sortedTitles("titleAsc")).toEqual(["alpha", "middle", "zebra"]);
+        expect(await sortedTitles("titleDesc")).toEqual(["zebra", "middle", "alpha"]);
+    });
+
+    it("keeps search results in their existing order", async () => {
+        const { listBookmarks } = await import("./bookmarks");
+        const listed = await listBookmarks({
+            query: "example.com",
+            scope: "active",
+            sortBy: "titleAsc",
+            userId
+        });
+
+        expect(listed.map((bookmark) => bookmark.title)).toEqual(["middle", "alpha", "zebra"]);
     });
 });

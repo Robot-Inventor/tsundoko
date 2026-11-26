@@ -1,14 +1,25 @@
 import { AddBookmarkDialog } from "./AddBookmarkDialog";
 import type { Bookmark } from "../lib/bookmark";
 import { BookmarkList } from "./BookmarkList";
+import { BookmarkSortMenu } from "./BookmarkSortMenu";
 import type { ReactNode } from "react";
+import { defaultSortBy } from "../lib/bookmarkSort";
+import { useAccountContext } from "../hooks/useAccount";
 import { useBookmarkList } from "../hooks/useBookmarkList";
 import { useSearchContext } from "../hooks/useSearch";
 import { useTranslation } from "react-i18next";
 
 const HomePage = (): ReactNode => {
     const search = useSearchContext();
-    const list = useBookmarkList("active", search.query, search.finishSearch);
+    const { account, failed } = useAccountContext();
+    const list = useBookmarkList({
+        onSettled: search.finishLoading,
+        onSortStart: search.startListLoading,
+        query: search.query,
+        scope: "active",
+        sortBy: account?.sortByActive ?? (failed ? defaultSortBy : null)
+    });
+
     const { t: translate } = useTranslation();
 
     return (
@@ -16,14 +27,22 @@ const HomePage = (): ReactNode => {
             {/* The wrapper must stay rendered on mobile: AddBookmarkDialog's floating button lives here. */}
             <div className="flex items-center justify-between gap-2">
                 {/* The mobile header carries the page title, so the in-page h1 shows on desktop only. */}
-                <h1 className="hidden text-xl font-semibold md:block">{translate("page.home")}</h1>
-                <AddBookmarkDialog
-                    onAdd={(bookmark: Bookmark) => {
-                        search.clearSearch();
-                        list.addBookmark(bookmark);
-                    }}
-                />
+                <div className="flex items-center gap-4">
+                    <h1 className="hidden text-xl font-semibold md:block">{translate("page.home")}</h1>
+                    <AddBookmarkDialog
+                        onAdd={(bookmark: Bookmark) => {
+                            search.clearSearch();
+                            list.addBookmark(bookmark);
+                        }}
+                    />
+                </div>
+                {!search.query && <BookmarkSortMenu className="hidden md:inline-flex" scope="active" />}
             </div>
+            {!search.query && (
+                <div className="mt-4 flex justify-end md:hidden">
+                    <BookmarkSortMenu scope="active" />
+                </div>
+            )}
             <BookmarkList
                 archived={false}
                 bookmarks={list.bookmarks}

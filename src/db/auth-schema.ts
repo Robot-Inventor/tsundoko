@@ -9,6 +9,9 @@ export const user = pgTable("user", {
     image: text("image"),
     // Existing accounts keep Japanese until their owner chooses another language.
     locale: text("locale").default("ja").notNull(),
+    // Each list remembers its own sort option; existing accounts start with the current order.
+    sortByActive: text("sort_by_active").default("newest").notNull(),
+    sortByArchived: text("sort_by_archived").default("newest").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
         .defaultNow()
