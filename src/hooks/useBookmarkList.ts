@@ -17,7 +17,16 @@ const useBookmarkList = (scope: BookmarkScope, query: string, onSettled?: () => 
     const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
     const [loadState, setLoadState] = useState<LoadState>("loading");
     const [reload, setReload] = useState(false);
+    const [previousQuery, setPreviousQuery] = useState(query);
     const pendingActions = usePendingBookmarkActions();
+
+    // Back/Forward swaps the query before the next request resolves; drop the old results so a
+    // previous search is never shown under a different keyword.
+    if (previousQuery !== query) {
+        setPreviousQuery(query);
+        setBookmarks([]);
+        setLoadState("loading");
+    }
 
     useEffect(() => {
         const request = {
