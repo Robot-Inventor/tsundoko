@@ -53,12 +53,13 @@ const SearchBar = ({
                     aria-hidden="true"
                     className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
                 />
+                {/* Android Chrome also renders a native clear button next to the custom one. */}
                 <Input
                     aria-label={label}
                     autoCapitalize="none"
                     autoComplete="off"
                     autoCorrect="off"
-                    className="h-10 pl-8 pr-8"
+                    className="h-10 pl-8 pr-8 [&::-webkit-search-cancel-button]:appearance-none"
                     onChange={(event) => {
                         onSearchTextChange(event.currentTarget.value);
                     }}
