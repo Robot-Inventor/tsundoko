@@ -20,6 +20,10 @@ const pages = {
     },
     "/signup": {
         label: "auth.signupTitle"
+    },
+    "/tags": {
+        label: "page.tags",
+        searchLabel: "page.tagSearch"
     }
 } as const;
 
@@ -44,6 +48,10 @@ const getPage = (pathname: string): Page => {
 
     if (pathname.startsWith("/share")) {
         return pages["/share"];
+    }
+
+    if (pathname.startsWith("/tags")) {
+        return pages["/tags"];
     }
 
     return pages["/"];

@@ -1,6 +1,8 @@
-import type { BookmarkPreview, BookmarkScope, SavedBookmark } from "../lib/bookmark";
-import { type SQL, and, asc, cosineDistance, desc, eq, ilike, isNotNull, isNull, or, sql } from "drizzle-orm";
+// oxlint-disable import/max-dependencies -- Storage, search, tags, and previews legitimately meet here.
+import type { BookmarkListFilter, BookmarkPreview, SavedBookmark } from "../lib/bookmark";
+import { type SQL, and, asc, cosineDistance, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { type SortBy, defaultSortBy } from "../lib/bookmarkSort";
+import { attachTags, getBookmarkTags, tagFilterCondition, textSearchCondition } from "./bookmarkTags";
 import { deleteThumbnail, saveThumbnail } from "../lib/thumbnailStore";
 import { embed, embeddingInput } from "../lib/embedding";
 import type { PreviewData } from "../lib/preview";
@@ -27,12 +29,13 @@ const bookmarkListItemColumns = {
 // `content` and `embedding` are excluded from list reads: they are search-only internals.
 type BookmarkListItem = Omit<BookmarkRow, "archivedAt" | "content" | "embedding" | "userId">;
 
-const toSavedBookmark = (row: BookmarkListItem): SavedBookmark => ({
+const toSavedBookmark = (row: BookmarkListItem, tagNames: string[]): SavedBookmark => ({
     addedAt: row.addedAt.toISOString(),
     description: row.description,
     faviconUrl: row.faviconUrl,
     id: row.id,
     siteName: row.siteName,
+    tags: tagNames,
     thumbnailFit: row.thumbnailFile === null ? "center" : "top",
     thumbnailUrl: row.thumbnailUrl,
     title: row.title,
@@ -74,28 +77,17 @@ const keywordOrderBy = (sortBy: SortBy): SQL[] => {
     }
 };
 
-interface ListBookmarksInput {
-    query: string;
-    scope: BookmarkScope;
+interface ListBookmarksFilter extends BookmarkListFilter {
     sortBy?: SortBy;
-    userId: string;
 }
 
-const listBookmarks = async ({
-    query,
-    scope,
-    sortBy = defaultSortBy,
-    userId
-}: ListBookmarksInput): Promise<SavedBookmark[]> => {
-    const searchCondition = query
-        ? or(
-              ilike(bookmarks.title, likePattern(query)),
-              ilike(bookmarks.description, likePattern(query)),
-              ilike(bookmarks.content, likePattern(query)),
-              ilike(bookmarks.siteName, likePattern(query)),
-              ilike(bookmarks.url, likePattern(query))
-          )
-        : sql`true`;
+const listBookmarks = async (
+    { query, scope, sortBy = defaultSortBy, tag = "" }: ListBookmarksFilter,
+    userId: string
+): Promise<SavedBookmark[]> => {
+    const pattern = query ? likePattern(query) : null;
+    const tagCondition = tagFilterCondition(tag, userId);
+    const searchCondition = textSearchCondition(pattern, userId);
 
     const scopeCondition = scope === "active" ? isNull(bookmarks.archivedAt) : isNotNull(bookmarks.archivedAt);
 
@@ -105,32 +97,34 @@ const listBookmarks = async ({
     const keywordRows = await db
         .select(bookmarkListItemColumns)
         .from(bookmarks)
-        .where(and(eq(bookmarks.userId, userId), searchCondition, scopeCondition))
+        .where(and(eq(bookmarks.userId, userId), searchCondition, scopeCondition, tagCondition))
         .orderBy(...keywordOrderBy(query ? defaultSortBy : sortBy));
 
+    let rows = keywordRows;
     const queryEmbedding = await embeddingRequest;
 
-    if (!queryEmbedding) {
-        return keywordRows.map(toSavedBookmark);
+    if (queryEmbedding) {
+        // Keyword matches keep their position; the vector pass is deduplicated against them below.
+        // The HNSW index is shared across users and pgvector filters after the index scan, so a user
+        // whose rows fall outside the candidate set can receive fewer results. That is acceptable for
+        // this app's small, mostly single-user deployments.
+        const vectorRows = await db
+            .select(bookmarkListItemColumns)
+            .from(bookmarks)
+            .where(and(eq(bookmarks.userId, userId), scopeCondition, tagCondition, isNotNull(bookmarks.embedding)))
+            .orderBy(cosineDistance(bookmarks.embedding, queryEmbedding))
+            .limit(vectorResultLimit);
+
+        const keywordIds = new Set(keywordRows.map((row) => row.id));
+        rows = [...keywordRows, ...vectorRows.filter((row) => !keywordIds.has(row.id))];
     }
 
-    // Keyword matches keep their position; the vector pass is deduplicated against them below.
-    // The HNSW index is shared across users and pgvector filters after the index scan, so a user
-    // whose rows fall outside the candidate set can receive fewer results. That is acceptable for
-    // this app's small, mostly single-user deployments.
-    const vectorRows = await db
-        .select(bookmarkListItemColumns)
-        .from(bookmarks)
-        .where(and(eq(bookmarks.userId, userId), scopeCondition, isNotNull(bookmarks.embedding)))
-        .orderBy(cosineDistance(bookmarks.embedding, queryEmbedding))
-        .limit(vectorResultLimit);
+    const tagsByBookmark = await getBookmarkTags(
+        rows.map((row) => row.id),
+        userId
+    );
 
-    const keywordIds = new Set(keywordRows.map((row) => row.id));
-
-    return [
-        ...keywordRows.map(toSavedBookmark),
-        ...vectorRows.filter((row) => !keywordIds.has(row.id)).map(toSavedBookmark)
-    ];
+    return rows.map((row) => toSavedBookmark(row, tagsByBookmark.get(row.id) ?? []));
 };
 
 const getBookmarkImageUrls = async (
@@ -159,24 +153,21 @@ type BookmarkInsert = BookmarkPreview & {
     userId: string;
 };
 
-const insertBookmark = async (bookmark: BookmarkInsert): Promise<SavedBookmark | null> => {
-    const [saved] = await db
-        .insert(bookmarks)
-        .values(bookmark)
-        .onConflictDoNothing({ target: [bookmarks.userId, bookmarks.url] })
-        .returning(bookmarkListItemColumns);
-
-    return saved ? toSavedBookmark(saved) : null;
-};
-
 interface SaveBookmarkInput {
     preview: PreviewData | null;
+    tagNames?: string[];
     url: URL;
     userId: string;
     xPost: XPostThumbnail | null;
 }
 
-const saveBookmark = async ({ preview, url, userId, xPost }: SaveBookmarkInput): Promise<SavedBookmark | null> => {
+const saveBookmark = async ({
+    preview,
+    tagNames = [],
+    url,
+    userId,
+    xPost
+}: SaveBookmarkInput): Promise<SavedBookmark | null> => {
     const id = crypto.randomUUID();
     // Saving the file before the row keeps the stored path from outliving an actual file.
     // A failed save only loses the rendered thumbnail; the OG fallback still applies.
@@ -194,9 +185,32 @@ const saveBookmark = async ({ preview, url, userId, xPost }: SaveBookmarkInput):
 
     // Embedding failures must not cost the user the bookmark itself: a NULL embedding still saves,
     // and the row keeps working through keyword search.
-    const embedding = await embed(embeddingInput(bookmark), userId);
+    const embedding = await embed(embeddingInput({ ...bookmark, tags: tagNames }), userId);
 
-    return insertBookmark({ ...bookmark, embedding, id, userId });
+    const saved = await db.transaction(async (tx) => {
+        const [row] = await tx
+            .insert(bookmarks)
+            .values({ ...bookmark, embedding, id, userId })
+            .onConflictDoNothing({ target: [bookmarks.userId, bookmarks.url] })
+            .returning(bookmarkListItemColumns);
+
+        if (!row) {
+            return null;
+        }
+
+        const names = await attachTags(tx, {
+            bookmarkId: row.id,
+            names: tagNames,
+            userId
+        });
+
+        return {
+            names,
+            row
+        };
+    });
+
+    return saved ? toSavedBookmark(saved.row, saved.names) : null;
 };
 
 const setBookmarkArchived = async (
@@ -210,7 +224,13 @@ const setBookmarkArchived = async (
         .where(and(eq(bookmarks.id, id), eq(bookmarks.userId, userId)))
         .returning(bookmarkListItemColumns);
 
-    return row ? toSavedBookmark(row) : null;
+    if (!row) {
+        return null;
+    }
+
+    const namesByBookmark = await getBookmarkTags([row.id], userId);
+
+    return toSavedBookmark(row, namesByBookmark.get(row.id) ?? []);
 };
 
 // Deletes the row first, then unlinks the locally stored thumbnail if there was one:

@@ -1,5 +1,4 @@
 import { AddBookmarkDialog } from "./AddBookmarkDialog";
-import type { Bookmark } from "../lib/bookmark";
 import { BookmarkList } from "./BookmarkList";
 import { BookmarkSortMenu } from "./BookmarkSortMenu";
 import type { ReactNode } from "react";
@@ -7,11 +6,13 @@ import { defaultSortBy } from "../lib/bookmarkSort";
 import { useAccountContext } from "../hooks/useAccount";
 import { useBookmarkList } from "../hooks/useBookmarkList";
 import { useSearchContext } from "../hooks/useSearch";
+import { useTagListContext } from "../hooks/useTagList";
 import { useTranslation } from "react-i18next";
 
 const HomePage = (): ReactNode => {
     const search = useSearchContext();
     const { account, failed } = useAccountContext();
+    const tags = useTagListContext();
     const list = useBookmarkList({
         onSettled: search.finishLoading,
         onSortStart: search.startListLoading,
@@ -30,8 +31,9 @@ const HomePage = (): ReactNode => {
                 <div className="flex items-center gap-4">
                     <h1 className="hidden text-xl font-semibold md:block">{translate("page.home")}</h1>
                     <AddBookmarkDialog
-                        onAdd={(bookmark: Bookmark) => {
+                        onAdd={(bookmark) => {
                             search.clearSearch();
+                            tags.reload();
                             list.addBookmark(bookmark);
                         }}
                     />

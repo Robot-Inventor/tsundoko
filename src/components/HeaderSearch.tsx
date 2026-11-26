@@ -29,24 +29,30 @@ const MobileSearch = ({ search }: { search: UseSearchResult }): ReactNode => (
     </div>
 );
 
-const MobileSearchToggle = ({ search }: { search: UseSearchResult }): ReactNode => {
+const MobileSearchToggle = ({ search, visible }: { search: UseSearchResult; visible: boolean }): ReactNode => {
     const buttonRef = useRef<HTMLButtonElement>(null);
     const wasOpen = useRef(false);
     const { t: translate } = useTranslation();
 
     useLayoutEffect(() => {
         // Enter runs the search without touching this button, so give keyboard users their place back.
-        if (wasOpen.current && !search.searchOpen) {
+        const restoreFocus = visible && wasOpen.current && !search.searchOpen;
+
+        if (restoreFocus) {
             buttonRef.current?.focus();
         }
 
         wasOpen.current = search.searchOpen;
-    }, [search.searchOpen]);
+    }, [search.searchOpen, visible]);
 
     return (
         <Button
             aria-label={translate(search.searchOpen ? "common.closeSearch" : "common.openSearch")}
-            className="ms-auto size-11 md:hidden"
+            className={cn(
+                "ms-auto size-11 transition-[opacity,rotate,scale] duration-200 ease-out md:hidden motion-reduce:transition-none",
+                visible ? "rotate-0 scale-100 opacity-100" : "rotate-90 scale-50 opacity-0"
+            )}
+            inert={!visible}
             onClick={search.searchOpen ? search.closeSearch : search.openSearch}
             ref={buttonRef}
             size="icon"
@@ -72,19 +78,27 @@ const MobileSearchToggle = ({ search }: { search: UseSearchResult }): ReactNode 
     );
 };
 
-const HeaderSearch = ({ search }: { search: UseSearchResult }): ReactNode => (
+const HeaderSearch = ({ search, visible }: { search: UseSearchResult; visible: boolean }): ReactNode => (
     <>
-        <MobileSearchToggle search={search} />
+        <MobileSearchToggle search={search} visible={visible} />
         {/* Centered on the viewport instead of the space next to the logo; w-full prevents shrink-to-fit
             sizing from collapsing the absolutely positioned bar to the input's intrinsic width. */}
         <div className="absolute left-1/2 top-[calc(env(safe-area-inset-top)_+_1.75rem)] hidden w-full max-w-xl -translate-x-1/2 -translate-y-1/2 md:block">
-            <SearchBar
-                inputRef={search.desktopSearchInput}
-                onClear={search.clearSearch}
-                onSearch={search.runSearch}
-                onSearchTextChange={search.setSearchText}
-                searchText={search.searchText}
-            />
+            <div
+                className={cn(
+                    "transition-[opacity,translate,scale] duration-200 ease-out motion-reduce:transition-none",
+                    visible ? "translate-y-0 scale-100 opacity-100" : "-translate-y-1 scale-95 opacity-0"
+                )}
+                inert={!visible}
+            >
+                <SearchBar
+                    inputRef={search.desktopSearchInput}
+                    onClear={search.clearSearch}
+                    onSearch={search.runSearch}
+                    onSearchTextChange={search.setSearchText}
+                    searchText={search.searchText}
+                />
+            </div>
         </div>
         <MobileSearch search={search} />
     </>

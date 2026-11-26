@@ -7,9 +7,11 @@ import type { Bookmark } from "../lib/bookmark";
 import { Button } from "./ui/button";
 import { Input } from "./ui/Input";
 import { PlusIcon } from "lucide-react";
+import { TagInput } from "./TagInput";
 import { cn } from "../lib/utils";
 import { i18n } from "../lib/i18n";
 import { useSearchContext } from "../hooks/useSearch";
+import { useTagListContext } from "../hooks/useTagList";
 import { useTranslation } from "react-i18next";
 
 const formErrorKeys = {
@@ -29,9 +31,11 @@ interface BookmarkUrlFormProps {
 
 const BookmarkUrlForm = ({ onAdded, onCancel }: BookmarkUrlFormProps): ReactNode => {
     const [input, setInput] = useState("");
+    const [tagNames, setTagNames] = useState<string[]>([]);
     const [error, setError] = useState("");
     const [adding, setAdding] = useState(false);
     const urlInput = useRef<HTMLInputElement>(null);
+    const { tags } = useTagListContext();
     const { t: translate } = useTranslation();
 
     const addBookmark = async (): Promise<void> => {
@@ -50,7 +54,7 @@ const BookmarkUrlForm = ({ onAdded, onCancel }: BookmarkUrlFormProps): ReactNode
         }
 
         setAdding(true);
-        const result = await requestBookmark(url);
+        const result = await requestBookmark(url, tagNames);
         setAdding(false);
 
         if ("failure" in result) {
@@ -60,6 +64,7 @@ const BookmarkUrlForm = ({ onAdded, onCancel }: BookmarkUrlFormProps): ReactNode
         }
 
         setInput("");
+        setTagNames([]);
         onAdded(result.bookmark);
     };
 
@@ -93,6 +98,15 @@ const BookmarkUrlForm = ({ onAdded, onCancel }: BookmarkUrlFormProps): ReactNode
                 type="url"
                 value={input}
             />
+            <div className="space-y-1">
+                <p className="text-sm font-medium">{translate("bookmark.tagsLabel")}</p>
+                <TagInput
+                    disabled={adding}
+                    onChange={setTagNames}
+                    suggestions={tags.map((tag) => tag.name)}
+                    value={tagNames}
+                />
+            </div>
             {error ? (
                 <p className="text-sm wrap-anywhere text-destructive" id={errorId} role="alert">
                     {error}

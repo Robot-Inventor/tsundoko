@@ -12,10 +12,11 @@ const failureByStatus: Partial<Record<number, AddBookmarkFailure>> = {
     [httpStatus.tooManyRequests]: "rateLimit"
 };
 
-const requestBookmark = async (url: URL): Promise<AddBookmarkResult> => {
+const requestBookmark = async (url: URL, tags: string[] = []): Promise<AddBookmarkResult> => {
     try {
         const response = await bookmarkClient.api.bookmarks.$post({
             json: {
+                tags,
                 url: url.href
             }
         });

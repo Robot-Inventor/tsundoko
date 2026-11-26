@@ -11,6 +11,14 @@ const guardIdentifier = "initial-signup-guard";
 const userId = "user-a";
 const otherUserId = "user-b";
 
+const sortBookmark = (title: string, addedAt: string, slug: string): Omit<typeof bookmarks.$inferInsert, "id"> => ({
+    addedAt: new Date(addedAt),
+    siteName: "example.com",
+    title,
+    url: `https://example.com/sort-${slug}`,
+    userId
+});
+
 const state: { current?: TestDatabase } = {};
 
 const getSetup = (): TestDatabase => {
@@ -84,14 +92,8 @@ describe("bookmark ownership", () => {
         });
 
         expect(saved).not.toBeNull();
-        expect(await listBookmarks({ query: "", scope: "active", userId })).toHaveLength(oneBookmark);
-        expect(
-            await listBookmarks({
-                query: "",
-                scope: "active",
-                userId: otherUserId
-            })
-        ).toHaveLength(noBookmarks);
+        expect(await listBookmarks({ query: "", scope: "active" }, userId)).toHaveLength(oneBookmark);
+        expect(await listBookmarks({ query: "", scope: "active" }, otherUserId)).toHaveLength(noBookmarks);
     });
 
     it("allows the same URL for different users", async () => {
@@ -167,39 +169,109 @@ describe("bookmark ownership", () => {
     });
 });
 
+describe("bookmark tags", () => {
+    it("attaches reusable tags with their first spelling", async () => {
+        const { listBookmarks, saveBookmark } = await import("./bookmarks");
+        const first = await saveBookmark({
+            preview: null,
+            tagNames: ["  Work  ", "work", " Review "],
+            url: new URL("https://example.com/tag-first"),
+            userId,
+            xPost: null
+        });
+
+        const second = await saveBookmark({
+            preview: null,
+            tagNames: ["WORK", "News"],
+            url: new URL("https://example.com/tag-second"),
+            userId,
+            xPost: null
+        });
+
+        expect(first?.tags).toEqual(["Work", "Review"]);
+        expect(second?.tags).toEqual(["Work", "News"]);
+
+        const saved = await listBookmarks({ query: "", scope: "active" }, userId);
+        // List responses use a stable alphabetical order; only the save response keeps input order.
+        expect(saved.find((bookmark) => bookmark.id === first?.id)?.tags).toEqual(["Review", "Work"]);
+    });
+
+    it("filters by tag without exposing another user's tags", async () => {
+        const { listBookmarks, saveBookmark } = await import("./bookmarks");
+        const { listTags } = await import("./tags");
+        const saved = await saveBookmark({
+            preview: null,
+            tagNames: ["PrivateTag"],
+            url: new URL("https://example.com/tag-private"),
+            userId,
+            xPost: null
+        });
+
+        expect(saved).not.toBeNull();
+        const filtered = await listBookmarks(
+            {
+                query: "",
+                scope: "active",
+                tag: "privatetag"
+            },
+            userId
+        );
+
+        expect(filtered.map((bookmark) => bookmark.id)).toEqual([saved?.id]);
+
+        expect(
+            await listBookmarks(
+                {
+                    query: "",
+                    scope: "active",
+                    tag: "PrivateTag"
+                },
+                otherUserId
+            )
+        ).toEqual([]);
+
+        expect(await listTags(userId)).toContainEqual({
+            count: 1,
+            name: "PrivateTag"
+        });
+
+        expect(await listTags(otherUserId)).toEqual([]);
+    });
+
+    it("matches a tag name in keyword search", async () => {
+        const { listBookmarks, saveBookmark } = await import("./bookmarks");
+        const saved = await saveBookmark({
+            preview: null,
+            tagNames: ["FindableTag"],
+            url: new URL("https://example.com/tag-search"),
+            userId,
+            xPost: null
+        });
+
+        expect(saved).not.toBeNull();
+        expect(
+            (await listBookmarks({ query: "findable", scope: "active" }, userId)).map((bookmark) => bookmark.id)
+        ).toContain(saved?.id);
+    });
+});
+
 describe("bookmark sorting", () => {
     it("orders the list by the requested sort option", async () => {
         const { database } = getSetup();
 
         await database.delete(bookmarks);
-        await database.insert(bookmarks).values([
-            {
-                addedAt: new Date("2024-01-01T00:00:00.000Z"),
-                siteName: "example.com",
-                title: "zebra",
-                url: "https://example.com/sort-zebra",
-                userId
-            },
-            {
-                addedAt: new Date("2024-02-01T00:00:00.000Z"),
-                siteName: "example.com",
-                title: "alpha",
-                url: "https://example.com/sort-alpha",
-                userId
-            },
-            {
-                addedAt: new Date("2024-03-01T00:00:00.000Z"),
-                siteName: "example.com",
-                title: "middle",
-                url: "https://example.com/sort-middle",
-                userId
-            }
-        ]);
+        await database
+            .insert(bookmarks)
+            .values([
+                sortBookmark("zebra", "2024-01-01T00:00:00.000Z", "zebra"),
+                sortBookmark("alpha", "2024-02-01T00:00:00.000Z", "alpha"),
+                sortBookmark("middle", "2024-03-01T00:00:00.000Z", "middle")
+            ]);
 
         const { listBookmarks } = await import("./bookmarks");
 
         const sortedTitles = async (sortBy: SortBy): Promise<string[]> => {
-            const listed = await listBookmarks({ query: "", scope: "active", sortBy, userId });
+            const listed = await listBookmarks({ query: "", scope: "active", sortBy }, userId);
 
             return listed.map((bookmark) => bookmark.title);
         };
@@ -212,12 +284,14 @@ describe("bookmark sorting", () => {
 
     it("keeps search results in their existing order", async () => {
         const { listBookmarks } = await import("./bookmarks");
-        const listed = await listBookmarks({
-            query: "example.com",
-            scope: "active",
-            sortBy: "titleAsc",
+        const listed = await listBookmarks(
+            {
+                query: "example.com",
+                scope: "active",
+                sortBy: "titleAsc"
+            },
             userId
-        });
+        );
 
         expect(listed.map((bookmark) => bookmark.title)).toEqual(["middle", "alpha", "zebra"]);
     });

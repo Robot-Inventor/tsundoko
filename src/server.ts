@@ -11,6 +11,7 @@ import { httpStatus } from "./lib/httpStatus";
 import { imageApi } from "./imageApi";
 import { manifestApi } from "./manifestApi";
 import { responseHeaders } from "./responseHeaders";
+import { tagApi } from "./tagApi";
 
 const isProduction = process.env["NODE_ENV"] === "production";
 
@@ -35,6 +36,7 @@ app.route("/", authApi);
 
 app.use("/api/bookmarks", requireAuth);
 app.use("/api/bookmarks/*", requireAuth);
+app.use("/api/tags", requireAuth);
 app.use("/api/me", requireAuth);
 app.use("/api/me/*", requireAuth);
 app.use("/api/passkeys", requireAuth);
@@ -42,6 +44,7 @@ app.use("/api/passkeys/*", requireAuth);
 app.use("/api/thumbnail", requireAuth);
 app.use("/api/favicon", requireAuth);
 app.route("/", bookmarkApi);
+app.route("/", tagApi);
 app.route("/", imageApi);
 app.route("/", accountApi);
 
