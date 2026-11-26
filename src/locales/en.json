@@ -73,6 +73,8 @@
     "bookmark.urlLabel": "URL of the page to add",
     "bookmark.urlPlaceholder": "Enter a URL to add",
 
+    "search.resultsFor": "Results for \"{{query}}\"",
+
     "share.adding": "Adding… ({{current}}/{{total}})",
     "share.confirmDescription_one": "Add {{count}} bookmark?",
     "share.confirmDescription_other": "Add {{count}} bookmarks?",
