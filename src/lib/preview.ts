@@ -37,8 +37,8 @@ const imageUrl = (value: string | undefined, pageUrl: URL): string | null => {
     }
 };
 
-// `url` and `thumbnailFile` are filled by the save path, so the page fetch returns the rest only.
-type PreviewData = Omit<BookmarkPreview, "thumbnailFile" | "url"> & { content: string | null };
+// `url` is filled by the save path, so the page fetch returns the rest only.
+type PreviewData = Omit<BookmarkPreview, "url"> & { content: string | null };
 
 const getPreview = async (url: URL): Promise<PreviewData> => {
     const { response, url: pageUrl } = await publicFetch(url, {

@@ -1,17 +1,18 @@
 // oxlint-disable import/max-dependencies -- The route module legitimately wires validation, storage, previews, and rate limiting.
 import { type BookmarkScope, httpStatus } from "./lib/bookmark";
+import { type PreviewData, getPreview } from "./lib/preview";
 import { type SortBy, parseSortBy } from "./lib/bookmarkSort";
+import { type XPostThumbnail, isXPostUrl, renderXPost } from "./lib/xPost";
 import { bookmarkExists, deleteBookmark, listBookmarks, saveBookmark, setBookmarkArchived } from "./db/bookmarks";
 import { bookmarkUrl, normalizeBookmarkUrl } from "./lib/bookmarkUrl";
-import { isXPostUrl, renderXPost } from "./lib/xPost";
+import { cacheRemoteFavicon, cacheRemoteThumbnail, cacheRenderedThumbnail, readFavicon } from "./lib/imageCache";
+import { runImageOutbound, runOutbound } from "./lib/outboundLimit";
 import { Hono } from "hono";
 import { apiError } from "./lib/apiError";
 import { createRateLimit } from "./lib/rateLimit";
-import { getPreview } from "./lib/preview";
 import { normalizeTagNames } from "./lib/tags";
 import { parseContentType } from "./lib/mediaType";
 import { requestBodyLimit } from "./lib/requestBodyLimit";
-import { runOutbound } from "./lib/outboundLimit";
 import { type } from "arktype";
 import { validator } from "hono/validator";
 
@@ -63,6 +64,67 @@ const bookmarkIdParam = validator("param", (value): { id: string } => {
     };
 });
 
+interface BookmarkImageSources {
+    faviconUrl: string | null;
+    hostname: string;
+    id: string;
+    thumbnailUrl: string | null;
+}
+
+// Both fetches are best-effort: a failure leaves that image for the request path to fill, so the
+// bookmark itself is still saved and returned.
+const warmImageCache = async (
+    userId: string,
+    sources: BookmarkImageSources,
+    xPostPng: Uint8Array | null
+): Promise<void> => {
+    // The favicon is shared by every bookmark on the host, so an already cached icon is kept
+    // instead of rewriting it with whatever this page happens to advertise.
+    const cachedFavicon = await readFavicon(sources.hostname);
+
+    await Promise.all([
+        runImageOutbound(userId, () => {
+            if (xPostPng) {
+                return cacheRenderedThumbnail(sources.id, xPostPng);
+            }
+
+            return sources.thumbnailUrl
+                ? cacheRemoteThumbnail(sources.id, sources.thumbnailUrl)
+                : Promise.resolve(null);
+        }).catch(() => null),
+        cachedFavicon
+            ? Promise.resolve(null)
+            : runImageOutbound(userId, () => cacheRemoteFavicon(sources.hostname, sources.faviconUrl)).catch(() => null)
+    ]);
+};
+
+interface FetchedPreview {
+    preview: PreviewData | null;
+    xPost: XPostThumbnail | null;
+}
+
+// X post pages are fetched by xeet instead of the OG pipeline, so both are tried independently:
+// either one succeeding is enough to save the bookmark, and the OG result fills the rest.
+const fetchPreview = async (userId: string, url: URL): Promise<FetchedPreview> => {
+    const [xPost, preview] = await Promise.all([
+        isXPostUrl(url)
+            ? runOutbound(userId, () => renderXPost(url)).catch((error: unknown) => {
+                  // A busy pool and a failed render both degrade to the OG result.
+                  // oxlint-disable-next-line no-console -- Server-side diagnostics are console's legitimate use.
+                  console.warn("X post thumbnail rendering failed:", error);
+
+                  return null;
+              })
+            : null,
+        runOutbound(userId, () => getPreview(url)).catch(() => null)
+    ]);
+
+    return {
+        preview,
+        xPost
+    };
+};
+
 const archivePayload = validator("json", (value, context) => {
     const parsed = archiveRequest(value);
 
@@ -95,6 +157,7 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
             return context.json(apiError("bookmark.loadFailed"), httpStatus.internalServerError);
         }
     })
+    // oxlint-disable-next-line max-statements -- The save pipeline is linear; splitting it further would erase Hono's typed response.
     .post("/api/bookmarks", bookmarkSaveRateLimit, requestBodyLimit("bookmark.tooLong"), async (context) => {
         context.header("Cache-Control", "no-store");
 
@@ -122,20 +185,7 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
             return context.json(apiError("bookmark.saveFailed"), httpStatus.internalServerError);
         }
 
-        // X post pages are fetched by xeet instead of the OG pipeline, so both are tried independently:
-        // either one succeeding is enough to save the bookmark, and the OG result fills the rest.
-        const [xPost, preview] = await Promise.all([
-            isXPostUrl(input.url)
-                ? runOutbound(context.get("userId"), () => renderXPost(input.url)).catch((error: unknown) => {
-                      // A busy pool and a failed render both degrade to the OG result.
-                      // oxlint-disable-next-line no-console -- Server-side diagnostics are console's legitimate use.
-                      console.warn("X post thumbnail rendering failed:", error);
-
-                      return null;
-                  })
-                : null,
-            runOutbound(context.get("userId"), () => getPreview(input.url)).catch(() => null)
-        ]);
+        const { preview, xPost } = await fetchPreview(context.get("userId"), input.url);
 
         if (!preview && !xPost) {
             return context.json(apiError("bookmark.fetchFailed"), httpStatus.badGateway);
@@ -150,9 +200,23 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
                 xPost
             });
 
-            return saved
-                ? context.json(saved, httpStatus.created)
-                : context.json(apiError("bookmark.duplicate"), httpStatus.conflict);
+            if (!saved) {
+                return context.json(apiError("bookmark.duplicate"), httpStatus.conflict);
+            }
+
+            // Warming the cache before the response makes the first card render local.
+            await warmImageCache(
+                context.get("userId"),
+                {
+                    faviconUrl: preview?.faviconUrl ?? null,
+                    hostname: new URL(saved.url).hostname,
+                    id: saved.id,
+                    thumbnailUrl: preview?.thumbnailUrl ?? null
+                },
+                xPost?.png ?? null
+            );
+
+            return context.json(saved, httpStatus.created);
         } catch {
             return context.json(apiError("bookmark.saveFailed"), httpStatus.internalServerError);
         }
