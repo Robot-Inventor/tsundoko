@@ -39,13 +39,8 @@ const ArchivePage = (): ReactNode => {
                         }}
                     />
                 </div>
-                {!search.query && <BookmarkSortMenu className="hidden md:inline-flex" scope="archived" />}
+                {!search.query && <BookmarkSortMenu scope="archived" />}
             </div>
-            {!search.query && (
-                <div className="mt-4 flex justify-end md:hidden">
-                    <BookmarkSortMenu scope="archived" />
-                </div>
-            )}
             <BookmarkList
                 archived
                 bookmarks={list.bookmarks}
