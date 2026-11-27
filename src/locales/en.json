@@ -76,6 +76,8 @@
     "bookmark.sortLabel": "Sort by",
     "bookmark.sortNewest": "Date added (newest first)",
     "bookmark.sortOldest": "Date added (oldest first)",
+    "bookmark.sortPublishedNewest": "Published date (newest first)",
+    "bookmark.sortPublishedOldest": "Published date (oldest first)",
     "bookmark.sortTitleAsc": "Title (ascending)",
     "bookmark.sortTitleDesc": "Title (descending)",
     "bookmark.tagsEmpty": "No tags yet",

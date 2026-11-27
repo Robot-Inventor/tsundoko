@@ -86,14 +86,17 @@ const BookmarkCardTags = ({ tags }: BookmarkCardTagsProps): ReactNode => {
 interface BookmarkCardProps {
     archived: boolean;
     bookmark: Bookmark;
+    showPublishedDate: boolean;
 }
 
-const BookmarkCard = ({ archived, bookmark }: BookmarkCardProps): ReactNode => {
+const BookmarkCard = ({ archived, bookmark, showPublishedDate }: BookmarkCardProps): ReactNode => {
     const [thumbnailFailed, setThumbnailFailed] = useState(false);
     const [faviconFailed, setFaviconFailed] = useState(false);
     const { locale } = useLocale();
     const { t: translate } = useTranslation();
     const hasThumbnail = bookmark.thumbnailFit === "top" || bookmark.thumbnailUrl !== null;
+    // Undated bookmarks show no date at all when the list is sorted by publication date.
+    const displayedAt = showPublishedDate ? bookmark.publishedAt : bookmark.addedAt;
 
     // sm:border instead of the base ring: the grid item's overflow-clip cuts a ring painted
     // outside the card once it fills the row, and an inset ring would be covered by the
@@ -165,9 +168,11 @@ const BookmarkCard = ({ archived, bookmark }: BookmarkCardProps): ReactNode => {
                         )}
                         <span className="truncate">{formatSiteName(bookmark.siteName, locale)}</span>
                     </span>
-                    <time className="shrink-0" dateTime={bookmark.addedAt.toISOString()}>
-                        {formatDate(locale, bookmark.addedAt.toISOString(), "")}
-                    </time>
+                    {displayedAt && (
+                        <time className="shrink-0" dateTime={displayedAt.toISOString()}>
+                            {formatDate(locale, displayedAt.toISOString(), "")}
+                        </time>
+                    )}
                 </CardFooter>
             </div>
         </Card>

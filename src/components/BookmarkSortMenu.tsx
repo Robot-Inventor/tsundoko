@@ -19,6 +19,8 @@ import { useTranslation } from "react-i18next";
 const sortLabels = {
     newest: "bookmark.sortNewest",
     oldest: "bookmark.sortOldest",
+    publishedNewest: "bookmark.sortPublishedNewest",
+    publishedOldest: "bookmark.sortPublishedOldest",
     titleAsc: "bookmark.sortTitleAsc",
     titleDesc: "bookmark.sortTitleDesc"
 } as const satisfies Record<SortBy, string>;

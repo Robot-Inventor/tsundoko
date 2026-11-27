@@ -1,6 +1,8 @@
+// oxlint-disable import/max-dependencies -- Fetching, decoding, OG parsing, article extraction, and date parsing all meet here.
 import type { BookmarkPreview } from "./bookmark";
 import { decodeBuffer } from "encoding-sniffer";
 import { extractArticleContent } from "./articleContent";
+import { extractPublishedDate } from "./publishedDate";
 import { isXPostUrl } from "./xPost";
 import ogs from "open-graph-scraper";
 import { parseBookmarkUrl } from "./bookmarkUrl";
@@ -38,7 +40,10 @@ const imageUrl = (value: string | undefined, pageUrl: URL): string | null => {
 };
 
 // `url` and `thumbnailFile` are filled by the save path, so the page fetch returns the rest only.
-type PreviewData = Omit<BookmarkPreview, "thumbnailFile" | "url"> & { content: string | null };
+type PreviewData = Omit<BookmarkPreview, "thumbnailFile" | "url"> & {
+    content: string | null;
+    publishedAt?: Date | null;
+};
 
 const getPreview = async (url: URL): Promise<PreviewData> => {
     const { response, url: pageUrl } = await publicFetch(url, {
@@ -76,6 +81,7 @@ const getPreview = async (url: URL): Promise<PreviewData> => {
             cleanText(result.ogDescription, maxDescriptionLength) ??
             cleanText(result.twitterDescription, maxDescriptionLength),
         faviconUrl: imageUrl(result.favicon, pageUrl),
+        publishedAt: extractPublishedDate(result),
         siteName: cleanText(result.ogSiteName, maxSiteNameLength) ?? pageUrl.hostname,
         thumbnailUrl: imageUrl(result.ogImage?.[0]?.url, pageUrl) ?? imageUrl(result.twitterImage?.[0]?.url, pageUrl),
         title:

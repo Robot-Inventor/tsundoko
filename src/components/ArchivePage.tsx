@@ -12,12 +12,13 @@ import { useTranslation } from "react-i18next";
 const ArchivePage = (): ReactNode => {
     const search = useSearchContext();
     const { account, failed } = useAccountContext();
+    const sortBy = account?.sortByArchived ?? (failed ? defaultSortBy : null);
     const list = useBookmarkList({
         onSettled: search.finishLoading,
         onSortStart: search.startListLoading,
         query: search.query,
         scope: "archived",
-        sortBy: account?.sortByArchived ?? (failed ? defaultSortBy : null)
+        sortBy
     });
 
     const navigate = useNavigate();
@@ -53,6 +54,7 @@ const ArchivePage = (): ReactNode => {
                 loadState={list.loadState}
                 onRetry={list.retry}
                 query={search.query}
+                sortBy={sortBy}
             />
         </>
     );
