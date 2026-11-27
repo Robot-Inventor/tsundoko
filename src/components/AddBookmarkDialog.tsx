@@ -1,7 +1,7 @@
 // oxlint-disable import/max-dependencies -- The dialog wires form state, validation, and locale.
 import { type AddBookmarkFailure, requestBookmark } from "../lib/addBookmark";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, type RefObject, useRef, useState } from "react";
 import { maxBookmarkUrlLength, parseBookmarkUrl } from "../lib/bookmarkUrl";
 import type { Bookmark } from "../lib/bookmark";
 import { Button } from "./ui/button";
@@ -28,14 +28,14 @@ interface BookmarkUrlFormProps {
     initialTag: string | undefined;
     onAdded: (bookmark: Bookmark) => void;
     onCancel: () => void;
+    urlInput: RefObject<HTMLInputElement | null>;
 }
 
-const BookmarkUrlForm = ({ initialTag, onAdded, onCancel }: BookmarkUrlFormProps): ReactNode => {
+const BookmarkUrlForm = ({ initialTag, onAdded, onCancel, urlInput }: BookmarkUrlFormProps): ReactNode => {
     const [input, setInput] = useState("");
     const [tagNames, setTagNames] = useState<string[]>(initialTag ? [initialTag] : []);
     const [error, setError] = useState("");
     const [adding, setAdding] = useState(false);
-    const urlInput = useRef<HTMLInputElement>(null);
     const { tags } = useTagListContext();
     const { t: translate } = useTranslation();
 
@@ -136,6 +136,7 @@ interface AddBookmarkDialogProps {
 const AddBookmarkDialog = ({ initialTag, onAdd }: AddBookmarkDialogProps): ReactNode => {
     const search = useSearchContext();
     const [open, setOpen] = useState(false);
+    const urlInput = useRef<HTMLInputElement>(null);
     const inactive = open || search.searchOpen;
     const { t: translate } = useTranslation();
 
@@ -158,7 +159,10 @@ const AddBookmarkDialog = ({ initialTag, onAdd }: AddBookmarkDialogProps): React
             >
                 <PlusIcon aria-hidden="true" className="size-6" />
             </DialogTrigger>
-            <DialogContent>
+            {/* Base UI focuses the popup itself on touch to avoid opening the on-screen keyboard.
+                The URL field is the only input, so focus it instead. On iOS this still will not
+                raise the keyboard because the focus happens outside the tap's gesture. */}
+            <DialogContent initialFocus={urlInput}>
                 <DialogHeader>
                     <DialogTitle>{translate("bookmark.addTitle")}</DialogTitle>
                 </DialogHeader>
@@ -171,6 +175,7 @@ const AddBookmarkDialog = ({ initialTag, onAdd }: AddBookmarkDialogProps): React
                     onCancel={() => {
                         setOpen(false);
                     }}
+                    urlInput={urlInput}
                 />
             </DialogContent>
         </Dialog>

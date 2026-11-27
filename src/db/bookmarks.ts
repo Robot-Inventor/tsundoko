@@ -19,6 +19,7 @@ const bookmarkListItemColumns = {
     description: bookmarks.description,
     faviconUrl: bookmarks.faviconUrl,
     id: bookmarks.id,
+    publishedAt: bookmarks.publishedAt,
     siteName: bookmarks.siteName,
     thumbnailFit: bookmarks.thumbnailFit,
     thumbnailUrl: bookmarks.thumbnailUrl,
@@ -34,6 +35,7 @@ const toSavedBookmark = (row: BookmarkListItem, tagNames: string[]): SavedBookma
     description: row.description,
     faviconUrl: row.faviconUrl,
     id: row.id,
+    publishedAt: row.publishedAt?.toISOString() ?? null,
     siteName: row.siteName,
     tags: tagNames,
     thumbnailFit: row.thumbnailFit,
@@ -65,6 +67,7 @@ const vectorResultLimit = 20;
 
 // A saved sort option applies to the plain list only. Search results keep their relevance order.
 // Japanese titles need ICU collation; the addedAt/id tail keeps equal titles in a stable order.
+// An undated row counts as the oldest date: first ascending, last descending.
 const keywordOrderBy = (sortBy: SortBy): SQL[] => {
     const title = sql`${bookmarks.title} collate "ja-x-icu"`;
 
@@ -73,6 +76,10 @@ const keywordOrderBy = (sortBy: SortBy): SQL[] => {
             return [desc(bookmarks.addedAt), desc(bookmarks.id)];
         case "oldest":
             return [asc(bookmarks.addedAt), asc(bookmarks.id)];
+        case "publishedNewest":
+            return [sql`${bookmarks.publishedAt} desc nulls last`, desc(bookmarks.addedAt), desc(bookmarks.id)];
+        case "publishedOldest":
+            return [sql`${bookmarks.publishedAt} asc nulls first`, desc(bookmarks.addedAt), desc(bookmarks.id)];
         case "titleAsc":
             return [sql`${title} asc`, asc(bookmarks.addedAt), desc(bookmarks.id)];
         case "titleDesc":
@@ -154,6 +161,7 @@ type BookmarkInsert = BookmarkPreview & {
     content: string | null;
     embedding: number[] | null;
     id: string;
+    publishedAt: Date | null;
     userId: string;
     thumbnailFit: SavedBookmark["thumbnailFit"];
 };
@@ -166,6 +174,20 @@ interface SaveBookmarkInput {
     xPost: XPostThumbnail | null;
 }
 
+const toBookmarkInsert = ({ preview, url, xPost }: Pick<SaveBookmarkInput, "preview" | "url" | "xPost">) =>
+    ({
+        content: preview?.content ?? null,
+        description: preview?.description ?? null,
+        faviconUrl: preview?.faviconUrl ?? null,
+        publishedAt: preview?.publishedAt ?? null,
+        siteName: xPost?.siteName ?? preview?.siteName ?? url.hostname,
+        // The card crops a rendered X post from the top; page thumbnails stay centered.
+        thumbnailFit: xPost ? "top" : "center",
+        thumbnailUrl: preview?.thumbnailUrl ?? null,
+        title: xPost?.title ?? preview?.title ?? url.hostname,
+        url: normalizeBookmarkUrl(url)
+    }) as const satisfies Omit<BookmarkInsert, "embedding" | "id" | "userId">;
+
 const saveBookmark = async ({
     preview,
     tagNames = [],
@@ -174,18 +196,7 @@ const saveBookmark = async ({
     xPost
 }: SaveBookmarkInput): Promise<SavedBookmark | null> => {
     const id = crypto.randomUUID();
-    // The card crops a rendered X post from the top; page thumbnails stay centered.
-    const thumbnailFit = xPost ? "top" : "center";
-    const bookmark = {
-        content: preview?.content ?? null,
-        description: preview?.description ?? null,
-        faviconUrl: preview?.faviconUrl ?? null,
-        siteName: xPost?.siteName ?? preview?.siteName ?? url.hostname,
-        thumbnailFit,
-        thumbnailUrl: preview?.thumbnailUrl ?? null,
-        title: xPost?.title ?? preview?.title ?? url.hostname,
-        url: normalizeBookmarkUrl(url)
-    } as const satisfies Omit<BookmarkInsert, "embedding" | "id" | "userId">;
+    const bookmark = toBookmarkInsert({ preview, url, xPost });
 
     // Embedding failures must not cost the user the bookmark itself: a NULL embedding still saves,
     // and the row keeps working through keyword search.

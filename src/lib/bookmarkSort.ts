@@ -1,14 +1,37 @@
 import type { Bookmark } from "./bookmark";
 
-const sortByValues = ["newest", "oldest", "titleAsc", "titleDesc"] as const;
+const sortByValues = ["newest", "oldest", "publishedNewest", "publishedOldest", "titleAsc", "titleDesc"] as const;
 
 type SortBy = (typeof sortByValues)[number];
 
 const defaultSortBy: SortBy = "newest";
 const noMatch = -1;
+const sortsBefore = -1;
+const sortsAfter = 1;
 
 // Unknown values come from stale clients or hand-written URLs; they must not break the list.
 const parseSortBy = (value?: unknown): SortBy => sortByValues.find((candidate) => candidate === value) ?? defaultSortBy;
+
+const byAddedDesc = (left: Bookmark, right: Bookmark): number =>
+    right.addedAt.getTime() - left.addedAt.getTime() || right.id.localeCompare(left.id);
+
+// A missing publication date sorts as the oldest one: first ascending, last descending.
+const comparePublished = (left: Bookmark, right: Bookmark, newestFirst: boolean): number => {
+    const leftTime = left.publishedAt?.getTime() ?? null;
+    const rightTime = right.publishedAt?.getTime() ?? null;
+
+    if (leftTime === null || rightTime === null) {
+        if (leftTime === rightTime) {
+            return byAddedDesc(left, right);
+        }
+
+        return newestFirst === (leftTime === null) ? sortsAfter : sortsBefore;
+    }
+
+    const difference = newestFirst ? rightTime - leftTime : leftTime - rightTime;
+
+    return difference || byAddedDesc(left, right);
+};
 
 // Optimistic additions must land where the server would put them, not always at the top.
 // The tails mirror the SQL ORDER BY in db/bookmarks.ts.
@@ -18,6 +41,10 @@ const compareBySortBy = (left: Bookmark, right: Bookmark, sortBy: SortBy): numbe
             return right.addedAt.getTime() - left.addedAt.getTime() || right.id.localeCompare(left.id);
         case "oldest":
             return left.addedAt.getTime() - right.addedAt.getTime() || left.id.localeCompare(right.id);
+        case "publishedNewest":
+            return comparePublished(left, right, true);
+        case "publishedOldest":
+            return comparePublished(left, right, false);
         case "titleAsc":
             return (
                 left.title.localeCompare(right.title, "ja") ||

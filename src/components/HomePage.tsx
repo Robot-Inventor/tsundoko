@@ -13,12 +13,13 @@ const HomePage = (): ReactNode => {
     const search = useSearchContext();
     const { account, failed } = useAccountContext();
     const tags = useTagListContext();
+    const sortBy = account?.sortByActive ?? (failed ? defaultSortBy : null);
     const list = useBookmarkList({
         onSettled: search.finishLoading,
         onSortStart: search.startListLoading,
         query: search.query,
         scope: "active",
-        sortBy: account?.sortByActive ?? (failed ? defaultSortBy : null)
+        sortBy
     });
 
     const { t: translate } = useTranslation();
@@ -38,13 +39,8 @@ const HomePage = (): ReactNode => {
                         }}
                     />
                 </div>
-                {!search.query && <BookmarkSortMenu className="hidden md:inline-flex" scope="active" />}
+                {!search.query && <BookmarkSortMenu scope="active" />}
             </div>
-            {!search.query && (
-                <div className="mt-4 flex justify-end md:hidden">
-                    <BookmarkSortMenu scope="active" />
-                </div>
-            )}
             <BookmarkList
                 archived={false}
                 bookmarks={list.bookmarks}
@@ -53,6 +49,7 @@ const HomePage = (): ReactNode => {
                 loadState={list.loadState}
                 onRetry={list.retry}
                 query={search.query}
+                sortBy={sortBy}
             />
         </>
     );

@@ -25,6 +25,8 @@ const bookmarks = pgTable(
         embedding: vector({ dimensions: embeddingDimensions }),
         faviconUrl: text(),
         id: uuid().primaryKey().defaultRandom(),
+        // Publication date from the page's OGP or structured data. Null when the page has no usable date.
+        publishedAt: timestamp({ withTimezone: true }),
         siteName: text().notNull(),
         // Legacy path of an X render saved before the shared image cache. The migration converts
         // every file to WebP and clears this column, so only a failed conversion leaves a value.

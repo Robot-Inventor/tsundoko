@@ -215,9 +215,10 @@ const useSwipeToAction = (archived: boolean, bookmark: Bookmark, onLongPress: ()
 interface BookmarkListItemProps {
     archived: boolean;
     bookmark: Bookmark;
+    showPublishedDate: boolean;
 }
 
-const BookmarkListItem = ({ archived, bookmark }: BookmarkListItemProps): ReactNode => {
+const BookmarkListItem = ({ archived, bookmark, showPublishedDate }: BookmarkListItemProps): ReactNode => {
     const [drawerOpen, setDrawerOpen] = useState(false);
     const swipe = useSwipeToAction(archived, bookmark, () => {
         setDrawerOpen(true);
@@ -256,7 +257,7 @@ const BookmarkListItem = ({ archived, bookmark }: BookmarkListItemProps): ReactN
                 onPointerUp={swipe.onPointerEnd}
                 style={contentStyle}
             >
-                <BookmarkCard archived={archived} bookmark={bookmark} />
+                <BookmarkCard archived={archived} bookmark={bookmark} showPublishedDate={showPublishedDate} />
             </div>
 
             <Drawer onOpenChange={setDrawerOpen} open={drawerOpen} showSwipeHandle>

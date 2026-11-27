@@ -98,14 +98,17 @@ afterAll(async () => {
 describe("account sort settings API", () => {
     it("saves each scope's sort option and returns them from GET /api/me", async () => {
         const app = await accountApp();
-        const saved = await app.request("/api/me", jsonPatch({ sortByActive: "oldest", sortByArchived: "titleAsc" }));
+        const saved = await app.request(
+            "/api/me",
+            jsonPatch({ sortByActive: "publishedNewest", sortByArchived: "titleAsc" })
+        );
 
         expect(saved.status).toBe(noContent);
 
         const response = await app.request("/api/me");
 
         expect(await response.json()).toMatchObject({
-            sortByActive: "oldest",
+            sortByActive: "publishedNewest",
             sortByArchived: "titleAsc"
         });
     });
@@ -130,6 +133,7 @@ describe("bookmark list sort API", () => {
         await database.insert(bookmarks).values([
             {
                 addedAt: new Date("2024-01-01T00:00:00.000Z"),
+                publishedAt: new Date("2024-03-01T00:00:00.000Z"),
                 siteName: "example.com",
                 title: "zebra",
                 url: "https://example.com/api-zebra",
@@ -137,6 +141,7 @@ describe("bookmark list sort API", () => {
             },
             {
                 addedAt: new Date("2024-02-01T00:00:00.000Z"),
+                publishedAt: new Date("2024-02-01T00:00:00.000Z"),
                 siteName: "example.com",
                 title: "alpha",
                 url: "https://example.com/api-alpha",
@@ -144,6 +149,7 @@ describe("bookmark list sort API", () => {
             },
             {
                 addedAt: new Date("2024-03-01T00:00:00.000Z"),
+                publishedAt: new Date("2024-01-01T00:00:00.000Z"),
                 siteName: "example.com",
                 title: "middle",
                 url: "https://example.com/api-middle",
@@ -156,6 +162,14 @@ describe("bookmark list sort API", () => {
 
         expect(response.status).toBe(ok);
         expect(await titles(response)).toEqual(["alpha", "middle", "zebra"]);
+    });
+
+    it("orders the list by publication date", async () => {
+        const app = await bookmarkApp();
+        const response = await app.request("/api/bookmarks?scope=active&sortBy=publishedNewest");
+
+        expect(response.status).toBe(ok);
+        expect(await titles(response)).toEqual(["zebra", "alpha", "middle"]);
     });
 
     it("falls back to the default order for an unknown sort option", async () => {

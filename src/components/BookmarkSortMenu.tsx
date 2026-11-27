@@ -19,16 +19,17 @@ import { useTranslation } from "react-i18next";
 const sortLabels = {
     newest: "bookmark.sortNewest",
     oldest: "bookmark.sortOldest",
+    publishedNewest: "bookmark.sortPublishedNewest",
+    publishedOldest: "bookmark.sortPublishedOldest",
     titleAsc: "bookmark.sortTitleAsc",
     titleDesc: "bookmark.sortTitleDesc"
 } as const satisfies Record<SortBy, string>;
 
 interface BookmarkSortMenuProps {
-    className?: string;
     scope: BookmarkScope;
 }
 
-const BookmarkSortMenu = ({ className, scope }: BookmarkSortMenuProps): ReactNode => {
+const BookmarkSortMenu = ({ scope }: BookmarkSortMenuProps): ReactNode => {
     const { account, refresh } = useAccountContext();
     const { t: translate } = useTranslation();
 
@@ -65,12 +66,11 @@ const BookmarkSortMenu = ({ className, scope }: BookmarkSortMenuProps): ReactNod
 
     return (
         <DropdownMenu>
-            <DropdownMenuTrigger
-                aria-label={translate("bookmark.sortLabel")}
-                render=<Button className={className} size="sm" variant="ghost" />
-            >
+            {/* The mobile list pulls its top edge up 12px (max-sm:-mt-3), so the button needs at
+                least that much bottom margin or the first row would cover its tap area. */}
+            <DropdownMenuTrigger render=<Button className="max-md:my-3" size="sm" variant="ghost" />>
                 <ArrowDownUp aria-hidden="true" />
-                <span className="hidden md:inline">{translate("bookmark.sortButton")}</span>
+                <span>{translate("bookmark.sortButton")}</span>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-auto min-w-48 whitespace-nowrap">
                 <DropdownMenuRadioGroup onValueChange={change} value={sortBy}>

@@ -1,5 +1,5 @@
 {
-    "id": "24c4da83-9a8e-4f25-903f-64c35c422e37",
+    "id": "11e9544f-788f-4f03-a3f4-512b5bed2229",
     "prevId": "d2d435fd-cc1a-4ef0-bea1-4fda0f182911",
     "version": "7",
     "dialect": "postgresql",
@@ -117,6 +117,12 @@
                     "notNull": true,
                     "default": "gen_random_uuid()"
                 },
+                "publishedAt": {
+                    "name": "publishedAt",
+                    "type": "timestamp with time zone",
+                    "primaryKey": false,
+                    "notNull": false
+                },
                 "siteName": {
                     "name": "siteName",
                     "type": "text",
@@ -128,14 +134,6 @@
                     "type": "text",
                     "primaryKey": false,
                     "notNull": false
-                },
-                "thumbnailFit": {
-                    "name": "thumbnailFit",
-                    "type": "thumbnail_fit",
-                    "typeSchema": "public",
-                    "primaryKey": false,
-                    "notNull": true,
-                    "default": "'center'"
                 },
                 "thumbnailUrl": {
                     "name": "thumbnailUrl",
@@ -795,13 +793,7 @@
             "isRLSEnabled": false
         }
     },
-    "enums": {
-        "public.thumbnail_fit": {
-            "name": "thumbnail_fit",
-            "schema": "public",
-            "values": ["top", "center"]
-        }
-    },
+    "enums": {},
     "schemas": {},
     "sequences": {},
     "roles": {},
