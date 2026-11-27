@@ -43,7 +43,8 @@ const fetchBookmarks = async ({
 
         return (await response.json()).map((bookmark) => ({
             ...bookmark,
-            addedAt: new Date(bookmark.addedAt)
+            addedAt: new Date(bookmark.addedAt),
+            publishedAt: bookmark.publishedAt ? new Date(bookmark.publishedAt) : null
         }));
     } catch {
         return null;

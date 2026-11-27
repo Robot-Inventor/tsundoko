@@ -4,6 +4,7 @@ import { BookmarkListItem } from "./BookmarkListItem";
 import { Button } from "./ui/button";
 import type { LoadState } from "../hooks/useBookmarkList";
 import type { ReactNode } from "react";
+import type { SortBy } from "../lib/bookmarkSort";
 import { useTranslation } from "react-i18next";
 
 // Rows are full-bleed on mobile so the swipe gesture, the sliding card, and the reveal
@@ -25,6 +26,7 @@ interface BookmarkListProps {
     loadState: LoadState;
     onRetry: () => void;
     query: string;
+    sortBy: SortBy | null;
 }
 
 const BookmarkList = ({
@@ -34,9 +36,14 @@ const BookmarkList = ({
     listLabel,
     loadState,
     onRetry,
-    query
+    query,
+    sortBy
 }: BookmarkListProps): ReactNode => {
     const { t: translate } = useTranslation();
+
+    // Search keeps relevance order and hides the sort menu, so only a plain published-date list
+    // swaps the card's added date for the publication date.
+    const showPublishedDate = !query && (sortBy === "publishedNewest" || sortBy === "publishedOldest");
 
     if (loadState === "loading" && !bookmarks.length) {
         return (
@@ -85,7 +92,12 @@ const BookmarkList = ({
                     data-swipe-zone
                 >
                     {bookmarks.map((bookmark) => (
-                        <BookmarkListItem archived={archived} bookmark={bookmark} key={bookmark.id} />
+                        <BookmarkListItem
+                            archived={archived}
+                            bookmark={bookmark}
+                            key={bookmark.id}
+                            showPublishedDate={showPublishedDate}
+                        />
                     ))}
                 </ul>
             )}

@@ -6,6 +6,8 @@ describe("parseSortBy", () => {
     it("keeps every supported sort option", () => {
         expect(parseSortBy("newest")).toBe("newest");
         expect(parseSortBy("oldest")).toBe("oldest");
+        expect(parseSortBy("publishedNewest")).toBe("publishedNewest");
+        expect(parseSortBy("publishedOldest")).toBe("publishedOldest");
         expect(parseSortBy("titleAsc")).toBe("titleAsc");
         expect(parseSortBy("titleDesc")).toBe("titleDesc");
     });
@@ -17,22 +19,29 @@ describe("parseSortBy", () => {
     });
 });
 
-const makeBookmark = (id: string, title: string, addedAt: string): Bookmark => ({
+interface BookmarkFixture {
+    addedAt: string;
+    id: string;
+    publishedAt?: string;
+}
+
+const makeBookmark = ({ addedAt, id, publishedAt }: BookmarkFixture): Bookmark => ({
     addedAt: new Date(addedAt),
     description: null,
     faviconUrl: null,
     id,
+    publishedAt: publishedAt ? new Date(publishedAt) : null,
     siteName: "example.com",
     thumbnailFit: "center",
     thumbnailUrl: null,
-    title,
+    title: id,
     url: `https://example.com/${id}`
 });
 
-const zebra = makeBookmark("zebra", "zebra", "2024-01-01T00:00:00.000Z");
-const alpha = makeBookmark("alpha", "alpha", "2024-02-01T00:00:00.000Z");
-const middle = makeBookmark("middle", "middle", "2024-03-01T00:00:00.000Z");
-const beta = makeBookmark("beta", "beta", "2024-04-01T00:00:00.000Z");
+const zebra = makeBookmark({ addedAt: "2024-01-01T00:00:00.000Z", id: "zebra" });
+const alpha = makeBookmark({ addedAt: "2024-02-01T00:00:00.000Z", id: "alpha" });
+const middle = makeBookmark({ addedAt: "2024-03-01T00:00:00.000Z", id: "middle" });
+const beta = makeBookmark({ addedAt: "2024-04-01T00:00:00.000Z", id: "beta" });
 
 describe("insertBySortBy", () => {
     it("puts a new bookmark at the top of the newest-first list", () => {
@@ -68,6 +77,67 @@ describe("insertBySortBy", () => {
             "middle",
             "beta",
             "alpha"
+        ]);
+    });
+});
+
+describe("published-date ordering", () => {
+    const older = makeBookmark({
+        addedAt: "2024-01-01",
+        id: "older",
+        publishedAt: "2020-01-01"
+    });
+
+    const newer = makeBookmark({
+        addedAt: "2024-01-02",
+        id: "newer",
+        publishedAt: "2023-01-01"
+    });
+
+    const undated = makeBookmark({
+        addedAt: "2024-01-03",
+        id: "undated"
+    });
+
+    it("puts an undated bookmark last when sorting by newest publication date", () => {
+        const latest = makeBookmark({
+            addedAt: "2024-01-04",
+            id: "latest",
+            publishedAt: "2024-01-01"
+        });
+
+        expect(insertBySortBy([newer, older, undated], latest, "publishedNewest").map((item) => item.id)).toEqual([
+            "latest",
+            "newer",
+            "older",
+            "undated"
+        ]);
+    });
+
+    it("puts an undated bookmark first when sorting by oldest publication date", () => {
+        expect(insertBySortBy([older, newer], undated, "publishedOldest").map((item) => item.id)).toEqual([
+            "undated",
+            "older",
+            "newer"
+        ]);
+    });
+
+    it("breaks equal publication dates by added date descending", () => {
+        const addedEarlier = makeBookmark({
+            addedAt: "2024-01-01",
+            id: "addedEarlier",
+            publishedAt: "2022-01-01"
+        });
+
+        const addedLater = makeBookmark({
+            addedAt: "2024-02-01",
+            id: "addedLater",
+            publishedAt: "2022-01-01"
+        });
+
+        expect(insertBySortBy([addedEarlier], addedLater, "publishedNewest").map((item) => item.id)).toEqual([
+            "addedLater",
+            "addedEarlier"
         ]);
     });
 });

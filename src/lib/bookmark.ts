@@ -14,13 +14,16 @@ interface BookmarkPreview {
 interface SavedBookmark extends Omit<BookmarkPreview, "thumbnailFile"> {
     addedAt: string;
     id: string;
+    // Null when the page did not expose a usable publication date.
+    publishedAt: string | null;
     tags: string[];
     // "top" for locally stored renders: tall post screenshots are cropped from the top in the card.
     thumbnailFit: "top" | "center";
 }
 
-interface Bookmark extends Omit<SavedBookmark, "addedAt"> {
+interface Bookmark extends Omit<SavedBookmark, "addedAt" | "publishedAt"> {
     addedAt: Date;
+    publishedAt: Date | null;
 }
 
 type BookmarkScope = "active" | "archived";

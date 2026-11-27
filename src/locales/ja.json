@@ -76,6 +76,8 @@
     "bookmark.sortLabel": "並び順",
     "bookmark.sortNewest": "追加日（新しい順）",
     "bookmark.sortOldest": "追加日（古い順）",
+    "bookmark.sortPublishedNewest": "公開日（新しい順）",
+    "bookmark.sortPublishedOldest": "公開日（古い順）",
     "bookmark.sortTitleAsc": "タイトル（昇順）",
     "bookmark.sortTitleDesc": "タイトル（降順）",
     "bookmark.tagsEmpty": "タグがありません",

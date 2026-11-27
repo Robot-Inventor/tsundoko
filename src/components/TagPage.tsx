@@ -16,12 +16,13 @@ const TagPage = (): ReactNode => {
     const search = useSearchContext();
     const { account, failed } = useAccountContext();
     const tags = useTagListContext();
+    const sortBy = account?.sortByActive ?? (failed ? defaultSortBy : null);
     const list = useBookmarkList({
         onSettled: search.finishLoading,
         onSortStart: search.startListLoading,
         query: search.query,
         scope: "active",
-        sortBy: account?.sortByActive ?? (failed ? defaultSortBy : null),
+        sortBy,
         tag
     });
 
@@ -52,6 +53,7 @@ const TagPage = (): ReactNode => {
                 loadState={list.loadState}
                 onRetry={list.retry}
                 query={search.query}
+                sortBy={sortBy}
             />
         </>
     );

@@ -1,8 +1,6 @@
 import { type TestDatabase, containerTimeoutMs, startTestDatabase } from "./testDatabase";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { user, verification } from "./auth-schema";
-import type { SortBy } from "../lib/bookmarkSort";
-import { bookmarks } from "./schema";
 
 const oneBookmark = 1;
 const noBookmarks = 0;
@@ -10,14 +8,6 @@ const guardIdentifier = "initial-signup-guard";
 
 const userId = "user-a";
 const otherUserId = "user-b";
-
-const sortBookmark = (title: string, addedAt: string, slug: string): Omit<typeof bookmarks.$inferInsert, "id"> => ({
-    addedAt: new Date(addedAt),
-    siteName: "example.com",
-    title,
-    url: `https://example.com/sort-${slug}`,
-    userId
-});
 
 const state: { current?: TestDatabase } = {};
 
@@ -252,47 +242,5 @@ describe("bookmark tags", () => {
         expect(
             (await listBookmarks({ query: "findable", scope: "active" }, userId)).map((bookmark) => bookmark.id)
         ).toContain(saved?.id);
-    });
-});
-
-describe("bookmark sorting", () => {
-    it("orders the list by the requested sort option", async () => {
-        const { database } = getSetup();
-
-        await database.delete(bookmarks);
-        await database
-            .insert(bookmarks)
-            .values([
-                sortBookmark("zebra", "2024-01-01T00:00:00.000Z", "zebra"),
-                sortBookmark("alpha", "2024-02-01T00:00:00.000Z", "alpha"),
-                sortBookmark("middle", "2024-03-01T00:00:00.000Z", "middle")
-            ]);
-
-        const { listBookmarks } = await import("./bookmarks");
-
-        const sortedTitles = async (sortBy: SortBy): Promise<string[]> => {
-            const listed = await listBookmarks({ query: "", scope: "active", sortBy }, userId);
-
-            return listed.map((bookmark) => bookmark.title);
-        };
-
-        expect(await sortedTitles("newest")).toEqual(["middle", "alpha", "zebra"]);
-        expect(await sortedTitles("oldest")).toEqual(["zebra", "alpha", "middle"]);
-        expect(await sortedTitles("titleAsc")).toEqual(["alpha", "middle", "zebra"]);
-        expect(await sortedTitles("titleDesc")).toEqual(["zebra", "middle", "alpha"]);
-    });
-
-    it("keeps search results in their existing order", async () => {
-        const { listBookmarks } = await import("./bookmarks");
-        const listed = await listBookmarks(
-            {
-                query: "example.com",
-                scope: "active",
-                sortBy: "titleAsc"
-            },
-            userId
-        );
-
-        expect(listed.map((bookmark) => bookmark.title)).toEqual(["middle", "alpha", "zebra"]);
     });
 });

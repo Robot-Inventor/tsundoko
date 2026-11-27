@@ -19,6 +19,8 @@ const bookmarks = pgTable(
         embedding: vector({ dimensions: embeddingDimensions }),
         faviconUrl: text(),
         id: uuid().primaryKey().defaultRandom(),
+        // Publication date from the page's OGP or structured data. Null when the page has no usable date.
+        publishedAt: timestamp({ withTimezone: true }),
         siteName: text().notNull(),
         // Relative path under the data directory when the thumbnail is stored locally (e.g. X post renders).
         thumbnailFile: text(),

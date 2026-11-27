@@ -27,7 +27,8 @@ const requestBookmark = async (url: URL, tags: string[] = []): Promise<AddBookma
             return {
                 bookmark: {
                     ...saved,
-                    addedAt: new Date(saved.addedAt)
+                    addedAt: new Date(saved.addedAt),
+                    publishedAt: saved.publishedAt ? new Date(saved.publishedAt) : null
                 }
             };
         }
