@@ -25,13 +25,14 @@ const formErrorKeys = {
 const errorId = "add-bookmark-error";
 
 interface BookmarkUrlFormProps {
+    initialTag: string | undefined;
     onAdded: (bookmark: Bookmark) => void;
     onCancel: () => void;
 }
 
-const BookmarkUrlForm = ({ onAdded, onCancel }: BookmarkUrlFormProps): ReactNode => {
+const BookmarkUrlForm = ({ initialTag, onAdded, onCancel }: BookmarkUrlFormProps): ReactNode => {
     const [input, setInput] = useState("");
-    const [tagNames, setTagNames] = useState<string[]>([]);
+    const [tagNames, setTagNames] = useState<string[]>(initialTag ? [initialTag] : []);
     const [error, setError] = useState("");
     const [adding, setAdding] = useState(false);
     const urlInput = useRef<HTMLInputElement>(null);
@@ -128,10 +129,11 @@ const BookmarkUrlForm = ({ onAdded, onCancel }: BookmarkUrlFormProps): ReactNode
 };
 
 interface AddBookmarkDialogProps {
+    initialTag?: string;
     onAdd: (bookmark: Bookmark) => void;
 }
 
-const AddBookmarkDialog = ({ onAdd }: AddBookmarkDialogProps): ReactNode => {
+const AddBookmarkDialog = ({ initialTag, onAdd }: AddBookmarkDialogProps): ReactNode => {
     const search = useSearchContext();
     const [open, setOpen] = useState(false);
     const inactive = open || search.searchOpen;
@@ -161,6 +163,7 @@ const AddBookmarkDialog = ({ onAdd }: AddBookmarkDialogProps): ReactNode => {
                     <DialogTitle>{translate("bookmark.addTitle")}</DialogTitle>
                 </DialogHeader>
                 <BookmarkUrlForm
+                    initialTag={initialTag}
                     onAdded={(bookmark) => {
                         setOpen(false);
                         onAdd(bookmark);
