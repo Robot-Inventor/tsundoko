@@ -99,8 +99,11 @@ const MobilePageTitle = ({ query, searchOpen }: { query: string; searchOpen: boo
 
 const AppLayout = (): ReactNode => {
     const { pathname } = useLocation();
+    // These pages put the sort button in their leading row, so on mobile that row replaces the
+    // top content padding instead of sitting below it.
+    const showsSort = pathname === "/" || pathname === "/archive";
     // Tag pages list bookmarks too, so they keep the same search bar and progress indicator.
-    const isListPage = pathname === "/" || pathname === "/archive" || pathname.startsWith("/tags/");
+    const isListPage = showsSort || pathname.startsWith("/tags/");
     const showsSearch = isListPage;
     const search = useSearch(showsSearch, pathname);
     const tagList = useTagList(pathname);
@@ -177,7 +180,12 @@ const AppLayout = (): ReactNode => {
                             </div>
                         )}
                     </aside>
-                    <main className="min-w-0 flex-1 p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))] md:p-6 md:pb-6">
+                    <main
+                        className={cn(
+                            "min-w-0 flex-1 p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))] md:p-6 md:pb-6",
+                            showsSort && search.query === "" && "max-md:pt-0"
+                        )}
+                    >
                         <SearchContext value={search}>
                             <Outlet />
                         </SearchContext>
