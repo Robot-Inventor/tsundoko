@@ -1,9 +1,15 @@
-import { index, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, vector } from "drizzle-orm/pg-core";
+import { index, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, vector } from "drizzle-orm/pg-core";
 import { user } from "./auth-schema";
 
 // Fixed by the migration. Changing it means adding a migration that recreates the column and
 // re-embedding every bookmark, because vectors from different models cannot be mixed.
 const embeddingDimensions = 1536;
+
+// A database enum keeps the column from holding a value the app cannot render. Adding "bottom"
+// later needs a migration, which is acceptable for that safety.
+// Exported (and used here) so drizzle-kit registers the type; an unexported enum is silently
+// left out of generated migrations.
+const thumbnailFitEnum = pgEnum("thumbnail_fit", ["top", "center"]);
 
 const bookmarks = pgTable(
     "bookmarks",
@@ -22,8 +28,12 @@ const bookmarks = pgTable(
         // Publication date from the page's OGP or structured data. Null when the page has no usable date.
         publishedAt: timestamp({ withTimezone: true }),
         siteName: text().notNull(),
-        // Relative path under the data directory when the thumbnail is stored locally (e.g. X post renders).
+        // Legacy path of an X render saved before the shared image cache. The migration converts
+        // every file to WebP and clears this column, so only a failed conversion leaves a value.
         thumbnailFile: text(),
+        // Which edge of the card the thumbnail is cropped from. Rendered X posts are tall
+        // screenshots, so they keep their top; Open Graph images are cropped from the center.
+        thumbnailFit: thumbnailFitEnum().notNull().default("center"),
         thumbnailUrl: text(),
         title: text().notNull(),
         url: text().notNull(),
@@ -69,4 +79,4 @@ const bookmarkTags = pgTable(
 );
 
 export * from "./auth-schema";
-export { bookmarkTags, bookmarks, embeddingDimensions, tags };
+export { bookmarkTags, bookmarks, embeddingDimensions, tags, thumbnailFitEnum };

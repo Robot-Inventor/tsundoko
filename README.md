@@ -29,4 +29,4 @@ Run `bun run migrate:apply` to apply the latest migrations, and run `bun run bui
 
 On first launch with no accounts, the app asks you to create the first account with an email address, a display name, and a passkey. Later signups are only offered when `ENABLE_SIGNUP=true`.
 
-Keep the `data/` directory across restarts to retain the thumbnail images. Health checks are available at `/api/health`.
+Keep the `data/` directory across restarts to retain the cached thumbnails and favicons. Health checks are available at `/api/health`.

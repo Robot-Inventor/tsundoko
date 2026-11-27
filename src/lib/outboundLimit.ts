@@ -4,8 +4,6 @@ const maxConcurrentOutboundFetches = 8;
 const maxConcurrentPerKey = 4;
 const maxConcurrentImageFetches = 16;
 const maxConcurrentImagePerKey = 8;
-const maxConcurrentThumbnailReads = 8;
-const maxConcurrentThumbnailReadsPerKey = 4;
 // A backstop that recovers points from a task that never settles; it comfortably exceeds every
 // task timeout in the app, and normal slots return through reward() the moment a task settles.
 // A task that outlives the window temporarily over-credits the pool until the next expiry.
@@ -49,10 +47,8 @@ const createGate = (maxConcurrent: number, maxPerKey: number) => {
 };
 
 // Saves, previews and embeddings share a small pool. Images get their own pool with room for the
-// browser's parallel subresource requests, so loading a bookmark list cannot starve saving. Stored
-// thumbnails are read from disk, so they also get a separate small gate to bound buffered bytes.
+// browser's parallel subresource requests, so loading a bookmark list cannot starve saving.
 const runOutbound = createGate(maxConcurrentOutboundFetches, maxConcurrentPerKey);
 const runImageOutbound = createGate(maxConcurrentImageFetches, maxConcurrentImagePerKey);
-const runThumbnailRead = createGate(maxConcurrentThumbnailReads, maxConcurrentThumbnailReadsPerKey);
 
-export { RateLimiterRes, runImageOutbound, runOutbound, runThumbnailRead };
+export { RateLimiterRes, runImageOutbound, runOutbound };

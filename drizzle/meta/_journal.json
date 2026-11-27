@@ -85,6 +85,13 @@
             "when": 1795755781538,
             "tag": "0011_add_bookmarks_published_at",
             "breakpoints": true
+        },
+        {
+            "idx": 12,
+            "version": "7",
+            "when": 1795760901062,
+            "tag": "0012_first_wind_dancer",
+            "breakpoints": true
         }
     ]
 }

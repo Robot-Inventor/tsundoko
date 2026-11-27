@@ -1,17 +1,27 @@
 import { type Context, Hono } from "hono";
-import { RateLimiterRes, runImageOutbound, runThumbnailRead } from "./lib/outboundLimit";
+import { RateLimiterRes, runImageOutbound } from "./lib/outboundLimit";
+import {
+    cacheRemoteFavicon,
+    cacheRemoteThumbnail,
+    faviconSourceUrls,
+    readFavicon,
+    readThumbnail
+} from "./lib/imageCache";
 import type { AuthEnv } from "./authMiddleware";
 import { createRateLimit } from "./lib/rateLimit";
 import { fetchValidImage } from "./lib/remoteImage";
 import { getBookmarkImageUrls } from "./db/bookmarks";
 import { httpStatus } from "./lib/httpStatus";
-import { readThumbnail } from "./lib/thumbnailStore";
 import { type } from "arktype";
 import { validator } from "hono/validator";
 
 const imageRequestLimit = 5000;
-// Thumbnails and favicons are stable per page, so letting the browser cache them for a day keeps reloads cheap.
-const imageCacheControl = "private, max-age=86400";
+// The cache key is the bookmark id or the site's hostname, and neither is reused for different
+// content, so a browser can keep a cached image for a month without revalidating it.
+const imageCacheControl = "private, max-age=2592000, immutable";
+// A proxy response is a temporary stand-in for an image the cache could not store, and it holds
+// third-party bytes, so it gets a shorter lifetime without the immutable promise.
+const proxyCacheControl = "private, max-age=86400";
 
 const imageRateLimit = createRateLimit({ limit: imageRequestLimit });
 
@@ -24,6 +34,19 @@ const imageIdQuery = validator("query", (value): string | null => {
 
     return bookmarkId(id) instanceof type.errors ? null : id;
 });
+
+const rateLimited = (context: Context<AuthEnv>): Response => {
+    context.header("Retry-After", "1");
+
+    return context.body(null, httpStatus.serviceUnavailable);
+};
+
+const serveCached = (context: Context<AuthEnv>, webp: Uint8Array<ArrayBuffer>): Response => {
+    context.header("content-type", "image/webp");
+    context.header("Cache-Control", imageCacheControl);
+
+    return context.body(webp);
+};
 
 const serveImage = async (context: Context<AuthEnv>, imageUrl: string | null): Promise<Response> => {
     // Error responses must not be cached by the browser, unlike successful ones.
@@ -43,35 +66,39 @@ const serveImage = async (context: Context<AuthEnv>, imageUrl: string | null): P
         }
 
         context.header("content-type", image.mediaType);
-        context.header("Cache-Control", imageCacheControl);
+        context.header("Cache-Control", proxyCacheControl);
 
         return context.body(image.bytes);
     } catch (error) {
         if (error instanceof RateLimiterRes) {
-            context.header("Retry-After", "1");
-
-            return context.body(null, httpStatus.serviceUnavailable);
+            return rateLimited(context);
         }
 
         return context.body(null, httpStatus.badGateway);
     }
 };
 
-const getFaviconUrl = async (id: string | null, userId: string): Promise<string | null> => {
-    const bookmark = id ? await getBookmarkImageUrls(id, userId) : null;
+// A cache miss is filled inside the request that noticed it; the same bytes are then served instead
+// of reading the file back. When the fill cannot produce a usable image, the plain proxy below is
+// still tried, so a page that sharp rejects can still render in the browser.
+const fillCache = async (
+    context: Context<AuthEnv>,
+    fill: () => Promise<Uint8Array<ArrayBuffer> | null>,
+    fallbackUrl: string | null
+): Promise<Response> => {
+    try {
+        const cached = await runImageOutbound(context.get("userId"), fill);
 
-    if (!bookmark) {
-        return null;
+        if (cached) {
+            return serveCached(context, cached);
+        }
+    } catch (error) {
+        if (error instanceof RateLimiterRes) {
+            return rateLimited(context);
+        }
     }
 
-    // SVG cannot pass serveImage's validation, so Google's favicon service renders those instead.
-    const stored = bookmark.faviconUrl?.endsWith(".svg") ? null : bookmark.faviconUrl;
-
-    const googleFaviconUrl = new URL("https://www.google.com/s2/favicons");
-    googleFaviconUrl.searchParams.set("domain", new URL(bookmark.url).hostname);
-    googleFaviconUrl.searchParams.set("sz", "32");
-
-    return stored ?? googleFaviconUrl.href;
+    return serveImage(context, fallbackUrl);
 };
 
 const imageApi = new Hono<AuthEnv>()
@@ -79,37 +106,55 @@ const imageApi = new Hono<AuthEnv>()
         context.header("Cache-Control", "no-store");
 
         const id = context.req.valid("query");
-        const bookmark = id ? await getBookmarkImageUrls(id, context.get("userId")) : null;
 
-        if (bookmark?.thumbnailFile) {
-            const { thumbnailFile } = bookmark;
-
-            try {
-                const stored = await runThumbnailRead(context.get("userId"), () => readThumbnail(thumbnailFile));
-
-                if (stored) {
-                    context.header("content-type", "image/png");
-                    context.header("Cache-Control", imageCacheControl);
-
-                    return context.body(stored);
-                }
-            } catch (error) {
-                if (error instanceof RateLimiterRes) {
-                    context.header("Retry-After", "1");
-
-                    return context.body(null, httpStatus.serviceUnavailable);
-                }
-
-                throw error;
-            }
+        if (!id) {
+            return context.body(null, httpStatus.notFound);
         }
 
-        return serveImage(context, bookmark?.thumbnailUrl ?? null);
+        const userId = context.get("userId");
+        const bookmark = await getBookmarkImageUrls(id, userId);
+
+        if (!bookmark) {
+            return context.body(null, httpStatus.notFound);
+        }
+
+        const stored = await readThumbnail(id);
+
+        if (stored) {
+            return serveCached(context, stored);
+        }
+
+        const { thumbnailUrl } = bookmark;
+
+        return fillCache(
+            context,
+            () => (thumbnailUrl ? cacheRemoteThumbnail(id, thumbnailUrl) : Promise.resolve(null)),
+            thumbnailUrl
+        );
     })
     .get("/api/favicon", imageRateLimit, imageIdQuery, async (context) => {
-        const faviconUrl = await getFaviconUrl(context.req.valid("query"), context.get("userId"));
+        context.header("Cache-Control", "no-store");
 
-        return serveImage(context, faviconUrl);
+        const id = context.req.valid("query");
+        const userId = context.get("userId");
+        const bookmark = id ? await getBookmarkImageUrls(id, userId) : null;
+
+        if (!bookmark) {
+            return context.body(null, httpStatus.notFound);
+        }
+
+        const { hostname } = new URL(bookmark.url);
+        const stored = await readFavicon(hostname);
+
+        if (stored) {
+            return serveCached(context, stored);
+        }
+
+        return fillCache(
+            context,
+            () => cacheRemoteFavicon(hostname, bookmark.faviconUrl),
+            faviconSourceUrls(bookmark.faviconUrl, hostname)[0]
+        );
     });
 
 export { imageApi };

@@ -3,7 +3,7 @@ import type { BookmarkListFilter, BookmarkPreview, SavedBookmark } from "../lib/
 import { type SQL, and, asc, cosineDistance, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { type SortBy, defaultSortBy } from "../lib/bookmarkSort";
 import { attachTags, getBookmarkTags, tagFilterCondition, textSearchCondition } from "./bookmarkTags";
-import { deleteThumbnail, saveThumbnail } from "../lib/thumbnailStore";
+import { deleteFavicon, deleteLegacyThumbnail, deleteThumbnail } from "../lib/imageCache";
 import { embed, embeddingInput } from "../lib/embedding";
 import type { PreviewData } from "../lib/preview";
 import type { XPostThumbnail } from "../lib/xPost";
@@ -21,14 +21,14 @@ const bookmarkListItemColumns = {
     id: bookmarks.id,
     publishedAt: bookmarks.publishedAt,
     siteName: bookmarks.siteName,
-    thumbnailFile: bookmarks.thumbnailFile,
+    thumbnailFit: bookmarks.thumbnailFit,
     thumbnailUrl: bookmarks.thumbnailUrl,
     title: bookmarks.title,
     url: bookmarks.url
 } as const;
 
 // `content` and `embedding` are excluded from list reads: they are search-only internals.
-type BookmarkListItem = Omit<BookmarkRow, "archivedAt" | "content" | "embedding" | "userId">;
+type BookmarkListItem = Omit<BookmarkRow, "archivedAt" | "content" | "embedding" | "thumbnailFile" | "userId">;
 
 const toSavedBookmark = (row: BookmarkListItem, tagNames: string[]): SavedBookmark => ({
     addedAt: row.addedAt.toISOString(),
@@ -38,7 +38,7 @@ const toSavedBookmark = (row: BookmarkListItem, tagNames: string[]): SavedBookma
     publishedAt: row.publishedAt?.toISOString() ?? null,
     siteName: row.siteName,
     tags: tagNames,
-    thumbnailFit: row.thumbnailFile === null ? "center" : "top",
+    thumbnailFit: row.thumbnailFit,
     thumbnailUrl: row.thumbnailUrl,
     title: row.title,
     url: row.url
@@ -55,6 +55,11 @@ const bookmarkExists = async (url: string, userId: string): Promise<boolean> => 
 
 // `%` and `_` are LIKE wildcards and `\` escapes them, so all three must be escaped for a literal match.
 const likePattern = (query: string): string => `%${query.replace(/[\\%_]/gu, "\\$&")}%`;
+
+// A hostname followed by the path, port, query, fragment, or nothing. The boundary keeps
+// `example.com` from matching `example.com.evil.com`.
+const hostnamePattern = (hostname: string): string =>
+    `^https?://${hostname.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&")}([/:?#]|$)`;
 
 // Semantic results are appended below the keyword matches; this bounds how far the list grows
 // when a query matches none of the stored text but is still near everything in the embedding space.
@@ -137,11 +142,10 @@ const listBookmarks = async (
 const getBookmarkImageUrls = async (
     id: string,
     userId: string
-): Promise<Pick<BookmarkRow, "faviconUrl" | "thumbnailFile" | "thumbnailUrl" | "url"> | null> => {
+): Promise<Pick<BookmarkRow, "faviconUrl" | "thumbnailUrl" | "url"> | null> => {
     const [row] = await db
         .select({
             faviconUrl: bookmarks.faviconUrl,
-            thumbnailFile: bookmarks.thumbnailFile,
             thumbnailUrl: bookmarks.thumbnailUrl,
             url: bookmarks.url
         })
@@ -159,6 +163,7 @@ type BookmarkInsert = BookmarkPreview & {
     id: string;
     publishedAt: Date | null;
     userId: string;
+    thumbnailFit: SavedBookmark["thumbnailFit"];
 };
 
 interface SaveBookmarkInput {
@@ -169,19 +174,15 @@ interface SaveBookmarkInput {
     xPost: XPostThumbnail | null;
 }
 
-const toBookmarkInsert = ({
-    preview,
-    thumbnailFile,
-    url,
-    xPost
-}: Pick<SaveBookmarkInput, "preview" | "url" | "xPost"> & { thumbnailFile: string | null }) =>
+const toBookmarkInsert = ({ preview, url, xPost }: Pick<SaveBookmarkInput, "preview" | "url" | "xPost">) =>
     ({
         content: preview?.content ?? null,
         description: preview?.description ?? null,
         faviconUrl: preview?.faviconUrl ?? null,
         publishedAt: preview?.publishedAt ?? null,
         siteName: xPost?.siteName ?? preview?.siteName ?? url.hostname,
-        thumbnailFile,
+        // The card crops a rendered X post from the top; page thumbnails stay centered.
+        thumbnailFit: xPost ? "top" : "center",
         thumbnailUrl: preview?.thumbnailUrl ?? null,
         title: xPost?.title ?? preview?.title ?? url.hostname,
         url: normalizeBookmarkUrl(url)
@@ -195,10 +196,7 @@ const saveBookmark = async ({
     xPost
 }: SaveBookmarkInput): Promise<SavedBookmark | null> => {
     const id = crypto.randomUUID();
-    // Saving the file before the row keeps the stored path from outliving an actual file.
-    // A failed save only loses the rendered thumbnail; the OG fallback still applies.
-    const thumbnailFile = xPost ? await saveThumbnail(id, xPost.png).catch(() => null) : null;
-    const bookmark = toBookmarkInsert({ preview, thumbnailFile, url, xPost });
+    const bookmark = toBookmarkInsert({ preview, url, xPost });
 
     // Embedding failures must not cost the user the bookmark itself: a NULL embedding still saves,
     // and the row keeps working through keyword search.
@@ -250,23 +248,35 @@ const setBookmarkArchived = async (
     return toSavedBookmark(row, namesByBookmark.get(row.id) ?? []);
 };
 
-// Deletes the row first, then unlinks the locally stored thumbnail if there was one:
-// a failed unlink only leaves an unreachable orphan file behind.
+// Deletes the row first, then its cached images. The favicon is shared by every bookmark on the
+// host, so it goes only after the last one is gone.
 const deleteBookmark = async (id: string, userId: string): Promise<boolean> => {
     const [row] = await db
         .delete(bookmarks)
         .where(and(eq(bookmarks.id, id), eq(bookmarks.userId, userId)))
-        .returning({ thumbnailFile: bookmarks.thumbnailFile });
+        .returning({ thumbnailFile: bookmarks.thumbnailFile, url: bookmarks.url });
 
     if (!row) {
         return false;
     }
 
+    await deleteThumbnail(id);
+
+    // Only a row the startup migration has not converted yet still has a legacy file.
     if (row.thumbnailFile) {
-        await deleteThumbnail(row.thumbnailFile).catch((error: unknown) => {
-            // oxlint-disable-next-line no-console -- Server-side diagnostics are console's legitimate use.
-            console.warn("Thumbnail file deletion failed:", error);
-        });
+        await deleteLegacyThumbnail(row.thumbnailFile);
+    }
+
+    const { hostname } = new URL(row.url);
+    const [remaining] = await db
+        .select({ id: bookmarks.id })
+        .from(bookmarks)
+        .where(sql`${bookmarks.url} ~ ${hostnamePattern(hostname)}`)
+        // oxlint-disable-next-line no-magic-numbers -- One row is enough to know the site is still in use.
+        .limit(1);
+
+    if (!remaining) {
+        await deleteFavicon(hostname);
     }
 
     return true;

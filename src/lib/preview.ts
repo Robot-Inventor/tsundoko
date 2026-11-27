@@ -39,8 +39,8 @@ const imageUrl = (value: string | undefined, pageUrl: URL): string | null => {
     }
 };
 
-// `url` and `thumbnailFile` are filled by the save path, so the page fetch returns the rest only.
-type PreviewData = Omit<BookmarkPreview, "thumbnailFile" | "url"> & {
+// `url` is filled by the save path, so the page fetch returns the rest only.
+type PreviewData = Omit<BookmarkPreview, "url"> & {
     content: string | null;
     publishedAt?: Date | null;
 };
