@@ -20,7 +20,7 @@
         "cn": "^0.5.2",
         "drizzle-orm": "^0.45.4",
         "encoding-sniffer": "^1.0.2",
-        "hono": "^4.13.21",
+        "hono": "^4.13.22",
         "i18next": "^27.2.7",
         "linkedom": "^0.18.15",
         "lucide-react": "^1.79.0",
@@ -1345,7 +1345,7 @@
 
     "hastscript": ["hastscript@9.0.3", "", { "dependencies": { "@types/hast": "^3.0.0", "comma-separated-tokens": "^2.0.0", "hast-util-parse-selector": "^4.0.0", "property-information": "^7.0.0", "space-separated-tokens": "^2.0.0" } }, "sha512-1ALZXSmCGmW3h8AMz4R4+QKSKFi7sNgXLVwmwB8FYVtl1CwQ3WDkSAEY/d5tp1g/vbQgq2s1WlHgfO3jbw1TsA=="],
 
-    "hono": ["hono@4.13.21", "", {}, "sha512-h9UsguqfVk4kjUwLvQpHOmOaJpW10jz9lp8bvKUUa04wJG/fabKFBqXZ06D6LFaeKQZtUZRVeg0gfkTTEsX7Mw=="],
+    "hono": ["hono@4.13.23", "", {}, "sha512-OS90dj7dcsftEEWCOef8jRbnHE5lbrOq0hNRqjSyPsOnaGZvvfof1KS05hQNb4kUOCfDq1mG3PmHoX37DMnHQg=="],
 
     "hookified": ["hookified@1.15.1", "", {}, "sha512-MvG/clsADq1GPM2KGo2nyfaWVyn9naPiXrqIe4jYjXNZQt238kWyOGrsyc/DmRAQ+Re6yeo6yX/yoNCG5KAEVg=="],
 
