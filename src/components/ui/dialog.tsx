@@ -38,20 +38,66 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  style,
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
 }) {
+  // The keyboard shrinks and can pan the visual viewport, while a fixed popup stays tied to the
+  // layout viewport. Track the visible strip so the popup stays centered in what the user sees.
+  const [visibleArea, setVisibleArea] = React.useState<{ height: number; center: number } | null>(null)
+
+  React.useEffect(() => {
+    const viewport = window.visualViewport
+
+    if (!viewport) {
+      return
+    }
+
+    const update = (): void => {
+      // A stale offset after the keyboard closes, or a zoomed viewport, must not move the popup.
+      const keyboardOpen = viewport.height < window.innerHeight - 1 && viewport.scale === 1
+
+      setVisibleArea(
+        keyboardOpen
+          ? { center: viewport.offsetTop + viewport.height / 2, height: viewport.height }
+          : null
+      )
+    }
+
+    update()
+    viewport.addEventListener("resize", update)
+    viewport.addEventListener("scroll", update)
+    window.addEventListener("resize", update)
+
+    return () => {
+      viewport.removeEventListener("resize", update)
+      viewport.removeEventListener("scroll", update)
+      window.removeEventListener("resize", update)
+    }
+  }, [])
+
+  const popupStyle = {
+    ...style,
+    ...(visibleArea === null
+      ? {}
+      : {
+          maxHeight: `calc(${visibleArea.height}px - 1rem - env(safe-area-inset-top) - env(safe-area-inset-bottom))`,
+          top: `${visibleArea.center}px`
+        })
+  }
+
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 outline-none transition-[opacity,scale] sm:max-w-sm data-starting-style:scale-95 data-starting-style:opacity-0 data-ending-style:scale-95 data-ending-style:opacity-0",
+          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto overscroll-contain rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 outline-none transition-[opacity,scale] sm:max-w-sm data-starting-style:scale-95 data-starting-style:opacity-0 data-ending-style:scale-95 data-ending-style:opacity-0",
           overlayTransition,
           className
         )}
+        style={popupStyle}
         {...props}
       >
         {children}
