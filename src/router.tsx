@@ -18,6 +18,7 @@ import { SignupPage } from "./components/SignupPage";
 import { TagPage } from "./components/TagPage";
 import { getAuthState } from "./lib/authClient";
 import { parseSearchQuery } from "./lib/searchQuery";
+import { setUnauthorizedHandler } from "./lib/authFetch";
 
 const rootRoute = createRootRoute({
     component: RootComponent
@@ -221,6 +222,12 @@ const routeTree = rootRoute.addChildren([
 const router = createRouter({
     routeTree,
     scrollRestoration: true
+});
+
+// A 401 invalidates the cached signed-in flag, so the guards have to run again to send the user
+// to the login or signup page instead of leaving them on a page whose requests keep failing.
+setUnauthorizedHandler(() => {
+    void router.invalidate();
 });
 
 declare module "@tanstack/react-router" {

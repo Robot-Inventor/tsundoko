@@ -8,6 +8,7 @@ import { notifyError, notifySuccess } from "../lib/appToast";
 import { Button } from "./ui/button";
 import { Input } from "./ui/Input";
 import { authClient } from "../lib/authClient";
+import { authFetch } from "../lib/authFetch";
 import { isLocale } from "../lib/locale";
 import { useAccountContext } from "../hooks/useAccount";
 import { useLocale } from "../hooks/useLocale";
@@ -16,7 +17,7 @@ import { useTranslation } from "react-i18next";
 const avatarAccept = "image/png,image/jpeg,image/webp";
 
 const sendAvatar = async (request: RequestInit): Promise<string | null> => {
-    const response = await fetch("/api/me/avatar", request);
+    const response = await authFetch("/api/me/avatar", request);
 
     if (!response.ok) {
         return apiErrorMessage(await response.json().catch(() => null), "avatar.changeFailed");
