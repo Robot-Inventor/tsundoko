@@ -34,7 +34,7 @@ const createServer = ({ authInfo }: { authInfo?: AuthInfo }): McpServer => {
                 readOnlyHint: true
             },
             description:
-                "Search the user's saved bookmarks by keyword and semantic similarity. Returns title, URL, description, tags, and dates.",
+                "Search the user's saved bookmarks by keyword and semantic similarity. Returns title, URL, description, tags, and dates. Use offset with limit to page through results.",
             inputSchema: searchInput
         },
         async (input) => searchBookmarks(userId, input)
