@@ -28,9 +28,10 @@ const firstTagIndex = 0;
 interface BookmarkCardMenuProps {
     archived: boolean;
     bookmark: Bookmark;
+    onEdit: () => void;
 }
 
-const BookmarkCardMenu = ({ archived, bookmark }: BookmarkCardMenuProps): ReactNode => {
+const BookmarkCardMenu = ({ archived, bookmark, onEdit }: BookmarkCardMenuProps): ReactNode => {
     const { t: translate } = useTranslation();
 
     return (
@@ -47,7 +48,7 @@ const BookmarkCardMenu = ({ archived, bookmark }: BookmarkCardMenuProps): ReactN
             {/* The trigger is a small icon, so the menu sizes itself to its labels rather than
                 to the anchor width and never wraps them. */}
             <DropdownMenuContent align="end" className="w-auto whitespace-nowrap">
-                {getBookmarkCardActions(archived, bookmark).map(({ icon: Icon, label, onSelect, variant }) => (
+                {getBookmarkCardActions(archived, bookmark, onEdit).map(({ icon: Icon, label, onSelect, variant }) => (
                     <DropdownMenuItem key={label} onClick={onSelect} variant={variant ?? "default"}>
                         <Icon aria-hidden="true" />
                         {label}
@@ -88,10 +89,11 @@ const BookmarkCardTags = ({ tags }: BookmarkCardTagsProps): ReactNode => {
 interface BookmarkCardProps {
     archived: boolean;
     bookmark: Bookmark;
+    onEdit: () => void;
     showPublishedDate: boolean;
 }
 
-const BookmarkCard = ({ archived, bookmark, showPublishedDate }: BookmarkCardProps): ReactNode => {
+const BookmarkCard = ({ archived, bookmark, onEdit, showPublishedDate }: BookmarkCardProps): ReactNode => {
     const [thumbnailFailed, setThumbnailFailed] = useState(false);
     const [faviconFailed, setFaviconFailed] = useState(false);
     const { locale } = useLocale();
@@ -125,7 +127,7 @@ const BookmarkCard = ({ archived, bookmark, showPublishedDate }: BookmarkCardPro
                     </div>
                 )}
 
-                <BookmarkCardMenu archived={archived} bookmark={bookmark} />
+                <BookmarkCardMenu archived={archived} bookmark={bookmark} onEdit={onEdit} />
             </div>
 
             <div className={contentLayoutClass}>

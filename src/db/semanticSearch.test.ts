@@ -1,8 +1,10 @@
+// oxlint-disable max-lines -- The fake embedding server and its scenarios are easier to follow together.
 import { type TestDatabase, containerTimeoutMs, startTestDatabase } from "./testDatabase";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { bookmarks, embeddingDimensions } from "./schema";
 import type { SavedBookmark } from "../lib/bookmark";
 import { createServer } from "node:http";
-import { embeddingDimensions } from "./schema";
+import { eq } from "drizzle-orm";
 import { httpStatus } from "../lib/httpStatus";
 import { user } from "./auth-schema";
 
@@ -20,7 +22,8 @@ const unsetValue = 0;
 
 const embeddingState = {
     dimensions: embeddingDimensions,
-    fail: false
+    fail: false,
+    requests: 0
 };
 
 // One-hot vectors stand in for a real model: "cat" and "feline" share a direction, as do "dog"
@@ -40,6 +43,8 @@ const fakeEmbedding = (text: string, dimensions = embeddingDimensions): number[]
 };
 
 const embeddingServer = createServer((request, response) => {
+    embeddingState.requests += 1;
+
     if (embeddingState.fail) {
         response.writeHead(httpStatus.internalServerError).end();
 
@@ -83,10 +88,11 @@ interface SemanticBookmark {
     content: string | null;
     owner: string;
     path: string;
+    tags?: string[];
     title: string;
 }
 
-const saveSemanticBookmark = async ({ content, owner, path, title }: SemanticBookmark): Promise<string> => {
+const saveSemanticBookmark = async ({ content, owner, path, tags, title }: SemanticBookmark): Promise<string> => {
     const { saveBookmark } = await import("./bookmarks");
     const saved = await saveBookmark({
         preview: {
@@ -97,6 +103,7 @@ const saveSemanticBookmark = async ({ content, owner, path, title }: SemanticBoo
             thumbnailUrl: null,
             title
         },
+        tagNames: tags,
         url: new URL(`https://example.com/${path}`),
         userId: owner,
         xPost: null
@@ -120,6 +127,17 @@ const bookmarkIds = async (query: string): Promise<string[]> =>
 
 const bookmarkTitles = async (query: string): Promise<string[]> =>
     (await searchBookmarks(query)).map((bookmark) => bookmark.title);
+
+// Semantic search appends every stored vector, so the search results cannot show which direction a
+// row points; reading the column is the only way to observe a re-embed.
+const embeddingOf = async (id: string): Promise<number[] | null> => {
+    const [{ embedding }] = await getSetup()
+        .database.select({ embedding: bookmarks.embedding })
+        .from(bookmarks)
+        .where(eq(bookmarks.id, id));
+
+    return embedding;
+};
 
 beforeAll(async () => {
     const setup = await startTestDatabase();
@@ -273,6 +291,93 @@ describe("semantic search", () => {
         await backfillEmbeddings(true);
 
         expect(await bookmarkIds("dog")).toContain(wrongSizeId);
+    });
+});
+
+describe("bookmark edit embeddings", () => {
+    it("re-embeds an edited title and keeps the vector when the provider fails", async () => {
+        const { updateBookmark } = await import("./bookmarkUpdate");
+        const id = await saveSemanticBookmark({
+            content: null,
+            owner: semanticUserId,
+            path: "edit-vector",
+            title: "Canine notes"
+        });
+
+        await updateBookmark({
+            id,
+            tags: [],
+            title: "Cat notes",
+            userId: semanticUserId
+        });
+
+        const edited = await embeddingOf(id);
+
+        expect(edited?.[catDimension]).toBe(selectedValue);
+        expect(edited?.[dogDimension]).toBe(unsetValue);
+
+        embeddingState.fail = true;
+
+        try {
+            await updateBookmark({
+                id,
+                tags: [],
+                title: "Dog notes",
+                userId: semanticUserId
+            });
+        } finally {
+            embeddingState.fail = false;
+        }
+
+        // The failed regeneration kept the vector from the last successful edit.
+        const preserved = await embeddingOf(id);
+
+        expect(preserved?.[catDimension]).toBe(selectedValue);
+        expect(preserved?.[dogDimension]).toBe(unsetValue);
+    });
+
+    it("skips the provider when an edit changes nothing", async () => {
+        const { updateBookmark } = await import("./bookmarkUpdate");
+        const id = await saveSemanticBookmark({
+            content: null,
+            owner: semanticUserId,
+            path: "no-op-edit",
+            title: "Cat notes"
+        });
+
+        const requested = embeddingState.requests;
+
+        await updateBookmark({
+            id,
+            tags: [],
+            title: "Cat notes",
+            userId: semanticUserId
+        });
+
+        expect(embeddingState.requests).toBe(requested);
+    });
+
+    it("treats tag spelling and order as unchanged without calling the provider", async () => {
+        const { updateBookmark } = await import("./bookmarkUpdate");
+        const id = await saveSemanticBookmark({
+            content: null,
+            owner: semanticUserId,
+            path: "no-op-tags",
+            tags: ["B", "A"],
+            title: "Cat notes"
+        });
+
+        const requested = embeddingState.requests;
+        const updated = await updateBookmark({
+            id,
+            tags: ["a", "b"],
+            title: "Cat notes",
+            userId: semanticUserId
+        });
+
+        expect(embeddingState.requests).toBe(requested);
+        // The stored spellings survive; the response is alphabetical like a list read.
+        expect(updated?.tags).toEqual(["A", "B"]);
     });
 });
 
