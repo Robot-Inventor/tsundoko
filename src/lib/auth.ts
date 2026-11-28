@@ -7,6 +7,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { env } from "../env";
 import { getCurrentAdapter } from "@better-auth/core/context";
 import { passkey } from "@better-auth/passkey";
+import { signupContextMarker } from "./signupContext";
 
 const auth = betterAuth({
     baseURL: env.BETTER_AUTH_URL,
@@ -29,19 +30,19 @@ const auth = betterAuth({
         passkey({
             registration: {
                 afterVerification: async (contextData) => {
-                    // Only the signup flow carries a signup token. A signed-in user adding a passkey
-                    // from settings has none, so the plugin's normal registration path must run.
-                    if (!contextData.context) {
+                    // Only the signup flow carries the marker. A signed-in user adding a passkey from
+                    // settings has none, so the plugin's normal registration path must run.
+                    if (contextData.context !== signupContextMarker) {
                         return;
                     }
 
-                    const signup = verifySignup(contextData.ctx.body, contextData.context);
+                    const signup = verifySignup(contextData.ctx.body, contextData.ctx.request);
                     const adapter = await getCurrentAdapter(contextData.ctx.context.adapter);
 
                     return await createSignupUser(adapter, contextData.user.id, signup);
                 },
                 requireSession: false,
-                resolveUser: ({ context }) => resolveSignupUser(context)
+                resolveUser: ({ ctx }) => resolveSignupUser(ctx.request)
             },
             rpName: "Tsundoko"
         })

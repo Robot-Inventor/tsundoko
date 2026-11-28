@@ -1,4 +1,4 @@
-import { type SignupInfo, readSignupToken } from "./signupToken";
+import { type SignupInfo, readSignupTokenFromRequest } from "./signupToken";
 import { emailTaken, signupAllowed } from "./signupPolicy";
 import { APIError } from "better-auth/api";
 import type { DBTransactionAdapter } from "@better-auth/core/db/adapter";
@@ -15,8 +15,8 @@ const guardExpiresAt = new Date("9999-12-31T00:00:00.000Z");
 const isUniqueViolation = (error: unknown): boolean =>
     typeof error === "object" && error !== null && "code" in error && error.code === uniqueViolationCode;
 
-const resolveSignupUser = (context: string | null | undefined): { displayName: string; id: string; name: string } => {
-    const signup = context ? readSignupToken(context) : null;
+const resolveSignupUser = (request: Request | undefined): { displayName: string; id: string; name: string } => {
+    const signup = readSignupTokenFromRequest(request);
 
     if (!signup) {
         throw new APIError("BAD_REQUEST", {
@@ -32,7 +32,7 @@ const resolveSignupUser = (context: string | null | undefined): { displayName: s
     };
 };
 
-const verifySignup = (body: unknown, context: string | null | undefined): SignupInfo => {
+const verifySignup = (body: unknown, request: Request | undefined): SignupInfo => {
     // The plugin only opens a transaction when a session is created. Signup must use that path.
     const parsed = registrationBody(body);
 
@@ -43,7 +43,7 @@ const verifySignup = (body: unknown, context: string | null | undefined): Signup
         });
     }
 
-    const signup = context ? readSignupToken(context) : null;
+    const signup = readSignupTokenFromRequest(request);
 
     if (!signup) {
         throw new APIError("BAD_REQUEST", {

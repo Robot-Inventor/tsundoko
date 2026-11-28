@@ -1,10 +1,16 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import type { Context } from "hono";
 import { env } from "../env";
+import { parse as parseCookie } from "hono/utils/cookie";
+import { setCookie } from "hono/cookie";
 import { type } from "arktype";
 
-const tokenTtlMinutes = 5;
-const millisecondsPerMinute = 60_000;
-const tokenTtlMs = tokenTtlMinutes * millisecondsPerMinute;
+const signupCookieName = "signup-context";
+const tokenTtlMinutes = 2;
+const secondsPerMinute = 60;
+const millisecondsPerSecond = 1000;
+const signupTokenTtlSeconds = tokenTtlMinutes * secondsPerMinute;
+const tokenTtlMs = signupTokenTtlSeconds * millisecondsPerSecond;
 
 const tokenPayload = type({
     email: "string >= 1",
@@ -33,6 +39,18 @@ const createSignupToken = ({ email, locale, name }: SignupInfo): string => {
     ).toString("base64url");
 
     return `${payload}.${sign(payload)}`;
+};
+
+// The signed token is a bearer credential, so it stays in an HttpOnly cookie instead of the
+// passkey plugin's query-string `context`.
+const setSignupCookie = (context: Context, token: string, secure: boolean): void => {
+    setCookie(context, signupCookieName, token, {
+        httpOnly: true,
+        maxAge: signupTokenTtlSeconds,
+        path: "/",
+        sameSite: "Lax",
+        secure
+    });
 };
 
 const decodePayload = (payload: string): unknown => {
@@ -70,4 +88,19 @@ const readSignupToken = (token: string): SignupInfo | null => {
     };
 };
 
-export { createSignupToken, readSignupToken, type SignupInfo };
+const readSignupTokenFromRequest = (request: Request | undefined): SignupInfo | null => {
+    const cookie = request?.headers.get("cookie") ?? "";
+    const token = parseCookie(cookie, signupCookieName)[signupCookieName];
+
+    return token ? readSignupToken(token) : null;
+};
+
+export {
+    createSignupToken,
+    readSignupToken,
+    readSignupTokenFromRequest,
+    setSignupCookie,
+    signupCookieName,
+    signupTokenTtlSeconds,
+    type SignupInfo
+};

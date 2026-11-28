@@ -1,9 +1,9 @@
+import { createSignupToken, setSignupCookie } from "./lib/signupToken";
 import { needsSetup, signupAllowed } from "./lib/signupPolicy";
 import { Hono } from "hono";
 import { apiError } from "./lib/apiError";
 import { auth } from "./lib/auth";
 import { createRateLimit } from "./lib/rateLimit";
-import { createSignupToken } from "./lib/signupToken";
 import { env } from "./env";
 import { httpStatus } from "./lib/httpStatus";
 import { requestBodyLimit } from "./lib/requestBodyLimit";
@@ -57,7 +57,13 @@ const authApi = new Hono()
         // A duplicate address is rejected when the user row is inserted: createSignupUser re-checks
         // emailTaken, and the unique index on user.email catches a concurrent signup. Reporting it
         // here would let an unauthenticated caller enumerate registered addresses through the status.
-        return context.json({ token: createSignupToken({ email, locale: parsed.locale, name }) }, httpStatus.ok);
+        setSignupCookie(
+            context,
+            createSignupToken({ email, locale: parsed.locale, name }),
+            new URL(env.BETTER_AUTH_URL).protocol === "https:"
+        );
+
+        return context.body(null, httpStatus.noContent);
     })
     .on(["POST", "GET"], "/api/auth/*", requestBodyLimit("auth.tooLong"), (context) => auth.handler(context.req.raw));
 
