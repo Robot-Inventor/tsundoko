@@ -7,6 +7,7 @@ import { apiErrorMessage, errorMessage } from "../lib/errorMessage";
 import { notifyError, notifySuccess } from "../lib/appToast";
 import { Button } from "./ui/button";
 import { Input } from "./ui/Input";
+import { ReaderModeSettings } from "./ReaderModeSettings";
 import { authClient } from "../lib/authClient";
 import { authFetch } from "../lib/authFetch";
 import { isLocale } from "../lib/locale";
@@ -263,6 +264,7 @@ const AccountSettings = (): ReactNode => {
                     <AvatarForm account={account} onSaved={refresh} />
                     <NameForm account={account} onSaved={refresh} />
                     <LanguageForm />
+                    <ReaderModeSettings />
                 </>
             ) : (
                 <p className="text-muted-foreground">{translate("common.loading")}</p>

@@ -1,6 +1,7 @@
 import {
     ArchiveIcon,
     ArchiveRestoreIcon,
+    ExternalLinkIcon,
     LinkIcon,
     type LucideIcon,
     PencilIcon,
@@ -11,6 +12,13 @@ import { notifyError, notifySuccess } from "../lib/appToast";
 import type { Bookmark } from "../lib/bookmark";
 import { i18n } from "../lib/i18n";
 import { requestBookmarkAction } from "../lib/bookmarkActions";
+
+interface BookmarkCardActionsInput {
+    archived: boolean;
+    bookmark: Bookmark;
+    onEdit: () => void;
+    readerMode: boolean;
+}
 
 interface BookmarkCardAction {
     // The mobile drawer runs a deferred action only after it has closed, so a dialog it opens
@@ -50,16 +58,33 @@ const shareBookmark = async (bookmark: Bookmark): Promise<void> => {
 
 // One definition drives both the desktop hover menu and the mobile long-press drawer,
 // so adding an action to either one automatically adds it to the other.
-const getBookmarkCardActions = (archived: boolean, bookmark: Bookmark, onEdit: () => void): BookmarkCardAction[] => {
-    const actions: BookmarkCardAction[] = [
-        {
-            icon: LinkIcon,
-            label: i18n.t("bookmark.actionCopyLink"),
+const getBookmarkCardActions = ({
+    archived,
+    bookmark,
+    onEdit,
+    readerMode
+}: BookmarkCardActionsInput): BookmarkCardAction[] => {
+    const actions: BookmarkCardAction[] = [];
+
+    // In reader view a card click navigates to the article, so the original link needs its own
+    // explicit action. With reader view off the card click already opens it.
+    if (readerMode) {
+        actions.push({
+            icon: ExternalLinkIcon,
+            label: i18n.t("bookmark.actionOpenOriginal"),
             onSelect: (): void => {
-                void copyBookmarkLink(bookmark);
+                window.open(bookmark.url, "_blank", "noopener,noreferrer");
             }
+        });
+    }
+
+    actions.push({
+        icon: LinkIcon,
+        label: i18n.t("bookmark.actionCopyLink"),
+        onSelect: (): void => {
+            void copyBookmarkLink(bookmark);
         }
-    ];
+    });
 
     // Browsers without the Web Share API (most desktop ones) cannot share, so the item is
     // left out instead of showing an action that always fails.

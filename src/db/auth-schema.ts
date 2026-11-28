@@ -12,6 +12,8 @@ export const user = pgTable("user", {
     // Each list remembers its own sort option; existing accounts start with the current order.
     sortByActive: text("sort_by_active").default("newest").notNull(),
     sortByArchived: text("sort_by_archived").default("newest").notNull(),
+    // Existing accounts keep opening the original link until they opt into the reader view.
+    readerMode: boolean("reader_mode").default(false).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
         .defaultNow()

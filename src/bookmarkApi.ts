@@ -8,6 +8,7 @@ import type { ErrorCode } from "./lib/errorCodes";
 import { Hono } from "hono";
 import { apiError } from "./lib/apiError";
 import { bookmarkUrl } from "./lib/bookmarkUrl";
+import { getBookmarkWithContent } from "./db/bookmarkContent";
 import { normalizeTagNames } from "./lib/tags";
 import { parseContentType } from "./lib/mediaType";
 import { requestBodyLimit } from "./lib/requestBodyLimit";
@@ -86,6 +87,20 @@ const editPayload = validator("json", (value, context) => {
 });
 
 const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
+    .get("/api/bookmarks/:id/content", bookmarkListRateLimit, bookmarkIdParam, async (context) => {
+        context.header("Cache-Control", "no-store");
+        const { id } = context.req.valid("param");
+
+        try {
+            const bookmark = await getBookmarkWithContent(id, context.get("userId"));
+
+            return bookmark
+                ? context.json(bookmark, httpStatus.ok)
+                : context.json(apiError("bookmark.notFound"), httpStatus.notFound);
+        } catch {
+            return context.json(apiError("bookmark.loadFailed"), httpStatus.internalServerError);
+        }
+    })
     .get("/api/bookmarks", bookmarkListRateLimit, listQuery, async (context) => {
         context.header("Cache-Control", "no-store");
         const query = context.req.valid("query");

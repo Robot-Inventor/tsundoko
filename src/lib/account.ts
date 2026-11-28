@@ -17,6 +17,7 @@ interface Account extends AccountSummary {
     // to disable those actions before the server has to reject them.
     passkeyEditableUntil: string;
     locale: Locale;
+    readerMode: boolean;
     sortByActive: SortBy;
     sortByArchived: SortBy;
 }
@@ -28,6 +29,7 @@ const readAccount = async (userId: string, sessionStartedAt: Date): Promise<Acco
             image: user.image,
             locale: user.locale,
             name: user.name,
+            readerMode: user.readerMode,
             sortByActive: user.sortByActive,
             sortByArchived: user.sortByArchived
         })
@@ -45,6 +47,7 @@ const readAccount = async (userId: string, sessionStartedAt: Date): Promise<Acco
         locale: isLocale(row.locale) ? row.locale : "en",
         name: row.name,
         passkeyEditableUntil: getPasskeyEditingDeadline(sessionStartedAt).toISOString(),
+        readerMode: row.readerMode,
         sortByActive: parseSortBy(row.sortByActive),
         sortByArchived: parseSortBy(row.sortByArchived)
     };

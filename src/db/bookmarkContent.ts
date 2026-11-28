@@ -21,8 +21,8 @@ const getBookmarkMetadata = async (id: string, userId: string): Promise<SavedBoo
     return toSavedBookmark(row, tagsByBookmark.get(row.id) ?? []);
 };
 
-// The MCP get_bookmark tool is the only caller: the REST API deliberately keeps the extracted
-// article body on the server, so this read is separate from the list path.
+// Reading the article body is deliberately separate from the list path: the reader view and the
+// MCP get_bookmark tool opt in, while list queries never pull a potentially large body.
 const getBookmarkWithContent = async (
     id: string,
     userId: string

@@ -46,6 +46,7 @@
     "@hono/bun": "^1.0.1",
     "@modelcontextprotocol/server": "^2.4.0",
     "@mozilla/readability": "^0.6.0",
+    "@pierre/words": "^0.3.0",
     "@tanstack/react-router": "^1.170.46",
     "@xeet/core": "^0.1.2",
     "arktype": "^2.2.10",

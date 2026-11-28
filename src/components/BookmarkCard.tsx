@@ -2,6 +2,7 @@
 import { Card, CardFooter, CardHeader } from "./ui/Card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
 import { EllipsisVerticalIcon, GlobeIcon, ImageOffIcon, TagIcon } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import {
     cardLayoutClass,
@@ -11,7 +12,6 @@ import {
     thumbnailLayoutClass
 } from "./bookmarkCardLayout";
 import type { Bookmark } from "../lib/bookmark";
-import { Link } from "@tanstack/react-router";
 import { formatDate } from "../lib/dateFormat";
 import { formatSiteName } from "../lib/localizedNames";
 import { getBookmarkCardActions } from "./bookmarkCardActions";
@@ -32,9 +32,10 @@ interface BookmarkCardMenuProps {
     archived: boolean;
     bookmark: Bookmark;
     onEdit: () => void;
+    readerMode: boolean;
 }
 
-const BookmarkCardMenu = ({ archived, bookmark, onEdit }: BookmarkCardMenuProps): ReactNode => {
+const BookmarkCardMenu = ({ archived, bookmark, onEdit, readerMode }: BookmarkCardMenuProps): ReactNode => {
     const { t: translate } = useTranslation();
 
     return (
@@ -51,7 +52,12 @@ const BookmarkCardMenu = ({ archived, bookmark, onEdit }: BookmarkCardMenuProps)
             {/* The trigger is a small icon, so the menu sizes itself to its labels rather than
                 to the anchor width and never wraps them. */}
             <DropdownMenuContent align="end" className="w-auto whitespace-nowrap">
-                {getBookmarkCardActions(archived, bookmark, onEdit).map(({ icon: Icon, label, onSelect, variant }) => (
+                {getBookmarkCardActions({
+                    archived,
+                    bookmark,
+                    onEdit,
+                    readerMode
+                }).map(({ icon: Icon, label, onSelect, variant }) => (
                     <DropdownMenuItem key={label} onClick={onSelect} variant={variant ?? "default"}>
                         <Icon aria-hidden="true" />
                         {label}
@@ -98,19 +104,76 @@ const BookmarkCardTags = ({ tags }: BookmarkCardTagsProps): ReactNode => {
     );
 };
 
+const primaryMouseButton = 0;
+
+interface BookmarkCardTitleProps {
+    bookmark: Bookmark;
+    readerMode: boolean;
+}
+
+const BookmarkCardTitle = ({ bookmark, readerMode }: BookmarkCardTitleProps): ReactNode => {
+    const navigate = useNavigate();
+    const { t: translate } = useTranslation();
+
+    return (
+        <h2 className="font-heading text-base leading-snug font-semibold">
+            <a
+                className="block rounded-sm after:absolute after:inset-0 after:content-[''] focus-visible:focus-outline"
+                href={bookmark.url}
+                onClick={(event) => {
+                    // Middle click and modified clicks keep the anchor's native new-tab behaviour;
+                    // only a plain click changes destination in reader mode.
+                    const isPlainClick =
+                        event.button === primaryMouseButton &&
+                        !event.ctrlKey &&
+                        !event.metaKey &&
+                        !event.shiftKey &&
+                        !event.altKey;
+
+                    if (!readerMode || !isPlainClick) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    void navigate({
+                        params: {
+                            bookmarkId: bookmark.id
+                        },
+                        to: "/reader/$bookmarkId"
+                    });
+                }}
+                rel="noopener noreferrer"
+                target="_blank"
+            >
+                <span className="line-clamp-3 wrap-anywhere sm:line-clamp-2">{bookmark.title}</span>
+                <span className="sr-only">
+                    {translate(readerMode ? "bookmark.opensInReader" : "common.opensInNewTab")}
+                </span>
+            </a>
+        </h2>
+    );
+};
+
 interface BookmarkCardProps {
     archived: boolean;
     bookmark: Bookmark;
     eager: boolean;
     onEdit: () => void;
+    readerMode: boolean;
     showPublishedDate: boolean;
 }
 
-const BookmarkCard = ({ archived, bookmark, eager, onEdit, showPublishedDate }: BookmarkCardProps): ReactNode => {
+const BookmarkCard = ({
+    archived,
+    bookmark,
+    eager,
+    onEdit,
+    readerMode,
+    showPublishedDate
+}: BookmarkCardProps): ReactNode => {
     const [thumbnailFailed, setThumbnailFailed] = useState(false);
     const [faviconFailed, setFaviconFailed] = useState(false);
     const { locale } = useLocale();
-    const { t: translate } = useTranslation();
     const hasThumbnail = bookmark.thumbnailFit === "top" || bookmark.thumbnailUrl !== null;
     // Undated bookmarks show no date at all when the list is sorted by publication date.
     const displayedAt = showPublishedDate ? bookmark.publishedAt : bookmark.addedAt;
@@ -140,22 +203,12 @@ const BookmarkCard = ({ archived, bookmark, eager, onEdit, showPublishedDate }: 
                     </div>
                 )}
 
-                <BookmarkCardMenu archived={archived} bookmark={bookmark} onEdit={onEdit} />
+                <BookmarkCardMenu archived={archived} bookmark={bookmark} onEdit={onEdit} readerMode={readerMode} />
             </div>
 
             <div className={contentLayoutClass}>
                 <CardHeader className={headerLayoutClass}>
-                    <h2 className="font-heading text-base leading-snug font-semibold">
-                        <a
-                            className="block rounded-sm after:absolute after:inset-0 after:content-[''] focus-visible:focus-outline"
-                            href={bookmark.url}
-                            rel="noopener noreferrer"
-                            target="_blank"
-                        >
-                            <span className="line-clamp-3 wrap-anywhere sm:line-clamp-2">{bookmark.title}</span>
-                            <span className="sr-only">{translate("common.opensInNewTab")}</span>
-                        </a>
-                    </h2>
+                    <BookmarkCardTitle bookmark={bookmark} readerMode={readerMode} />
                     {bookmark.description && (
                         <p className="hidden wrap-anywhere text-muted-foreground sm:line-clamp-3">
                             {bookmark.description}

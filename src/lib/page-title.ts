@@ -12,6 +12,9 @@ const pages = {
     "/login": {
         label: "auth.loginTitle"
     },
+    "/reader": {
+        label: "page.reader"
+    },
     "/settings": {
         label: "page.settings"
     },
@@ -40,6 +43,10 @@ const getPage = (pathname: string): Page => {
 
     if (pathname.startsWith("/login")) {
         return pages["/login"];
+    }
+
+    if (pathname.startsWith("/reader")) {
+        return pages["/reader"];
     }
 
     if (pathname.startsWith("/signup")) {
