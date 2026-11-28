@@ -8,9 +8,11 @@ const thumbnailLayoutClass =
 
 const contentLayoutClass = "flex min-w-0 flex-1 flex-col sm:gap-4";
 
-// Two title lines plus the gap and three description lines. Reserving it on real cards
-// too keeps rows the same height when a title is short or a description is missing.
-const headerLayoutClass = "px-0 sm:px-4 sm:min-h-[6.875rem]";
+// Two title lines, the gap, three description lines, the gap, then the tag row's top
+// spacing and its line (2×22px + 6px + 3×20px + 6px + 4px + 20px = 140px). Reserving the
+// whole block keeps the tag row at the same height on every card, whether or not the
+// description reaches its three-line clamp.
+const headerLayoutClass = "flex flex-col px-0 sm:px-4 sm:min-h-[8.75rem]";
 
 const footerLayoutClass = "mt-auto border-t-0 bg-transparent p-0 sm:border-t sm:bg-muted/50 sm:p-4";
 
