@@ -89,7 +89,7 @@
     "oxlint": "^1.95.0",
     "tailwindcss": "^4.3.5",
     "tsrs": "^7.1.0-beta.tsrs5",
-    "vite": "^8.3.8",
+    "vite": "^8.4.0",
     "vitest": "^5.1.2"
   },
   "engines": {
