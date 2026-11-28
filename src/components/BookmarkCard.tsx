@@ -1,7 +1,7 @@
 // oxlint-disable import/max-dependencies -- The card composes layout, menu, and locale concerns.
 import { Card, CardFooter, CardHeader } from "./ui/Card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
-import { EllipsisVerticalIcon, GlobeIcon, ImageOffIcon } from "lucide-react";
+import { EllipsisVerticalIcon, GlobeIcon, ImageOffIcon, TagIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import {
     cardLayoutClass,
@@ -68,6 +68,7 @@ interface BookmarkCardTagsProps {
 
 const BookmarkCardTags = ({ tags }: BookmarkCardTagsProps): ReactNode => {
     const { tags: tagList } = useTagListContext();
+    const { t: translate } = useTranslation();
     const colorByKey = new Map(tagList.map((tag) => [tagNameKey(tag.name), tag.color]));
 
     if (!tags.length) {
@@ -75,20 +76,24 @@ const BookmarkCardTags = ({ tags }: BookmarkCardTagsProps): ReactNode => {
     }
 
     return (
-        <div className="mt-1 hidden flex-wrap gap-x-2 gap-y-1 text-muted-foreground sm:flex">
+        // One row only: longer tags ellipsize instead of wrapping, and the trailing +N keeps
+        // the count of tags hidden past maxVisibleTags visible.
+        <div className="mt-auto hidden flex-nowrap gap-x-2 pt-1 text-muted-foreground sm:flex">
             {tags.slice(firstTagIndex, maxVisibleTags).map((tag) => (
                 <Link
-                    className="relative z-10 inline-block max-w-full truncate rounded-sm hover:text-foreground focus-visible:focus-outline"
+                    aria-label={translate("bookmark.listTag", { tag })}
+                    className="relative z-10 inline-flex min-w-0 items-center gap-1 rounded-sm hover:text-foreground focus-visible:focus-outline"
                     key={tag}
                     params={{ tag }}
                     style={{ color: readableTagColor(colorByKey.get(tagNameKey(tag)) ?? null) }}
                     title={tag}
                     to="/tags/$tag"
                 >
-                    #{tag}
+                    <TagIcon aria-hidden="true" className="size-3.5 shrink-0" />
+                    <span className="min-w-0 truncate">{tag}</span>
                 </Link>
             ))}
-            {tags.length > maxVisibleTags ? <span>+{tags.length - maxVisibleTags}</span> : null}
+            {tags.length > maxVisibleTags ? <span className="shrink-0">+{tags.length - maxVisibleTags}</span> : null}
         </div>
     );
 };
