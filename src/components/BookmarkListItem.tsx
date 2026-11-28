@@ -1,5 +1,5 @@
 import { type BookmarkActionKind, requestBookmarkAction } from "../lib/bookmarkActions";
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "./ui/drawer";
+import { Drawer, DrawerContent, DrawerTitle } from "./ui/drawer";
 import { type ReactNode, useRef, useState } from "react";
 import { exitAnimationMs, restingOffsetPx, touchPointerType } from "../lib/swipe";
 import type { Bookmark } from "../lib/bookmark";
@@ -262,10 +262,8 @@ const BookmarkListItem = ({ archived, bookmark, showPublishedDate }: BookmarkLis
 
             <Drawer onOpenChange={setDrawerOpen} open={drawerOpen} showSwipeHandle>
                 <DrawerContent>
-                    <DrawerHeader>
-                        <DrawerTitle className="line-clamp-2 wrap-anywhere">{bookmark.title}</DrawerTitle>
-                    </DrawerHeader>
-                    <ul className="pb-2">
+                    <DrawerTitle className="sr-only">{bookmark.title}</DrawerTitle>
+                    <ul className="py-2">
                         {getBookmarkCardActions(archived, bookmark).map(({ icon: Icon, label, onSelect, variant }) => (
                             <li key={label}>
                                 <button
