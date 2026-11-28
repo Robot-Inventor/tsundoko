@@ -49,8 +49,8 @@ interface ShareConfirmationProps {
     urls: string[];
 }
 
-// A share target launch adds without asking. A link from another site opens the same route but
-// has a referrer, so the user confirms the URLs before anything is saved.
+// A browser-initiated share launch adds without asking. Other navigations get a confirmation
+// marker from the server (Sec-Fetch-Site, or its absence), so the user confirms the URLs first.
 const ShareConfirmation = ({
     onCancel,
     onConfirm,
