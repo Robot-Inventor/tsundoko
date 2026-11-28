@@ -13,7 +13,7 @@ beforeAll(() => {
 });
 
 const cookieFor = async (secure: boolean): Promise<string | null> => {
-    const { setSignupCookie } = await import("./signupCookie");
+    const { setSignupCookie } = await import("./signupToken");
     const app = new Hono().post("/", (context) => {
         setSignupCookie(context, token, secure);
 

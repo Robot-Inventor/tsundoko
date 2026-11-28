@@ -1,12 +1,11 @@
+import { createSignupToken, setSignupCookie } from "./lib/signupToken";
 import { needsSetup, signupAllowed } from "./lib/signupPolicy";
 import { Hono } from "hono";
 import { apiError } from "./lib/apiError";
 import { auth } from "./lib/auth";
-import { createSignupToken } from "./lib/signupToken";
 import { env } from "./env";
 import { httpStatus } from "./lib/httpStatus";
 import { requestBodyLimit } from "./lib/requestBodyLimit";
-import { setSignupCookie } from "./lib/signupCookie";
 import { type } from "arktype";
 
 const signupRequest = type({

@@ -1,6 +1,8 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import type { Context } from "hono";
 import { env } from "../env";
 import { parse as parseCookie } from "hono/utils/cookie";
+import { setCookie } from "hono/cookie";
 import { type } from "arktype";
 
 const signupCookieName = "signup-context";
@@ -37,6 +39,18 @@ const createSignupToken = ({ email, locale, name }: SignupInfo): string => {
     ).toString("base64url");
 
     return `${payload}.${sign(payload)}`;
+};
+
+// The signed token is a bearer credential, so it stays in an HttpOnly cookie instead of the
+// passkey plugin's query-string `context`.
+const setSignupCookie = (context: Context, token: string, secure: boolean): void => {
+    setCookie(context, signupCookieName, token, {
+        httpOnly: true,
+        maxAge: signupTokenTtlSeconds,
+        path: "/",
+        sameSite: "Lax",
+        secure
+    });
 };
 
 const decodePayload = (payload: string): unknown => {
@@ -85,6 +99,7 @@ export {
     createSignupToken,
     readSignupToken,
     readSignupTokenFromRequest,
+    setSignupCookie,
     signupCookieName,
     signupTokenTtlSeconds,
     type SignupInfo
