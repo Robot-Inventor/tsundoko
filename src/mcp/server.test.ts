@@ -77,7 +77,8 @@ describe("MCP tool visibility", () => {
             "list_tags",
             "add_bookmark",
             "update_bookmark",
-            "archive_bookmark"
+            "archive_bookmark",
+            "update_tag"
         ]);
     });
 
@@ -92,6 +93,7 @@ describe("MCP tool visibility", () => {
             "add_bookmark",
             "update_bookmark",
             "archive_bookmark",
+            "update_tag",
             "delete_bookmark"
         ]);
     });

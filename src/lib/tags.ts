@@ -1,3 +1,5 @@
+import { isTagColor } from "./tagColor";
+
 const maxTagLength = 30;
 const maxTagsPerBookmark = 10;
 
@@ -9,6 +11,9 @@ interface TagSummary {
 }
 
 const trimTagName = (value: string): string => value.trim();
+
+// A null color is valid and clears the tag's color; anything else must be a hex value.
+const isValidTagColor = (color: string | null): boolean => color === null || isTagColor(color);
 
 // Names keep the spelling the user first entered; only lookup and de-duplication use the lowercase key.
 const tagNameKey = (value: string): string => trimTagName(value).toLowerCase();
@@ -38,4 +43,12 @@ const normalizeTagNames = (values: string[]): string[] | null => {
     return uniqueNames.length > maxTagsPerBookmark ? null : uniqueNames;
 };
 
-export { type TagSummary, maxTagLength, maxTagsPerBookmark, normalizeTagNames, tagNameKey, trimTagName };
+export {
+    type TagSummary,
+    isValidTagColor,
+    maxTagLength,
+    maxTagsPerBookmark,
+    normalizeTagNames,
+    tagNameKey,
+    trimTagName
+};

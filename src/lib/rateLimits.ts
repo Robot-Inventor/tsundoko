@@ -20,5 +20,6 @@ export {
     mcpTokenLimiter,
     tagListLimiter,
     tagListRateLimit,
+    tagWriteLimiter,
     tagWriteRateLimit
 };

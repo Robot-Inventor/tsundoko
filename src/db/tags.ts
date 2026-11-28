@@ -28,9 +28,15 @@ interface TagUpdate {
     userId: string;
 }
 
+interface TagUpdateResult {
+    color: string | null;
+    id: string;
+    name: string;
+}
+
 // Renaming onto a name another tag already owns merges the two: the bookmarks move to the
 // existing tag, which keeps its spelling and color, and the edited tag disappears.
-const updateTag = async ({ color, id, name, userId }: TagUpdate): Promise<boolean> =>
+const updateTag = async ({ color, id, name, userId }: TagUpdate): Promise<TagUpdateResult | null> =>
     db.transaction(async (tx) => {
         const [source] = await tx
             .select({ id: tags.id })
@@ -38,12 +44,16 @@ const updateTag = async ({ color, id, name, userId }: TagUpdate): Promise<boolea
             .where(and(eq(tags.id, id), eq(tags.userId, userId)));
 
         if (!source) {
-            return false;
+            return null;
         }
 
         const normalizedName = tagNameKey(name);
         const [target] = await tx
-            .select({ id: tags.id })
+            .select({
+                color: tags.color,
+                id: tags.id,
+                name: tags.name
+            })
             .from(tags)
             .where(and(eq(tags.userId, userId), eq(tags.normalizedName, normalizedName)));
 
@@ -62,12 +72,16 @@ const updateTag = async ({ color, id, name, userId }: TagUpdate): Promise<boolea
 
             await tx.delete(tags).where(eq(tags.id, id));
 
-            return true;
+            return target;
         }
 
         await tx.update(tags).set({ color, name, normalizedName }).where(eq(tags.id, id));
 
-        return true;
+        return {
+            color,
+            id,
+            name
+        };
     });
 
 // bookmark_tags rows go with the tag through their foreign key.

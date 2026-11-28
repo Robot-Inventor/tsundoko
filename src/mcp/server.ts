@@ -5,19 +5,21 @@ import {
     archiveBookmarkInput,
     bookmarkIdInput,
     editBookmark,
+    editTag,
     getBookmark,
     listTagsForTool,
     removeBookmark,
     searchBookmarks,
     searchInput,
     setArchived,
-    updateBookmarkInput
+    updateBookmarkInput,
+    updateTagInput
 } from "./tools";
 import { hasTokenPermission, scopesToPermissions } from "../lib/tokenPermissions";
 import packageInfo from "../../package.json";
 import { type } from "arktype";
 
-// oxlint-disable-next-line max-statements, max-lines-per-function -- Registering seven tools is one linear wiring step.
+// oxlint-disable-next-line max-statements, max-lines-per-function -- Registering the tools is one linear wiring step.
 const createServer = ({ authInfo }: { authInfo?: AuthInfo }): McpServer => {
     const server = new McpServer({ name: "tsundoko", version: packageInfo.version });
     const userId = authInfo?.clientId;
@@ -93,6 +95,16 @@ const createServer = ({ authInfo }: { authInfo?: AuthInfo }): McpServer => {
         async ({ archived, id }) => setArchived(userId, id, archived)
     );
 
+    const updateTagTool = server.registerTool(
+        "update_tag",
+        {
+            description:
+                "Update a tag's name and color. A name another tag already uses merges the two, and the existing tag keeps its name and color. Color is a hex value like #12a594, or null to clear it.",
+            inputSchema: updateTagInput
+        },
+        async (input) => editTag(userId, input)
+    );
+
     const deleteTool = server.registerTool(
         "delete_bookmark",
         {
@@ -115,6 +127,7 @@ const createServer = ({ authInfo }: { authInfo?: AuthInfo }): McpServer => {
         addTool.disable();
         updateTool.disable();
         archiveTool.disable();
+        updateTagTool.disable();
     }
 
     if (!hasTokenPermission(permissions, "delete")) {
