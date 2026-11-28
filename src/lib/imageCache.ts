@@ -1,13 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
-import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { fetchValidImage } from "./remoteImage";
 import sharp from "sharp";
 
 // Everything fetched from other sites is stored under data/, which the deployment keeps across
-// restarts. Legacy X renders sit in data/thumbnails and are converted by the startup migration.
+// restarts.
 const dataRoot = "data";
-const legacyThumbnailsDir = resolve(dataRoot, "thumbnails");
 const thumbnailsDir = resolve(dataRoot, "images", "thumbnails");
 const faviconsDir = resolve(dataRoot, "images", "favicons");
 
@@ -56,17 +55,6 @@ const thumbnailCachePath = (id: string): string => resolve(thumbnailsDir, `${id}
 const faviconCacheKey = (hostname: string): string => createHash("sha256").update(hostname).digest("hex");
 
 const faviconCachePath = (hostname: string): string => resolve(faviconsDir, `${faviconCacheKey(hostname)}.webp`);
-
-// A row can only point inside data/thumbnails; a tampered value that climbs out of the directory
-// yields no path, so the migration clears the row without reading anything outside the cache area.
-const legacyThumbnailPath = (file: string): string | null => {
-    const absolute = resolve(dataRoot, file);
-    const fromDirectory = relative(legacyThumbnailsDir, absolute);
-    const escapesDirectory =
-        isAbsolute(fromDirectory) || fromDirectory.startsWith("..") || dirname(fromDirectory) !== ".";
-
-    return escapesDirectory ? null : absolute;
-};
 
 const saveThumbnail = async (id: string, source: Uint8Array): Promise<Uint8Array<ArrayBuffer>> => {
     const webp = await renderWebp(source, thumbnailWidthPx);
@@ -139,38 +127,14 @@ const deleteThumbnail = (id: string): Promise<void> => unlinkQuietly(thumbnailCa
 
 const deleteFavicon = (hostname: string): Promise<void> => unlinkQuietly(faviconCachePath(hostname));
 
-const deleteLegacyThumbnail = async (file: string): Promise<void> => {
-    const path = legacyThumbnailPath(file);
-
-    if (path) {
-        await unlinkQuietly(path);
-    }
-};
-
-// The startup migration calls this once per legacy row. It only writes the new file: the caller
-// clears the row before removing the old file, so a crash can leave an orphan but never a row
-// pointing at a file that is already gone.
-const convertLegacyThumbnail = async (id: string, file: string): Promise<void> => {
-    const path = legacyThumbnailPath(file);
-
-    if (!path) {
-        return;
-    }
-
-    await saveThumbnail(id, new Uint8Array(await readFile(path)));
-};
-
 export {
     cacheRemoteFavicon,
     cacheRemoteThumbnail,
     cacheRenderedThumbnail,
-    convertLegacyThumbnail,
     deleteFavicon,
-    deleteLegacyThumbnail,
     deleteThumbnail,
     faviconCacheKey,
     faviconSourceUrls,
-    legacyThumbnailPath,
     readFavicon,
     readThumbnail,
     renderWebp
