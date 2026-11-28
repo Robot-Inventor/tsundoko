@@ -17,6 +17,7 @@ import { SharePage } from "./components/SharePage";
 import { SignupPage } from "./components/SignupPage";
 import { TagPage } from "./components/TagPage";
 import { getAuthState } from "./lib/authClient";
+import { isLoginRedirect } from "./lib/loginRedirect";
 import { parseSearchQuery } from "./lib/searchQuery";
 import { setUnauthorizedHandler } from "./lib/authFetch";
 
@@ -178,26 +179,21 @@ const tagRoute = createRoute({
     validateSearch: parseSearchQuery
 });
 
-const loginRedirects = ["/settings", "/share"] as const;
-
 const loginRoute = createRoute({
     beforeLoad: requireGuest,
     component: LoginPage,
     getParentRoute: () => rootRoute,
     loader: (): Promise<AuthLoaderData> => getAuthState(),
     path: "/login",
-    // Only the pages that ask to return after signing in are accepted; keeping the union closed
-    // means no user-supplied value ever reaches navigate().
-    validateSearch: (search: Record<string, unknown>): { redirect?: (typeof loginRedirects)[number] } => {
-        const target = loginRedirects.find((path) => path === search["redirect"]);
+    // A failed write can send the user here from any page, so the return URL is the current one.
+    validateSearch: (search: Record<string, unknown>): { redirect?: string } => {
+        const target = search["redirect"];
 
-        if (!target) {
-            return {};
-        }
-
-        return {
-            redirect: target
-        };
+        return isLoginRedirect(target)
+            ? {
+                  redirect: target
+              }
+            : {};
     }
 });
 
