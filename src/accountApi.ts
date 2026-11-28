@@ -9,6 +9,7 @@ import { db } from "./db";
 import { eq } from "drizzle-orm";
 import { httpStatus } from "./lib/httpStatus";
 import { passkeyApi } from "./passkeyApi";
+import { requestBodyLimit } from "./lib/requestBodyLimit";
 import { sortByValues } from "./lib/bookmarkSort";
 import { type } from "arktype";
 import { user } from "./db/auth-schema";
@@ -33,7 +34,7 @@ const accountApi = new Hono<AuthEnv>()
 
         return context.json(account, httpStatus.ok);
     })
-    .patch("/api/me", async (context) => {
+    .patch("/api/me", requestBodyLimit("auth.tooLong"), async (context) => {
         context.header("Cache-Control", "no-store");
 
         const body: unknown = await context.req.json().catch(() => null);
