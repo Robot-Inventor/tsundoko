@@ -77,7 +77,8 @@ const requireSignupAvailable = async (): Promise<AuthLoaderData> => {
 
 // A share target delivers its payload as query parameters. Only strings are kept; anything
 // else is ignored rather than failing the whole share. The server adds "confirm" when the
-// navigation came from another site (Sec-Fetch-Site), which cannot be suppressed like a referrer.
+// navigation came from another site or has no Sec-Fetch-Site header, which cannot be suppressed
+// like a referrer.
 interface ShareSearch extends SharedContent {
     confirm?: string;
 }
