@@ -3,7 +3,7 @@ import { RateLimiterRes, runImageOutbound } from "./lib/outboundLimit";
 import {
     cacheRemoteFavicon,
     cacheRemoteThumbnail,
-    faviconSourceUrls,
+    googleFaviconUrl,
     readFavicon,
     readThumbnail
 } from "./lib/imageCache";
@@ -153,7 +153,8 @@ const imageApi = new Hono<AuthEnv>()
         return fillCache(
             context,
             () => cacheRemoteFavicon(hostname, bookmark.faviconUrl),
-            faviconSourceUrls(bookmark.faviconUrl, hostname)[0]
+            // Google renders the sources the page favicon cannot, so retry it instead of the stored URL.
+            googleFaviconUrl(hostname)
         );
     });
 

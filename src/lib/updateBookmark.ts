@@ -1,14 +1,16 @@
 import { type Bookmark, httpStatus } from "./bookmark";
 import { bookmarkClient } from "./bookmarkClient";
 
-type UpdateBookmarkFailure = "invalid" | "notFound" | "rateLimit" | "save";
+type UpdateBookmarkFailure = "auth" | "invalid" | "notFound" | "rateLimit" | "save";
 
 type UpdateBookmarkResult = { bookmark: Bookmark } | { failure: UpdateBookmarkFailure };
 
 const failureByStatus: Partial<Record<number, UpdateBookmarkFailure>> = {
     [httpStatus.badRequest]: "invalid",
+    [httpStatus.forbidden]: "auth",
     [httpStatus.notFound]: "notFound",
-    [httpStatus.tooManyRequests]: "rateLimit"
+    [httpStatus.tooManyRequests]: "rateLimit",
+    [httpStatus.unauthorized]: "auth"
 };
 
 interface UpdateBookmarkInput {

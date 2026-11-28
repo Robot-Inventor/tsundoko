@@ -96,11 +96,12 @@ const BookmarkCardTags = ({ tags }: BookmarkCardTagsProps): ReactNode => {
 interface BookmarkCardProps {
     archived: boolean;
     bookmark: Bookmark;
+    eager: boolean;
     onEdit: () => void;
     showPublishedDate: boolean;
 }
 
-const BookmarkCard = ({ archived, bookmark, onEdit, showPublishedDate }: BookmarkCardProps): ReactNode => {
+const BookmarkCard = ({ archived, bookmark, eager, onEdit, showPublishedDate }: BookmarkCardProps): ReactNode => {
     const [thumbnailFailed, setThumbnailFailed] = useState(false);
     const [faviconFailed, setFaviconFailed] = useState(false);
     const { locale } = useLocale();
@@ -122,7 +123,7 @@ const BookmarkCard = ({ archived, bookmark, onEdit, showPublishedDate }: Bookmar
                         alt=""
                         className={`${thumbnailClass}${bookmark.thumbnailFit === "top" ? " object-top" : ""}`}
                         decoding="async"
-                        loading="lazy"
+                        loading={eager ? "eager" : "lazy"}
                         onError={() => {
                             setThumbnailFailed(true);
                         }}
@@ -169,7 +170,7 @@ const BookmarkCard = ({ archived, bookmark, onEdit, showPublishedDate }: Bookmar
                                 className="size-4 shrink-0 rounded-full object-cover"
                                 decoding="async"
                                 height={16}
-                                loading="lazy"
+                                loading={eager ? "eager" : "lazy"}
                                 onError={() => {
                                     setFaviconFailed(true);
                                 }}

@@ -10,6 +10,9 @@ import { describe, expect, it } from "vitest";
 const hrefs = (content: SharedContent): string[] => extractSharedUrls(content).map((url) => url.href);
 
 describe("share gate", () => {
+    // Hono's req.header() has no value when the header is absent.
+    const { site: absentSite }: { site?: string } = {};
+
     it("recognises the share path regardless of case and trailing slashes", () => {
         expect(isSharePath("/share")).toBe(true);
         expect(isSharePath("/Share/")).toBe(true);
@@ -17,11 +20,18 @@ describe("share gate", () => {
         expect(isSharePath("/archive")).toBe(false);
     });
 
-    it("asks only for an unmarked cross-site navigation", () => {
-        expect(needsShareConfirmation("cross-site", false)).toBe(true);
-        expect(needsShareConfirmation("cross-site", true)).toBe(false);
+    it("asks for confirmation unless the navigation is a trusted share launch", () => {
         expect(needsShareConfirmation("none", false)).toBe(false);
-        expect(needsShareConfirmation("", false)).toBe(false);
+        expect(needsShareConfirmation("same-origin", false)).toBe(false);
+        expect(needsShareConfirmation("same-site", false)).toBe(false);
+        expect(needsShareConfirmation("cross-site", false)).toBe(true);
+        expect(needsShareConfirmation(absentSite, false)).toBe(true);
+        expect(needsShareConfirmation("", false)).toBe(true);
+    });
+
+    it("stops redirecting once the confirmation marker is in the URL", () => {
+        expect(needsShareConfirmation("cross-site", true)).toBe(false);
+        expect(needsShareConfirmation(absentSite, true)).toBe(false);
     });
 });
 

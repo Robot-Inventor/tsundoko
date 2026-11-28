@@ -2,6 +2,8 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 
 const firstIndex = 0;
 const oneCharacter = 1;
+const oneMinuteMs = 60_000;
+const threeMinutesMs = 180_000;
 const sixMinutesMs = 360_000;
 const testSecret = "test-secret-at-least-thirty-two-characters";
 
@@ -63,5 +65,59 @@ describe("signup context token", () => {
             locale: "en",
             name: "A"
         });
+    });
+
+    it("expires within three minutes", async () => {
+        const { createSignupToken, readSignupToken } = await import("./signupToken");
+        const token = createSignupToken({
+            email: "a@example.com",
+            locale: "en",
+            name: "A"
+        });
+
+        const now = Date.now();
+
+        vi.useFakeTimers();
+        vi.setSystemTime(now + oneMinuteMs);
+
+        expect(readSignupToken(token)).not.toBeNull();
+
+        vi.setSystemTime(now + threeMinutesMs);
+
+        expect(readSignupToken(token)).toBeNull();
+
+        vi.useRealTimers();
+    });
+});
+
+describe("signup context cookie", () => {
+    it("reads the token from the cookie and never from the query string", async () => {
+        const { createSignupToken, readSignupTokenFromRequest, signupCookieName } = await import("./signupToken");
+        const token = createSignupToken({
+            email: "a@example.com",
+            locale: "en",
+            name: "A"
+        });
+
+        const signup = {
+            email: "a@example.com",
+            locale: "en",
+            name: "A"
+        } as const;
+
+        const requestWithCookie = (name: string): Request =>
+            new Request("https://example.com", {
+                headers: {
+                    cookie: `${name}=${token}`
+                }
+            });
+
+        expect(readSignupTokenFromRequest(requestWithCookie(signupCookieName))).toStrictEqual(signup);
+
+        expect(readSignupTokenFromRequest(new Request("https://example.com"))).toBeNull();
+
+        expect(readSignupTokenFromRequest(new Request(`https://example.com?context=${token}`))).toBeNull();
+
+        expect(readSignupTokenFromRequest(requestWithCookie("other"))).toBeNull();
     });
 });

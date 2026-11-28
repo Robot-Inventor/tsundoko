@@ -134,7 +134,7 @@ export {
     deleteFavicon,
     deleteThumbnail,
     faviconCacheKey,
-    faviconSourceUrls,
+    googleFaviconUrl,
     readFavicon,
     readThumbnail,
     renderWebp

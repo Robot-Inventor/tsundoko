@@ -5,15 +5,13 @@ import { authClient, clearAuthState } from "../lib/authClient";
 import { Button } from "./ui/button";
 import { Input } from "./ui/Input";
 import { hasPendingShare } from "../lib/pendingShare";
-import { type } from "arktype";
+import { signupContextMarker } from "../lib/signupContext";
 import { useLocale } from "../hooks/useLocale";
 import { useTranslation } from "react-i18next";
 
-const tokenResponse = type({ token: "string" });
+type SignupContextResult = { kind: "error"; message: string } | { kind: "ready" };
 
-type SignupTokenResult = { kind: "error"; message: string } | { kind: "token"; token: string };
-
-const requestSignupToken = async (email: string, locale: "ja" | "en", name: string): Promise<SignupTokenResult> => {
+const requestSignupContext = async (email: string, locale: "ja" | "en", name: string): Promise<SignupContextResult> => {
     const response = await fetch("/api/auth/signup-context", {
         body: JSON.stringify({ email, locale, name }),
         headers: {
@@ -22,23 +20,13 @@ const requestSignupToken = async (email: string, locale: "ja" | "en", name: stri
         method: "POST"
     });
 
-    if (!response.ok) {
-        return {
-            kind: "error",
-            message: apiErrorMessage(await response.json().catch(() => null), "signup.startFailed")
-        };
-    }
-
-    const token = tokenResponse(await response.json());
-
-    return token instanceof type.errors
+    return response.ok
         ? {
-              kind: "error",
-              message: apiErrorMessage(null, "signup.startFailed")
+              kind: "ready"
           }
         : {
-              kind: "token",
-              token: token.token
+              kind: "error",
+              message: apiErrorMessage(await response.json().catch(() => null), "signup.startFailed")
           };
 };
 
@@ -116,13 +104,13 @@ const SignupPage = (): ReactNode => {
         setError(null);
 
         try {
-            const token = await requestSignupToken(email, locale, name);
+            const context = await requestSignupContext(email, locale, name);
 
-            if (token.kind === "error") {
-                setError(token.message);
+            if (context.kind === "error") {
+                setError(context.message);
             } else {
                 const result = await authClient.passkey.addPasskey({
-                    context: token.token,
+                    context: signupContextMarker,
                     createSession: true
                 });
 

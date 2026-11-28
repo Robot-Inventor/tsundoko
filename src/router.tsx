@@ -17,7 +17,9 @@ import { SharePage } from "./components/SharePage";
 import { SignupPage } from "./components/SignupPage";
 import { TagPage } from "./components/TagPage";
 import { getAuthState } from "./lib/authClient";
+import { isLoginRedirect } from "./lib/loginRedirect";
 import { parseSearchQuery } from "./lib/searchQuery";
+import { setUnauthorizedHandler } from "./lib/authFetch";
 
 const rootRoute = createRootRoute({
     component: RootComponent
@@ -75,7 +77,8 @@ const requireSignupAvailable = async (): Promise<AuthLoaderData> => {
 
 // A share target delivers its payload as query parameters. Only strings are kept; anything
 // else is ignored rather than failing the whole share. The server adds "confirm" when the
-// navigation came from another site (Sec-Fetch-Site), which cannot be suppressed like a referrer.
+// navigation came from another site or has no Sec-Fetch-Site header, which cannot be suppressed
+// like a referrer.
 interface ShareSearch extends SharedContent {
     confirm?: string;
 }
@@ -177,26 +180,21 @@ const tagRoute = createRoute({
     validateSearch: parseSearchQuery
 });
 
-const loginRedirects = ["/settings", "/share"] as const;
-
 const loginRoute = createRoute({
     beforeLoad: requireGuest,
     component: LoginPage,
     getParentRoute: () => rootRoute,
     loader: (): Promise<AuthLoaderData> => getAuthState(),
     path: "/login",
-    // Only the pages that ask to return after signing in are accepted; keeping the union closed
-    // means no user-supplied value ever reaches navigate().
-    validateSearch: (search: Record<string, unknown>): { redirect?: (typeof loginRedirects)[number] } => {
-        const target = loginRedirects.find((path) => path === search["redirect"]);
+    // A failed write can send the user here from any page, so the return URL is the current one.
+    validateSearch: (search: Record<string, unknown>): { redirect?: string } => {
+        const target = search["redirect"];
 
-        if (!target) {
-            return {};
-        }
-
-        return {
-            redirect: target
-        };
+        return isLoginRedirect(target)
+            ? {
+                  redirect: target
+              }
+            : {};
     }
 });
 
@@ -221,6 +219,12 @@ const routeTree = rootRoute.addChildren([
 const router = createRouter({
     routeTree,
     scrollRestoration: true
+});
+
+// A 401 invalidates the cached signed-in flag, so the guards have to run again to send the user
+// to the login or signup page instead of leaving them on a page whose requests keep failing.
+setUnauthorizedHandler(() => {
+    void router.invalidate();
 });
 
 declare module "@tanstack/react-router" {

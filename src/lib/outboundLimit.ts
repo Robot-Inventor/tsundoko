@@ -51,4 +51,4 @@ const createGate = (maxConcurrent: number, maxPerKey: number) => {
 const runOutbound = createGate(maxConcurrentOutboundFetches, maxConcurrentPerKey);
 const runImageOutbound = createGate(maxConcurrentImageFetches, maxConcurrentImagePerKey);
 
-export { RateLimiterRes, runImageOutbound, runOutbound };
+export { createGate, RateLimiterRes, runImageOutbound, runOutbound };

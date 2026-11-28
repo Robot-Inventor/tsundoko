@@ -1,6 +1,6 @@
+import type { Context, MiddlewareHandler } from "hono";
 import { RateLimiterMemory, RateLimiterRes } from "rate-limiter-flexible";
 import type { AuthEnv } from "../authMiddleware";
-import type { MiddlewareHandler } from "hono";
 import { apiError } from "./apiError";
 import { createMiddleware } from "hono/factory";
 import { httpStatus } from "./httpStatus";
@@ -10,8 +10,12 @@ const millisecondsPerSecond = 1000;
 
 type RateLimitResult = { allowed: true } | { allowed: false; retryAfterSeconds: number };
 
-// A fixed window per user is enough here: the goal is to bound outbound work, not to smooth bursts
-// precisely. A limiter can be shared by routes and MCP tools that spend the same resource.
+type RateLimitKey = (context: Context<AuthEnv>) => string;
+
+const userIdRateLimitKey: RateLimitKey = (context) => context.get("userId");
+
+// A fixed window per caller is enough here: the goal is to bound outbound work, not to smooth bursts
+// precisely. A limiter can be shared by routes that spend the same resource.
 const createRateLimiter = ({ limit }: { limit: number }) => {
     const limiter = new RateLimiterMemory({ duration: rateLimitWindowSeconds, points: limit });
 
@@ -35,9 +39,12 @@ const createRateLimiter = ({ limit }: { limit: number }) => {
     };
 };
 
-const rateLimitMiddleware = (consume: (key: string) => Promise<RateLimitResult>): MiddlewareHandler<AuthEnv> =>
+const rateLimitMiddleware = (
+    consume: (key: string) => Promise<RateLimitResult>,
+    key: RateLimitKey = userIdRateLimitKey
+): MiddlewareHandler<AuthEnv> =>
     createMiddleware<AuthEnv>(async (context, next) => {
-        const result = await consume(context.get("userId"));
+        const result = await consume(key(context));
 
         if (!result.allowed) {
             context.header("Cache-Control", "no-store");
@@ -49,4 +56,7 @@ const rateLimitMiddleware = (consume: (key: string) => Promise<RateLimitResult>)
         return next();
     });
 
-export { type RateLimitResult, createRateLimiter, rateLimitMiddleware };
+const createRateLimit = ({ limit, key }: { limit: number; key?: RateLimitKey }): MiddlewareHandler<AuthEnv> =>
+    rateLimitMiddleware(createRateLimiter({ limit }), key);
+
+export { type RateLimitResult, createRateLimit, createRateLimiter, rateLimitMiddleware };
