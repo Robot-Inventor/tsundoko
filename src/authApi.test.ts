@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 const payloadTooLarge = 413;
+const tooManyRequests = 429;
 const oversizedNameLength = 20_000;
 const oversizedName = "x".repeat(oversizedNameLength);
+// Matches the unauthenticated route budget in authApi.ts.
+const authRequestLimit = 30;
 
 // The handlers read the environment at import time, so set it first. Loading them at module
 // scope keeps their cold start out of an individual test's timeout budget.
@@ -24,6 +27,40 @@ describe("signup context endpoint", () => {
         });
 
         expect(response.status).toBe(payloadTooLarge);
+    });
+});
+
+describe("unauthenticated auth endpoints", () => {
+    it("shares one per-IP budget between status and signup-context", async () => {
+        const postOversizedSignup = (ip: string): Promise<Response> =>
+            authApi.request("/api/auth/signup-context", {
+                body: JSON.stringify({ email: "a@example.com", name: oversizedName }),
+                headers: {
+                    "content-type": "application/json",
+                    "x-forwarded-for": ip
+                },
+                method: "POST"
+            });
+
+        const ip = "203.0.113.20";
+        const withinBudget = await Promise.all(Array.from({ length: authRequestLimit }, () => postOversizedSignup(ip)));
+
+        expect(withinBudget.every((response) => response.status === payloadTooLarge)).toBe(true);
+        expect((await postOversizedSignup(ip)).status).toBe(tooManyRequests);
+
+        // A forged leading entry must not buy a fresh budget; the proxy-supplied last entry still keys the limit.
+        expect((await postOversizedSignup(`198.51.100.5, ${ip}`)).status).toBe(tooManyRequests);
+
+        const status = await authApi.request("/api/auth/status", {
+            headers: {
+                "x-forwarded-for": ip
+            }
+        });
+
+        expect(status.status).toBe(tooManyRequests);
+        expect(status.headers.get("retry-after")).toBe("60");
+        expect(status.headers.get("cache-control")).toBe("no-store");
+        expect((await postOversizedSignup("203.0.113.21")).status).toBe(payloadTooLarge);
     });
 });
 
