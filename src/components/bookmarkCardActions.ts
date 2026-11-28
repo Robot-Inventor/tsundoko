@@ -53,12 +53,6 @@ const shareBookmark = async (bookmark: Bookmark): Promise<void> => {
 const getBookmarkCardActions = (archived: boolean, bookmark: Bookmark, onEdit: () => void): BookmarkCardAction[] => {
     const actions: BookmarkCardAction[] = [
         {
-            deferUntilClosed: true,
-            icon: PencilIcon,
-            label: i18n.t("bookmark.actionEdit"),
-            onSelect: onEdit
-        },
-        {
             icon: LinkIcon,
             label: i18n.t("bookmark.actionCopyLink"),
             onSelect: (): void => {
@@ -80,6 +74,12 @@ const getBookmarkCardActions = (archived: boolean, bookmark: Bookmark, onEdit: (
     }
 
     actions.push(
+        {
+            deferUntilClosed: true,
+            icon: PencilIcon,
+            label: i18n.t("bookmark.actionEdit"),
+            onSelect: onEdit
+        },
         {
             icon: archived ? ArchiveRestoreIcon : ArchiveIcon,
             label: archived ? i18n.t("bookmark.actionUnarchive") : i18n.t("bookmark.actionArchive"),
