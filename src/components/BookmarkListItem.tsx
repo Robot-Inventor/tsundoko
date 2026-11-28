@@ -6,6 +6,7 @@ import { BookmarkCard } from "./BookmarkCard";
 import { BookmarkItemDrawer } from "./BookmarkItemDrawer";
 import { EditBookmarkDialog } from "./EditBookmarkDialog";
 import { SwipeReveal } from "./SwipeReveal";
+import { useAccountContext } from "../hooks/useAccount";
 
 // A swipe reveals the colored background in proportion to the finger travel; crossing
 // 30% of the row width reveals the icon, releasing past it commits the action.
@@ -219,6 +220,8 @@ interface BookmarkListItemProps {
 }
 
 const BookmarkListItem = ({ archived, bookmark, eager, showPublishedDate }: BookmarkListItemProps): ReactNode => {
+    const { account } = useAccountContext();
+    const readerMode = account?.readerMode ?? false;
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const swipe = useSwipeToAction(archived, bookmark, () => {
@@ -269,6 +272,7 @@ const BookmarkListItem = ({ archived, bookmark, eager, showPublishedDate }: Book
                     onEdit={() => {
                         setEditOpen(true);
                     }}
+                    readerMode={readerMode}
                     showPublishedDate={showPublishedDate}
                 />
             </div>
@@ -281,6 +285,7 @@ const BookmarkListItem = ({ archived, bookmark, eager, showPublishedDate }: Book
                 }}
                 onOpenChange={setDrawerOpen}
                 open={drawerOpen}
+                readerMode={readerMode}
             />
 
             <EditBookmarkDialog bookmark={bookmark} onOpenChange={setEditOpen} open={editOpen} />

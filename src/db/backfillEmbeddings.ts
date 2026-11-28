@@ -49,7 +49,7 @@ const backfillEmbeddings = async (force: boolean): Promise<void> => {
 
     // oxlint-disable-next-line no-console -- A one-shot CLI script reports its result on stdout.
     console.log(
-        `埋め込みを生成しました: ${String(targets.length - failed.length)}件（失敗: ${String(failed.length)}件）`
+        `埋め込みを生成しました：${String(targets.length - failed.length)}件（失敗：${String(failed.length)}件）`
     );
 };
 

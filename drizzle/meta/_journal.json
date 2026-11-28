@@ -113,6 +113,13 @@
             "when": 1795867820371,
             "tag": "0015_friendly_lethal_legion",
             "breakpoints": true
+        },
+        {
+            "idx": 16,
+            "version": "7",
+            "when": 1795892031406,
+            "tag": "0016_reader_mode",
+            "breakpoints": true
         }
     ]
 }

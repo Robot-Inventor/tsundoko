@@ -30,9 +30,24 @@ const avatarBusy = Symbol("avatarBusy");
 
 const accountPatchRequest = type({
     "locale?": '"ja" | "en"',
+    "readerMode?": "boolean",
     "sortByActive?": type.enumerated(...sortByValues),
     "sortByArchived?": type.enumerated(...sortByValues)
 });
+
+const invalidPatchError = (body: unknown): "auth.invalidLocale" | "auth.invalidReaderMode" | "auth.invalidSortBy" => {
+    const hasField = (name: string): boolean => typeof body === "object" && body !== null && name in body;
+
+    if (hasField("locale")) {
+        return "auth.invalidLocale";
+    }
+
+    if (hasField("readerMode")) {
+        return "auth.invalidReaderMode";
+    }
+
+    return "auth.invalidSortBy";
+};
 
 const accountApi = new Hono<AuthEnv>()
     .get("/api/me", async (context) => {
@@ -53,18 +68,19 @@ const accountApi = new Hono<AuthEnv>()
         const parsed = accountPatchRequest(body);
 
         if (parsed instanceof type.errors) {
-            const invalidLocale = typeof body === "object" && body !== null && "locale" in body;
-
-            return context.json(
-                apiError(invalidLocale ? "auth.invalidLocale" : "auth.invalidSortBy"),
-                httpStatus.badRequest
-            );
+            return context.json(apiError(invalidPatchError(body)), httpStatus.badRequest);
         }
 
-        const update: Partial<Pick<typeof user.$inferInsert, "locale" | "sortByActive" | "sortByArchived">> = {};
+        const update: Partial<
+            Pick<typeof user.$inferInsert, "locale" | "readerMode" | "sortByActive" | "sortByArchived">
+        > = {};
 
         if ("locale" in parsed) {
             update.locale = parsed.locale;
+        }
+
+        if ("readerMode" in parsed) {
+            update.readerMode = parsed.readerMode;
         }
 
         if ("sortByActive" in parsed) {

@@ -11,6 +11,7 @@ import { savePendingShare, takePendingShare } from "./lib/pendingShare";
 import { ArchivePage } from "./components/ArchivePage";
 import { HomePage } from "./components/HomePage";
 import { LoginPage } from "./components/LoginPage";
+import { ReaderPage } from "./components/ReaderPage";
 import { RootComponent } from "./components/RootComponent";
 import { SettingsPage } from "./components/SettingsPage";
 import { SharePage } from "./components/SharePage";
@@ -18,6 +19,7 @@ import { SignupPage } from "./components/SignupPage";
 import { TagPage } from "./components/TagPage";
 import { getAuthState } from "./lib/authClient";
 import { isLoginRedirect } from "./lib/loginRedirect";
+import { loadReaderContent } from "./lib/readerContent";
 import { parseSearchQuery } from "./lib/searchQuery";
 import { setUnauthorizedHandler } from "./lib/authFetch";
 
@@ -172,6 +174,14 @@ const settingsRoute = createRoute({
     path: "/settings"
 });
 
+const readerRoute = createRoute({
+    beforeLoad: requireSignedIn,
+    component: ReaderPage,
+    getParentRoute: () => rootRoute,
+    loader: ({ params }) => loadReaderContent(params.bookmarkId),
+    path: "/reader/$bookmarkId"
+});
+
 const tagRoute = createRoute({
     beforeLoad: requireSignedIn,
     component: TagPage,
@@ -210,6 +220,7 @@ const routeTree = rootRoute.addChildren([
     archiveRoute,
     homeRoute,
     loginRoute,
+    readerRoute,
     settingsRoute,
     shareRoute,
     signupRoute,
