@@ -54,7 +54,7 @@
     "hono": "^4.13.22",
     "i18next": "^27.2.9",
     "linkedom": "^0.18.15",
-    "lucide-react": "^1.79.0",
+    "lucide-react": "^1.81.0",
     "open-graph-scraper": "^6.13.0",
     "postgres": "^4.1.1",
     "rate-limiter-flexible": "^11.6.1",
