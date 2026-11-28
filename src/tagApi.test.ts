@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // The real static handlers pull in the Bun-only Hono adapter; the API wiring under test does not
 // need them.
@@ -11,19 +11,17 @@ vi.mock("./spaStatic", () => ({
 const unauthorized = 401;
 const tagUrl = "http://localhost/api/tags/00000000-0000-4000-8000-000000000000";
 
-beforeAll(() => {
-    process.env.BETTER_AUTH_SECRET = "test-secret-at-least-thirty-two-characters";
-    process.env.BETTER_AUTH_URL = "http://localhost:3300";
-    process.env.DATABASE_URL = "postgresql://user:password@127.0.0.1:5432/test";
+// The composed server imports the auth and database modules. Loading it here, before the tests
+// run, keeps that cold start out of a single test's timeout budget; the environment must exist
+// first because the modules read it at import time.
+process.env.BETTER_AUTH_SECRET = "test-secret-at-least-thirty-two-characters";
+process.env.BETTER_AUTH_URL = "http://localhost:3300";
+process.env.DATABASE_URL = "postgresql://user:password@127.0.0.1:5432/test";
 
-    vi.resetModules();
-});
+vi.resetModules();
+const { default: server } = await import("./server");
 
-const requestTag = async (init: RequestInit): Promise<Response> => {
-    const { default: server } = await import("./server");
-
-    return server.fetch(new Request(tagUrl, init));
-};
+const requestTag = (init: RequestInit): Promise<Response> => server.fetch(new Request(tagUrl, init));
 
 // The composed server is the only place that proves the auth middleware covers the tag
 // sub-paths; mounting tagApi alone would hide a missing guard.
