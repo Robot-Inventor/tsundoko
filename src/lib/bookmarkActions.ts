@@ -231,10 +231,25 @@ const requestBookmarkAction = (kind: BookmarkActionKind, bookmark: Bookmark): vo
     toastOwner = action;
 };
 
+// A pending action's preview was captured before an edit, so the stored copy is refreshed to keep
+// views that read the snapshot in step. The action object keeps its identity because the commit
+// timer and the toast owner compare it on every tick.
+const refreshPendingBookmark = (bookmark: Bookmark): void => {
+    const action = snapshot.get(bookmark.id);
+
+    if (!action) {
+        return;
+    }
+
+    action.bookmark = bookmark;
+    replaceSnapshot(new Map(snapshot));
+};
+
 export {
     type BookmarkActionKind,
     applyPendingActions,
     onActionCommitted,
+    refreshPendingBookmark,
     requestBookmarkAction,
     usePendingBookmarkActions
 };

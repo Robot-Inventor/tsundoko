@@ -1,11 +1,8 @@
-// oxlint-disable import/max-dependencies -- The route module legitimately wires validation, storage, previews, and rate limiting.
+// oxlint-disable import/max-dependencies -- The route module legitimately wires validation, storage, and rate limiting.
 import { type BookmarkScope, httpStatus } from "./lib/bookmark";
-import { type PreviewData, getPreview } from "./lib/preview";
 import { type SortBy, parseSortBy } from "./lib/bookmarkSort";
-import { type XPostThumbnail, isXPostUrl, renderXPost } from "./lib/xPost";
 import { bookmarkExists, deleteBookmark, listBookmarks, saveBookmark, setBookmarkArchived } from "./db/bookmarks";
-import { cacheRemoteFavicon, cacheRemoteThumbnail, cacheRenderedThumbnail, readFavicon } from "./lib/imageCache";
-import { runImageOutbound, runOutbound } from "./lib/outboundLimit";
+import { fetchPreview, warmImageCache } from "./lib/bookmarkPreview";
 import { Hono } from "hono";
 import { apiError } from "./lib/apiError";
 import { bookmarkUrl } from "./lib/bookmarkUrl";
@@ -15,12 +12,16 @@ import { normalizeTagNames } from "./lib/tags";
 import { parseContentType } from "./lib/mediaType";
 import { requestBodyLimit } from "./lib/requestBodyLimit";
 import { type } from "arktype";
+import { updateBookmark } from "./db/bookmarkUpdate";
 import { validator } from "hono/validator";
 
 const bookmarkSaveLimit = 30;
 const bookmarkListLimit = 60;
+// An edited title only needs to be non-empty; pages may legitimately have no title of their own.
+const minimumTitleLength = 1;
 
-const bookmarkSaveRateLimit = createRateLimit({ limit: bookmarkSaveLimit });
+// Saving and editing both may call the embedding API, so they share one budget.
+const bookmarkWriteRateLimit = createRateLimit({ limit: bookmarkSaveLimit });
 const bookmarkListRateLimit = createRateLimit({ limit: bookmarkListLimit });
 
 const previewRequest = type("string.json.parse").to({
@@ -30,6 +31,11 @@ const previewRequest = type("string.json.parse").to({
 
 const archiveRequest = type({
     archivedAt: "string.date.parse | null"
+});
+
+const editRequest = type({
+    tags: "string[]",
+    title: type("string.trim").to(type("string").atLeastLength(minimumTitleLength))
 });
 
 const bookmarkId = type("string.uuid");
@@ -65,65 +71,13 @@ const bookmarkIdParam = validator("param", (value): { id: string } => {
     };
 });
 
-interface BookmarkImageSources {
-    faviconUrl: string | null;
-    hostname: string;
-    id: string;
-    thumbnailUrl: string | null;
-}
-
-// Both fetches are best-effort: a failure leaves that image for the request path to fill, so the
-// bookmark itself is still saved and returned.
-const warmImageCache = async (
-    userId: string,
-    sources: BookmarkImageSources,
-    xPostPng: Uint8Array | null
-): Promise<void> => {
-    // The favicon is shared by every bookmark on the host, so an already cached icon is kept
-    // instead of rewriting it with whatever this page happens to advertise.
-    const cachedFavicon = await readFavicon(sources.hostname);
-
-    await Promise.all([
-        runImageOutbound(userId, () => {
-            if (xPostPng) {
-                return cacheRenderedThumbnail(sources.id, xPostPng);
-            }
-
-            return sources.thumbnailUrl
-                ? cacheRemoteThumbnail(sources.id, sources.thumbnailUrl)
-                : Promise.resolve(null);
-        }).catch(() => null),
-        cachedFavicon
-            ? Promise.resolve(null)
-            : runImageOutbound(userId, () => cacheRemoteFavicon(sources.hostname, sources.faviconUrl)).catch(() => null)
-    ]);
-};
-
-interface FetchedPreview {
-    preview: PreviewData | null;
-    xPost: XPostThumbnail | null;
-}
-
-// X post pages are fetched by xeet instead of the OG pipeline, so both are tried independently:
-// either one succeeding is enough to save the bookmark, and the OG result fills the rest.
-const fetchPreview = async (userId: string, url: URL): Promise<FetchedPreview> => {
-    const [xPost, preview] = await Promise.all([
-        isXPostUrl(url)
-            ? runOutbound(userId, () => renderXPost(url)).catch((error: unknown) => {
-                  // A busy pool and a failed render both degrade to the OG result.
-                  // oxlint-disable-next-line no-console -- Server-side diagnostics are console's legitimate use.
-                  console.warn("X post thumbnail rendering failed:", error);
-
-                  return null;
-              })
-            : null,
-        runOutbound(userId, () => getPreview(url)).catch(() => null)
-    ]);
-
-    return {
-        preview,
-        xPost
-    };
+// A failed lookup is reported as null so the route can distinguish it from "not a duplicate".
+const bookmarkAlreadyExists = async (url: URL, userId: string): Promise<boolean | null> => {
+    try {
+        return await bookmarkExists(url.href, userId);
+    } catch {
+        return null;
+    }
 };
 
 const archivePayload = validator("json", (value, context) => {
@@ -131,6 +85,16 @@ const archivePayload = validator("json", (value, context) => {
 
     if (parsed instanceof type.errors) {
         return context.json(apiError("bookmark.invalidArchivedAt"), httpStatus.badRequest);
+    }
+
+    return parsed;
+});
+
+const editPayload = validator("json", (value, context) => {
+    const parsed = editRequest(value);
+
+    if (parsed instanceof type.errors) {
+        return context.json(apiError("bookmark.invalidTitle"), httpStatus.badRequest);
     }
 
     return parsed;
@@ -159,7 +123,7 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
         }
     })
     // oxlint-disable-next-line max-statements -- The save pipeline is linear; splitting it further would erase Hono's typed response.
-    .post("/api/bookmarks", bookmarkSaveRateLimit, requestBodyLimit("bookmark.tooLong"), async (context) => {
+    .post("/api/bookmarks", bookmarkWriteRateLimit, requestBodyLimit("bookmark.tooLong"), async (context) => {
         context.header("Cache-Control", "no-store");
 
         if (parseContentType(context.req.header("content-type"))?.essence !== "application/json") {
@@ -178,25 +142,30 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
             return context.json(apiError("tag.invalid"), httpStatus.badRequest);
         }
 
-        try {
-            if (await bookmarkExists(normalizeBookmarkUrl(input.url), context.get("userId"))) {
-                return context.json(apiError("bookmark.duplicate"), httpStatus.conflict);
-            }
-        } catch {
+        const submittedUrl = new URL(normalizeBookmarkUrl(input.url));
+        const alreadySubmitted = await bookmarkAlreadyExists(submittedUrl, context.get("userId"));
+
+        if (alreadySubmitted === null) {
             return context.json(apiError("bookmark.saveFailed"), httpStatus.internalServerError);
         }
 
-        const { preview, xPost } = await fetchPreview(context.get("userId"), input.url);
+        if (alreadySubmitted) {
+            return context.json(apiError("bookmark.duplicate"), httpStatus.conflict);
+        }
+
+        const { preview, url: resolvedUrl, xPost } = await fetchPreview(context.get("userId"), input.url);
 
         if (!preview && !xPost) {
             return context.json(apiError("bookmark.fetchFailed"), httpStatus.badGateway);
         }
 
+        const normalizedUrl = new URL(normalizeBookmarkUrl(resolvedUrl));
+
         try {
             const saved = await saveBookmark({
                 preview,
                 tagNames,
-                url: input.url,
+                url: normalizedUrl,
                 userId: context.get("userId"),
                 xPost
             });
@@ -234,6 +203,33 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
 
             try {
                 const updated = await setBookmarkArchived(id, archivedAt, context.get("userId"));
+
+                return updated
+                    ? context.json(updated, httpStatus.ok)
+                    : context.json(apiError("bookmark.notFound"), httpStatus.notFound);
+            } catch {
+                return context.json(apiError("bookmark.saveFailed"), httpStatus.internalServerError);
+            }
+        }
+    )
+    .put(
+        "/api/bookmarks/:id",
+        bookmarkWriteRateLimit,
+        requestBodyLimit("bookmark.tooLong"),
+        bookmarkIdParam,
+        editPayload,
+        async (context) => {
+            context.header("Cache-Control", "no-store");
+            const { id } = context.req.valid("param");
+            const { tags, title } = context.req.valid("json");
+            const tagNames = normalizeTagNames(tags);
+
+            if (!tagNames) {
+                return context.json(apiError("tag.invalid"), httpStatus.badRequest);
+            }
+
+            try {
+                const updated = await updateBookmark({ id, tags: tagNames, title, userId: context.get("userId") });
 
                 return updated
                     ? context.json(updated, httpStatus.ok)

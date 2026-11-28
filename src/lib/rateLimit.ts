@@ -9,7 +9,7 @@ const rateLimitWindowSeconds = 60;
 const millisecondsPerSecond = 1000;
 
 // A fixed window per user is enough here: the goal is to bound outbound work, not to smooth bursts
-// precisely. Each route that spends server resources gets its own limiter.
+// precisely. A limiter can be shared by routes that spend the same resource.
 const createRateLimit = ({ limit }: { limit: number }): MiddlewareHandler<AuthEnv> => {
     const limiter = new RateLimiterMemory({ duration: rateLimitWindowSeconds, points: limit });
 
