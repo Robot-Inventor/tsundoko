@@ -26,8 +26,11 @@ const LoginPage = (): ReactNode => {
                 clearAuthState();
                 // Navigating first lets the target route's guard read the fresh session; invalidating here
                 // would run the login route's guest guard and drop the redirect before it is used.
+                // The redirect is a full in-app URL, including any query or fragment, so it
+                // cannot be passed as a route name.
                 await router.navigate({
-                    to: redirect ?? "/"
+                    href: redirect ?? "/",
+                    to: "/"
                 });
             }
         } catch {

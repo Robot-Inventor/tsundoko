@@ -27,6 +27,13 @@ describe("normalizeTagNames", () => {
         expect(normalizeTagNames(["x".repeat(maxTagLength + onePastTheLimit)])).toBeNull();
     });
 
+    it("accepts extra raw entries when duplicates leave the maximum unique tags", () => {
+        const uniqueNames = letters.slice(firstIndex, maxTagsPerBookmark);
+        const names = [...uniqueNames, "a"] as const;
+
+        expect(normalizeTagNames(names)).toEqual([...uniqueNames]);
+    });
+
     it("returns null for more tags than the maximum", () => {
         expect(normalizeTagNames([...letters])).toBeNull();
     });
