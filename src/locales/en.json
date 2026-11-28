@@ -137,6 +137,21 @@
     "passkey.renameTitle": "Rename passkey",
     "passkey.title": "Passkeys",
 
+    "tag.colorLabel": "Color",
+    "tag.colorSwatch": "Use color {{color}}",
+    "tag.delete": "Delete tag",
+    "tag.deleteDescription": "Delete \"{{name}}\"? The tag is removed from every bookmark that uses it.",
+    "tag.deleteTitle": "Delete tag",
+    "tag.edit": "Edit",
+    "tag.editTitle": "Edit tag",
+    "tag.hexLabel": "Hex color",
+    "tag.mergeConfirm": "Merge",
+    "tag.mergeDescription": "A tag named \"{{name}}\" already exists. Its name and color stay, and this tag's bookmarks move to it.",
+    "tag.mergeTitle": "Merge tags",
+    "tag.menuLabel": "Open menu for {{name}}",
+    "tag.nameLabel": "Tag name",
+    "tag.noColor": "No color",
+
     "errors.auth.accountNotFound": "User not found.",
     "errors.auth.avatarReadFailed": "Could not read the image.",
     "errors.auth.avatarTooLarge": "The image is too large.",
@@ -180,6 +195,10 @@
     "errors.rateLimit": "Too many requests. Please try again shortly.",
     "errors.signup.startFailed": "Could not start sign-up.",
     "errors.tag.invalid": "Use at most 10 tags of 30 characters or fewer each.",
+    "errors.tag.invalidColor": "Choose a valid color.",
+    "errors.tag.invalidName": "Enter a tag name of 30 characters or fewer.",
     "errors.tag.loadFailed": "Could not load tags.",
+    "errors.tag.notFound": "Tag not found.",
+    "errors.tag.saveFailed": "Could not save the tag.",
     "errors.tag.tooMany": "You can add at most 10 tags."
 }

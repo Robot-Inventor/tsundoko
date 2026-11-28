@@ -37,6 +37,7 @@ app.route("/", authApi);
 app.use("/api/bookmarks", requireAuth);
 app.use("/api/bookmarks/*", requireAuth);
 app.use("/api/tags", requireAuth);
+app.use("/api/tags/*", requireAuth);
 app.use("/api/me", requireAuth);
 app.use("/api/me/*", requireAuth);
 app.use("/api/passkeys", requireAuth);

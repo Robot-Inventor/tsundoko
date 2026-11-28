@@ -46,9 +46,11 @@ const bookmarks = pgTable(
 
 // A tag belongs to one user and keeps the spelling chosen when it was first used.
 // normalizedName carries the case-insensitive key so two spellings cannot create two tags.
+// A null color keeps the tag neutral; otherwise the tag editor stores a `#rrggbb` value.
 const tags = pgTable(
     "tags",
     {
+        color: text(),
         id: uuid().primaryKey().defaultRandom(),
         name: text().notNull(),
         normalizedName: text("normalized_name").notNull(),

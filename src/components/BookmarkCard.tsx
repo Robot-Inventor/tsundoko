@@ -15,7 +15,10 @@ import { Link } from "@tanstack/react-router";
 import { formatDate } from "../lib/dateFormat";
 import { formatSiteName } from "../lib/localizedNames";
 import { getBookmarkCardActions } from "./bookmarkCardActions";
+import { readableTagColor } from "../lib/tagColor";
+import { tagNameKey } from "../lib/tags";
 import { useLocale } from "../hooks/useLocale";
+import { useTagListContext } from "../hooks/useTagList";
 import { useTranslation } from "react-i18next";
 
 // Mobile: Feedly/X-style media object (thumbnail left, cropped to card height); sm and up: full-width thumbnail on top.
@@ -64,6 +67,9 @@ interface BookmarkCardTagsProps {
 }
 
 const BookmarkCardTags = ({ tags }: BookmarkCardTagsProps): ReactNode => {
+    const { tags: tagList } = useTagListContext();
+    const colorByKey = new Map(tagList.map((tag) => [tagNameKey(tag.name), tag.color]));
+
     if (!tags.length) {
         return null;
     }
@@ -75,6 +81,7 @@ const BookmarkCardTags = ({ tags }: BookmarkCardTagsProps): ReactNode => {
                     className="relative z-10 inline-block max-w-full truncate rounded-sm hover:text-foreground focus-visible:focus-outline"
                     key={tag}
                     params={{ tag }}
+                    style={{ color: readableTagColor(colorByKey.get(tagNameKey(tag)) ?? null) }}
                     title={tag}
                     to="/tags/$tag"
                 >

@@ -28,6 +28,7 @@
         "postgres": "^4.1.1",
         "rate-limiter-flexible": "^11.6.1",
         "react": "^19.3.1",
+        "react-colorful": "^5.8.2",
         "react-dom": "^19.3.1",
         "react-i18next": "^18.0.3",
         "rehype-parse": "^9.0.1",
@@ -1738,6 +1739,8 @@
     "rate-limiter-flexible": ["rate-limiter-flexible@11.6.1", "", {}, "sha512-MADmnFGG80PFl2ibQ++erV/8AMYog7OVZm2g8G+Bya5+OgjVkPRKkOER4VIFzykY2uXsUdl97hYzH6HIdL73Jg=="],
 
     "react": ["react@19.3.1", "", {}, "sha512-QNhWdt7nrgVWWQG58QuGsAR3jv3Hbe4mb4vz7w2csnHavciZJgda1CPNaldF6eVxv90ud3jUXpKlHL69gO38yw=="],
+
+    "react-colorful": ["react-colorful@5.8.2", "", { "peerDependencies": { "react": ">=16.8.0", "react-dom": ">=16.8.0" } }, "sha512-gZ35jg1OQ71cwpHK74WoIFU4poCy9EjjjYqUGP1C04hn9gH7CD4cd2fGgLT2G/m8oAoxG2bJXjTVP+bBUzonKQ=="],
 
     "react-dom": ["react-dom@19.3.1", "", { "dependencies": { "scheduler": "^0.28.0" }, "peerDependencies": { "react": "^19.3.1" } }, "sha512-Y0bARz53lhEC1NMCASs0/j+faB/zqt3R8hpvg1e8+61ZVJ4UL0UdC4cBbXfZMcIuhrfgeILTLe+ZeBCavQPtKQ=="],
 

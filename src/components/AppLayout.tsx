@@ -1,71 +1,22 @@
 // oxlint-disable import/max-dependencies -- The layout wires navigation, search, tags, and account state.
 import { AccountProvider, MobileAccountMenu, SidebarAccountMenu } from "./AccountMenu";
-import { ArchiveIcon, HouseIcon, TagIcon } from "lucide-react";
-import { Link, Outlet, useLocation, useParams } from "@tanstack/react-router";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "./ui/drawer";
+import { Outlet, useLocation, useNavigate, useParams } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { SearchContext, desktopLayout, useSearch } from "../hooks/useSearch";
-import { TagListContext, useTagList, useTagListContext } from "../hooks/useTagList";
+import { type TagChange, TagEditDialog } from "./TagEditDialog";
+import { TagListContext, useTagList } from "../hooks/useTagList";
+import { type TagSummary, tagNameKey } from "../lib/tags";
 import { HeaderSearch } from "./HeaderSearch";
+import { MainNavigation } from "./MainNavigation";
 import { MobileMenu } from "./MobileMenu";
+import { PencilIcon } from "lucide-react";
 import { SearchProgress } from "./SearchProgress";
 import { cn } from "../lib/utils";
 import { getPage } from "../lib/page-title";
 import { useAccountState } from "../hooks/useAccount";
 import { useLocale } from "../hooks/useLocale";
 import { useTranslation } from "react-i18next";
-
-const navLinkClass =
-    "flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold focus-visible:focus-outline data-[status=active]:bg-sidebar-accent data-[status=active]:text-sidebar-accent-foreground";
-
-const homeActiveOptions = {
-    exact: true
-} as const;
-
-interface MainNavigationProps {
-    homeLinkRef?: React.Ref<HTMLAnchorElement>;
-    onNavigate?: () => void;
-}
-
-const MainNavigation = ({ homeLinkRef, onNavigate }: MainNavigationProps): ReactNode => {
-    const { tags } = useTagListContext();
-    const { t: translate } = useTranslation();
-
-    return (
-        <nav aria-label={translate("common.mainNavigation")} className="px-3 py-2">
-            <Link
-                activeOptions={homeActiveOptions}
-                className={navLinkClass}
-                onClick={onNavigate}
-                ref={homeLinkRef}
-                to="/"
-            >
-                <HouseIcon aria-hidden="true" className="size-4" />
-                {translate("common.home")}
-            </Link>
-            <Link className={navLinkClass} onClick={onNavigate} to="/archive">
-                <ArchiveIcon aria-hidden="true" className="size-4" />
-                {translate("common.archive")}
-            </Link>
-            {tags.length ? (
-                <div className="mt-4">
-                    <p className="px-3 pb-1 text-xs font-semibold text-muted-foreground">{translate("common.tags")}</p>
-                    {tags.map((tag) => (
-                        <Link
-                            className={navLinkClass}
-                            key={tag.name}
-                            onClick={onNavigate}
-                            params={{ tag: tag.name }}
-                            to="/tags/$tag"
-                        >
-                            <TagIcon aria-hidden="true" className="size-4 shrink-0" />
-                            <span className="truncate">{tag.name}</span>
-                        </Link>
-                    ))}
-                </div>
-            ) : null}
-        </nav>
-    );
-};
 
 const Logo = ({ className }: { className: string }): ReactNode => (
     <img alt="Tsundoko" className={className} height={370} src="/logo.svg" width={1666} />
@@ -97,6 +48,7 @@ const MobilePageTitle = ({ query, searchOpen }: { query: string; searchOpen: boo
     );
 };
 
+// oxlint-disable-next-line max-lines-per-function, max-statements -- The layout composes the header, sidebar, and overlays in one tree; splitting it would only thread the same state through props.
 const AppLayout = (): ReactNode => {
     const { pathname } = useLocation();
     // These pages put the sort button in their leading row, so on mobile that row replaces the
@@ -108,14 +60,67 @@ const AppLayout = (): ReactNode => {
     const search = useSearch(showsSearch, pathname);
     const tagList = useTagList(pathname);
     const [menuOpen, setMenuOpen] = useState(false);
+    const [editingTag, setEditingTag] = useState<TagSummary | null>(null);
+    const [actionsTag, setActionsTag] = useState<TagSummary | null>(null);
+    // Tags picked in the navigation sheet and the action drawer wait in refs until the modal
+    // that chose them has finished closing, so two overlays never compete for focus.
+    const pendingActionsTag = useRef<TagSummary | null>(null);
+    const pendingEditTag = useRef<TagSummary | null>(null);
     const desktopHomeLink = useRef<HTMLAnchorElement>(null);
     const accountState = useAccountState();
     const { account } = accountState;
     const { locale, setLocale } = useLocale();
     const appliedAccountLocale = useRef(false);
+    const navigate = useNavigate();
+    const params = useParams({ strict: false });
+    const { t: translate } = useTranslation();
+    const currentTag = typeof params.tag === "string" ? params.tag : "";
 
     const closeMenu = (): void => {
         setMenuOpen(false);
+    };
+
+    const openTagActions = (tag: TagSummary): void => {
+        // The sidebar stands in for the sheet on wide touch screens, where no sheet is open to
+        // wait for; closing it would leave the drawer request pending forever.
+        if (!menuOpen) {
+            setActionsTag(tag);
+
+            return;
+        }
+
+        pendingActionsTag.current = tag;
+        setMenuOpen(false);
+    };
+
+    const flushTagActions = (): void => {
+        const tag = pendingActionsTag.current;
+
+        if (!tag) {
+            return;
+        }
+
+        pendingActionsTag.current = null;
+        setActionsTag(tag);
+    };
+
+    const followRenamedTag = ({ from, to }: TagChange): void => {
+        if (currentTag && tagNameKey(currentTag) === tagNameKey(from)) {
+            void navigate({
+                params: {
+                    tag: to
+                },
+                replace: true,
+                search: true,
+                to: "/tags/$tag"
+            });
+        }
+    };
+
+    const leaveDeletedTag = (name: string): void => {
+        if (currentTag && tagNameKey(currentTag) === tagNameKey(name)) {
+            void navigate({ replace: true, to: "/" });
+        }
     };
 
     // Apply the server locale once when the account first loads. Later refreshes must not undo
@@ -152,6 +157,7 @@ const AppLayout = (): ReactNode => {
                 <header className="sticky top-0 z-20 flex h-[calc(3.5rem_+_env(safe-area-inset-top))] items-center gap-2 border-b bg-background px-3 pt-[env(safe-area-inset-top)] md:px-4">
                     <MobileMenu
                         finalFocus={() => (window.matchMedia(desktopLayout).matches ? desktopHomeLink.current : true)}
+                        onClosed={flushTagActions}
                         onOpenChange={setMenuOpen}
                         open={menuOpen}
                         searchOpen={search.searchOpen}
@@ -160,7 +166,11 @@ const AppLayout = (): ReactNode => {
                             <Logo className="block h-auto w-1/2" />
                             {account && <MobileAccountMenu account={account} onNavigate={closeMenu} />}
                         </div>
-                        <MainNavigation onNavigate={closeMenu} />
+                        <MainNavigation
+                            onEditTag={setEditingTag}
+                            onLongPressTag={openTagActions}
+                            onNavigate={closeMenu}
+                        />
                     </MobileMenu>
                     <Logo className="hidden h-auto w-32 md:block" />
                     <MobilePageTitle query={search.query} searchOpen={search.searchOpen} />
@@ -173,7 +183,11 @@ const AppLayout = (): ReactNode => {
 
                 <div className="flex min-h-[calc(100dvh_-_3.5rem_-_env(safe-area-inset-top))]">
                     <aside className="sticky top-[calc(3.5rem_+_env(safe-area-inset-top))] hidden h-[calc(100dvh_-_3.5rem_-_env(safe-area-inset-top))] w-56 shrink-0 flex-col overflow-y-auto border-e bg-sidebar text-sidebar-foreground md:flex">
-                        <MainNavigation homeLinkRef={desktopHomeLink} />
+                        <MainNavigation
+                            homeLinkRef={desktopHomeLink}
+                            onEditTag={setEditingTag}
+                            onLongPressTag={openTagActions}
+                        />
                         {account && (
                             <div className="mt-auto border-t p-3">
                                 <SidebarAccountMenu account={account} />
@@ -192,6 +206,59 @@ const AppLayout = (): ReactNode => {
                     </main>
                 </div>
             </AccountProvider>
+
+            <Drawer
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setActionsTag(null);
+                    }
+                }}
+                onOpenChangeComplete={(open) => {
+                    const tag = pendingEditTag.current;
+
+                    if (!open && tag) {
+                        pendingEditTag.current = null;
+                        setEditingTag(tag);
+                    }
+                }}
+                open={actionsTag !== null}
+                showSwipeHandle
+            >
+                <DrawerContent>
+                    <DrawerHeader>
+                        <DrawerTitle className="truncate">{actionsTag?.name ?? ""}</DrawerTitle>
+                    </DrawerHeader>
+                    <ul className="pb-2">
+                        <li>
+                            <button
+                                className="flex w-full items-center gap-3 px-4 py-3 text-sm hover:bg-muted"
+                                onClick={() => {
+                                    if (actionsTag) {
+                                        pendingEditTag.current = actionsTag;
+                                        setActionsTag(null);
+                                    }
+                                }}
+                                type="button"
+                            >
+                                <PencilIcon aria-hidden="true" className="size-4" />
+                                {translate("tag.edit")}
+                            </button>
+                        </li>
+                    </ul>
+                </DrawerContent>
+            </Drawer>
+
+            {editingTag ? (
+                <TagEditDialog
+                    key={editingTag.id}
+                    onClose={() => {
+                        setEditingTag(null);
+                    }}
+                    onDeleted={leaveDeletedTag}
+                    onSaved={followRenamedTag}
+                    tag={editingTag}
+                />
+            ) : null}
         </TagListContext.Provider>
     );
 };

@@ -164,6 +164,18 @@
     }
 }
 
+/* A tag chip wears the color chosen in the tag editor. The variable is the fallback for browsers
+   without the newer color functions; contrast-color() then picks the readable label color. */
+.tag-color-chip {
+    background-color: var(--tag-color);
+    color: var(--tag-text-color);
+    color: color(
+        from var(--tag-color) xyz-d65 calc(max(0, sign(0.17913 - y)) * 0.9505) max(0, sign(0.17913 - y))
+            calc(max(0, sign(0.17913 - y)) * 1.089)
+    );
+    color: contrast-color(var(--tag-color));
+}
+
 /* Unlayered so it wins over component utilities (e.g. the registry's cursor-default on
    menu items, which Base UI renders as div[role=menuitem]). */
 button:not(:disabled),
