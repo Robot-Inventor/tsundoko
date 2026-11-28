@@ -1,15 +1,27 @@
 import type { Context, MiddlewareHandler } from "hono";
+import { randomBytes } from "node:crypto";
+
+interface SecurityEnv {
+    Variables: {
+        cspNonce: string;
+    };
+}
+
+const nonceBytes = 16;
 
 // Vite emits hashed module scripts and same-origin stylesheets, so the SPA needs nothing beyond
 // 'self'. Inline style attributes set through the DOM (React's style prop) are not covered by
-// style-src, so they keep working. Avatars fall back to Gravatar for accounts without an upload.
-const contentSecurityPolicy = [
-    "default-src 'self'",
-    "img-src 'self' data: https://gravatar.com https://secure.gravatar.com",
-    "frame-ancestors 'none'",
-    "base-uri 'self'",
-    "object-src 'none'"
-].join("; ");
+// style-src, so they keep working. The nonce signs the stylesheets that Base UI and the color
+// picker inject at runtime. Avatars fall back to Gravatar for accounts without an upload.
+const contentSecurityPolicy = (nonce: string): string =>
+    [
+        "default-src 'self'",
+        "img-src 'self' data: https://gravatar.com https://secure.gravatar.com",
+        `style-src 'self' 'nonce-${nonce}'`,
+        "frame-ancestors 'none'",
+        "base-uri 'self'",
+        "object-src 'none'"
+    ].join("; ");
 
 const strictTransportSecurity = "max-age=31536000";
 
@@ -20,11 +32,16 @@ const isHttpsRequest = (context: Context): boolean =>
 
 // Every response opts in to the color-scheme hint. The manifest is served per theme, and the
 // manifest request that follows a document load only carries the hint after this opt-in.
-const responseHeaders: MiddlewareHandler = async (context, next) => {
+const responseHeaders: MiddlewareHandler<SecurityEnv> = async (context, next) => {
+    const nonce = randomBytes(nonceBytes).toString("base64");
+
+    // The document embeds this value for the color picker, and the policy below authorizes it.
+    context.set("cspNonce", nonce);
+
     await next();
 
     context.header("accept-ch", "Sec-CH-Prefers-Color-Scheme");
-    context.header("content-security-policy", contentSecurityPolicy);
+    context.header("content-security-policy", contentSecurityPolicy(nonce));
     context.header("x-content-type-options", "nosniff");
     context.header("referrer-policy", "no-referrer");
 
@@ -34,4 +51,4 @@ const responseHeaders: MiddlewareHandler = async (context, next) => {
     }
 };
 
-export { responseHeaders };
+export { type SecurityEnv, responseHeaders };

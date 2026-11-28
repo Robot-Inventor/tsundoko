@@ -1,5 +1,6 @@
 // oxlint-disable import/max-dependencies -- This file is the composition root that wires every API module together.
 import { type AuthEnv, requireAuth } from "./authMiddleware";
+import { type SecurityEnv, responseHeaders } from "./responseHeaders";
 import { serveAppAssets, serveAppHtml, serveShareGate } from "./spaStatic";
 import { Hono } from "hono";
 import { accountApi } from "./accountApi";
@@ -10,7 +11,6 @@ import { bookmarkApi } from "./bookmarkApi";
 import { httpStatus } from "./lib/httpStatus";
 import { imageApi } from "./imageApi";
 import { manifestApi } from "./manifestApi";
-import { responseHeaders } from "./responseHeaders";
 import { tagApi } from "./tagApi";
 
 const isProduction = process.env["NODE_ENV"] === "production";
@@ -24,7 +24,7 @@ if (isProduction) {
     await runMigrations();
 }
 
-const app = new Hono<AuthEnv>();
+const app = new Hono<AuthEnv & SecurityEnv>();
 
 app.use("*", responseHeaders);
 
@@ -52,7 +52,10 @@ app.route("/", accountApi);
 // Unknown API paths must not fall through to the SPA fallback below.
 app.get("/api/*", (context) => context.json(apiError("notFound"), httpStatus.notFound));
 
-// The SPA is served for every asset that exists; any other path is a client-side route.
+// Static assets are served by path, but the document itself must carry the CSP nonce. Without
+// these two routes, serveStatic would answer "/" and "/index.html" with the nonce-less build.
+app.get("/", serveAppHtml);
+app.get("/index.html", serveAppHtml);
 app.get("*", serveAppAssets);
 app.get("*", serveAppHtml);
 
