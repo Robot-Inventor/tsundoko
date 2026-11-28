@@ -8,6 +8,7 @@ import { Button } from "./ui/button";
 import { LoaderCircleIcon } from "lucide-react";
 import type { TFunction } from "i18next";
 import { requestBookmark } from "../lib/addBookmark";
+import { useLoginRedirect } from "../hooks/useLoginRedirect";
 import { useTranslation } from "react-i18next";
 
 interface ShareOutcome {
@@ -87,6 +88,7 @@ const ShareConfirmation = ({ onCancel, onConfirm, urls }: ShareConfirmationProps
 const SharePage = (): ReactNode => {
     const { requiresConfirmation, urls } = useLoaderData({ from: "/share" });
     const navigate = useNavigate();
+    const redirectToLogin = useLoginRedirect();
     const [confirmed, setConfirmed] = useState(!requiresConfirmation);
     const [done, setDone] = useState(0);
     const started = useRef(false);
@@ -135,11 +137,16 @@ const SharePage = (): ReactNode => {
 
             for (const [index, href] of urls.entries()) {
                 // One request at a time keeps the progress count meaningful and the server load flat.
-                // oxlint-disable-next-line no-await-in-loop react-doctor/async-await-in-loop
+                // oxlint-disable-next-line no-await-in-loop
                 const result = await requestBookmark(new URL(href));
 
                 if ("bookmark" in result) {
                     outcome.added += 1;
+                } else if (result.failure === "auth") {
+                    // The share route runs again with the original URLs once sign-in completes.
+                    redirectToLogin();
+
+                    return;
                 } else if (result.failure === "duplicate") {
                     outcome.duplicate += 1;
                 } else {
@@ -156,7 +163,7 @@ const SharePage = (): ReactNode => {
 
             reportOutcome(outcome, translate, separator);
         })();
-    }, [navigate, separator, translate, urls, waitsForConfirmation]);
+    }, [navigate, redirectToLogin, separator, translate, urls, waitsForConfirmation]);
 
     if (waitsForConfirmation) {
         return <ShareConfirmation onCancel={cancel} onConfirm={confirm} urls={urls} />;

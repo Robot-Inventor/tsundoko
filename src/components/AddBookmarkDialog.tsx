@@ -10,6 +10,7 @@ import { PlusIcon } from "lucide-react";
 import { TagInput } from "./TagInput";
 import { cn } from "../lib/utils";
 import { i18n } from "../lib/i18n";
+import { useLoginRedirect } from "../hooks/useLoginRedirect";
 import { useSearchContext } from "../hooks/useSearch";
 import { useTagListContext } from "../hooks/useTagList";
 import { useTranslation } from "react-i18next";
@@ -20,9 +21,23 @@ const formErrorKeys = {
     invalid: "errors.bookmark.invalidUrl",
     rateLimit: "errors.rateLimit",
     save: "errors.bookmark.saveFailed"
-} as const satisfies Record<AddBookmarkFailure, string>;
+} as const satisfies Record<Exclude<AddBookmarkFailure, "auth">, string>;
 
 const errorId = "add-bookmark-error";
+
+const reportFailure = (
+    failure: AddBookmarkFailure,
+    redirectToLogin: () => void,
+    setError: (message: string) => void
+): void => {
+    if (failure === "auth") {
+        redirectToLogin();
+
+        return;
+    }
+
+    setError(i18n.t(formErrorKeys[failure]));
+};
 
 interface BookmarkUrlFormProps {
     initialTag: string | undefined;
@@ -37,6 +52,7 @@ const BookmarkUrlForm = ({ initialTag, onAdded, onCancel, urlInput }: BookmarkUr
     const [error, setError] = useState("");
     const [adding, setAdding] = useState(false);
     const { tags } = useTagListContext();
+    const redirectToLogin = useLoginRedirect();
     const { t: translate } = useTranslation();
 
     const addBookmark = async (): Promise<void> => {
@@ -59,7 +75,7 @@ const BookmarkUrlForm = ({ initialTag, onAdded, onCancel, urlInput }: BookmarkUr
         setAdding(false);
 
         if ("failure" in result) {
-            setError(i18n.t(formErrorKeys[result.failure]));
+            reportFailure(result.failure, redirectToLogin, setError);
 
             return;
         }

@@ -9,6 +9,7 @@ import { TagInput } from "./TagInput";
 import { i18n } from "../lib/i18n";
 import { notifyBookmarkChanged } from "../lib/bookmarkChange";
 import { refreshPendingBookmark } from "../lib/bookmarkActions";
+import { useLoginRedirect } from "../hooks/useLoginRedirect";
 import { useTagListContext } from "../hooks/useTagList";
 import { useTranslation } from "react-i18next";
 
@@ -17,10 +18,24 @@ const failureKeys = {
     notFound: "errors.bookmark.notFound",
     rateLimit: "errors.rateLimit",
     save: "errors.bookmark.saveFailed"
-} as const satisfies Record<UpdateBookmarkFailure, string>;
+} as const satisfies Record<Exclude<UpdateBookmarkFailure, "auth">, string>;
 
 const errorId = "edit-bookmark-error";
 const titleInputId = "edit-bookmark-title";
+
+const reportFailure = (
+    failure: UpdateBookmarkFailure,
+    redirectToLogin: () => void,
+    setError: (message: string) => void
+): void => {
+    if (failure === "auth") {
+        redirectToLogin();
+
+        return;
+    }
+
+    setError(i18n.t(failureKeys[failure]));
+};
 
 interface EditBookmarkFormProps {
     bookmark: Bookmark;
@@ -46,6 +61,7 @@ const EditBookmarkForm = ({
     const [error, setError] = useState("");
     // Only a blank title makes the field itself invalid; other failures are general messages.
     const [titleInvalid, setTitleInvalid] = useState(false);
+    const redirectToLogin = useLoginRedirect();
     const { t: translate } = useTranslation();
 
     const save = async (): Promise<void> => {
@@ -75,7 +91,7 @@ const EditBookmarkForm = ({
         onSavingChange(false);
 
         if ("failure" in result) {
-            setError(i18n.t(failureKeys[result.failure]));
+            reportFailure(result.failure, redirectToLogin, setError);
 
             return;
         }
