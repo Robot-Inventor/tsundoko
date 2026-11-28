@@ -12,11 +12,13 @@ import { updateBookmark } from "../db/bookmarkUpdate";
 const defaultSearchLimit = 20;
 const maxSearchLimit = 50;
 const minimumSearchLimit = 1;
+const minimumOffset = 0;
 const minimumTitleLength = 1;
 const contentCharacterLimit = 100_000;
 
 const searchInput = type({
     "limit?": type("number.integer").atLeast(minimumSearchLimit).atMost(maxSearchLimit),
+    "offset?": type("number.integer").atLeast(minimumOffset),
     "query?": "string",
     "scope?": '"active" | "archived"',
     "tag?": "string"
@@ -86,8 +88,10 @@ const searchBookmarks = async (userId: string, input: typeof searchInput.infer):
         userId
     );
 
-    // oxlint-disable-next-line no-magic-numbers -- Zero is the start of the list.
-    return textResult(bookmarks.slice(0, input.limit ?? defaultSearchLimit));
+    const offset = input.offset ?? minimumOffset;
+    const limit = input.limit ?? defaultSearchLimit;
+
+    return textResult(bookmarks.slice(offset, offset + limit));
 };
 
 const getBookmark = async (userId: string, id: string): Promise<CallToolResult> => {

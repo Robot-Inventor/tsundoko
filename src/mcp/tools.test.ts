@@ -123,8 +123,11 @@ const callTool = async (
     return parsed;
 };
 
-const searchResult = async (scopes: string[]): Promise<Array<typeof searchResultItem.infer>> => {
-    const body = await callTool("search_bookmarks", {}, scopes);
+const searchResult = async (
+    scopes: string[],
+    args: Record<string, unknown> = {}
+): Promise<Array<typeof searchResultItem.infer>> => {
+    const body = await callTool("search_bookmarks", args, scopes);
     const text = body.result?.content?.[0]?.text;
     const parsed = searchResultItem.array()(text ? JSON.parse(text) : []);
 
@@ -187,6 +190,32 @@ describe("MCP bookmark tools", () => {
         }
 
         expect(parsed).toMatchObject({ content: "Article body", id: saved.id });
+    });
+
+    it("pages through search results with limit and offset", async () => {
+        const { saveBookmark } = await import("../db/bookmarks");
+
+        await Promise.all(
+            ["page-a", "page-b", "page-c"].map((name) =>
+                saveBookmark({
+                    preview: null,
+                    url: new URL(`https://example.com/${name}`),
+                    userId,
+                    xPost: null
+                })
+            )
+        );
+
+        const all = await searchResult(["bookmarks:read"], { limit: 50 });
+        const pageSize = 2;
+        const pageCount = Math.ceil(all.length / pageSize);
+        const offsets = [...Array(pageCount).keys()].map((page) => page * pageSize);
+        const pages = await Promise.all(
+            offsets.map((offset) => searchResult(["bookmarks:read"], { limit: pageSize, offset }))
+        );
+
+        expect(pages.flat().map((bookmark) => bookmark.id)).toEqual(all.map((bookmark) => bookmark.id));
+        expect(await searchResult(["bookmarks:read"], { limit: pageSize, offset: all.length })).toEqual([]);
     });
 });
 
