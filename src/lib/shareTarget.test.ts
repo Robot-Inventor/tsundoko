@@ -39,6 +39,35 @@ describe("isExternalReferrer", () => {
     });
 });
 
+describe("extractSharedUrls parameter priority", () => {
+    it("keeps the URL parameter's link instead of links in the text", () => {
+        expect(
+            hrefs({
+                text: "https://example.com/mentioned",
+                url: "https://example.com/article"
+            })
+        ).toEqual(["https://example.com/article"]);
+    });
+
+    it("ignores page title links when the text carries the shared URL", () => {
+        expect(
+            hrefs({
+                text: "https://x.com/user/status/1",
+                title: 'User on X: "ワールドリンク https://t.co/a #tag https://t.co/b" / X'
+            })
+        ).toEqual(["https://x.com/user/status/1"]);
+    });
+
+    it("collects the URLs of several items shared from the Android share sheet", () => {
+        expect(
+            hrefs({
+                text: "1. https://example.com/a\n2. https://example.com/b",
+                title: "First item"
+            })
+        ).toEqual(["https://example.com/a", "https://example.com/b"]);
+    });
+});
+
 describe("extractSharedUrls", () => {
     it("uses the url parameter", () => {
         expect(hrefs({ title: "Example", url: "https://example.com/article" })).toEqual([
@@ -57,14 +86,8 @@ describe("extractSharedUrls", () => {
         ]);
     });
 
-    it("keeps one copy of a URL that appears in several parameters", () => {
-        expect(
-            hrefs({
-                text: "https://example.com/a",
-                title: "https://example.com/a",
-                url: "https://example.com/a"
-            })
-        ).toEqual(["https://example.com/a"]);
+    it("keeps one copy of a URL that appears twice in one parameter", () => {
+        expect(hrefs({ text: "https://example.com/a https://example.com/a" })).toEqual(["https://example.com/a"]);
     });
 
     it("drops the punctuation around a URL", () => {

@@ -82,18 +82,28 @@ const urlsIn = (value: string | undefined): URL[] => {
     ).filter((url): url is URL => url !== null);
 };
 
+// Android share intents have no URL field, so the browser puts the shared link in "text" and the
+// page title in "title". A page title can carry links of its own (X puts the post text there, with
+// a t.co link to every attachment), so only the first parameter that contains a URL is read:
+// "url" when the browser provides it, otherwise "text", and "title" only when nothing else has
+// one. Reading them all would bookmark the page's own links along with the shared one.
 const extractSharedUrls = ({ text, title, url }: SharedContent): URL[] => {
     const seen = new Set<string>();
 
-    return [...urlsIn(url), ...urlsIn(text), ...urlsIn(title)].filter((candidate) => {
-        if (seen.has(candidate.href)) {
-            return false;
-        }
+    return (
+        [url, text, title]
+            .map(urlsIn)
+            .find((candidates) => candidates.length)
+            ?.filter((candidate) => {
+                if (seen.has(candidate.href)) {
+                    return false;
+                }
 
-        seen.add(candidate.href);
+                seen.add(candidate.href);
 
-        return true;
-    });
+                return true;
+            }) ?? []
+    );
 };
 
 export {
