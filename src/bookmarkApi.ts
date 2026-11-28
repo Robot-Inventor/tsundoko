@@ -100,13 +100,15 @@ const warmImageCache = async (
 
 interface FetchedPreview {
     preview: PreviewData | null;
+    url: URL;
     xPost: XPostThumbnail | null;
 }
 
 // X post pages are fetched by xeet instead of the OG pipeline, so both are tried independently:
 // either one succeeding is enough to save the bookmark, and the OG result fills the rest.
+// The page fetch also reports its redirect target, which is the URL the save path normalises.
 const fetchPreview = async (userId: string, url: URL): Promise<FetchedPreview> => {
-    const [xPost, preview] = await Promise.all([
+    const [xPost, fetchedPage] = await Promise.all([
         isXPostUrl(url)
             ? runOutbound(userId, () => renderXPost(url)).catch((error: unknown) => {
                   // A busy pool and a failed render both degrade to the OG result.
@@ -120,9 +122,19 @@ const fetchPreview = async (userId: string, url: URL): Promise<FetchedPreview> =
     ]);
 
     return {
-        preview,
+        preview: fetchedPage?.preview ?? null,
+        url: fetchedPage?.pageUrl ?? url,
         xPost
     };
+};
+
+// A failed lookup is reported as null so the route can distinguish it from "not a duplicate".
+const bookmarkAlreadyExists = async (url: URL, userId: string): Promise<boolean | null> => {
+    try {
+        return await bookmarkExists(url.href, userId);
+    } catch {
+        return null;
+    }
 };
 
 const archivePayload = validator("json", (value, context) => {
@@ -177,25 +189,30 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
             return context.json(apiError("tag.invalid"), httpStatus.badRequest);
         }
 
-        try {
-            if (await bookmarkExists(normalizeBookmarkUrl(input.url), context.get("userId"))) {
-                return context.json(apiError("bookmark.duplicate"), httpStatus.conflict);
-            }
-        } catch {
+        const submittedUrl = new URL(normalizeBookmarkUrl(input.url));
+        const alreadySubmitted = await bookmarkAlreadyExists(submittedUrl, context.get("userId"));
+
+        if (alreadySubmitted === null) {
             return context.json(apiError("bookmark.saveFailed"), httpStatus.internalServerError);
         }
 
-        const { preview, xPost } = await fetchPreview(context.get("userId"), input.url);
+        if (alreadySubmitted) {
+            return context.json(apiError("bookmark.duplicate"), httpStatus.conflict);
+        }
+
+        const { preview, url: resolvedUrl, xPost } = await fetchPreview(context.get("userId"), input.url);
 
         if (!preview && !xPost) {
             return context.json(apiError("bookmark.fetchFailed"), httpStatus.badGateway);
         }
 
+        const normalizedUrl = new URL(normalizeBookmarkUrl(resolvedUrl));
+
         try {
             const saved = await saveBookmark({
                 preview,
                 tagNames,
-                url: input.url,
+                url: normalizedUrl,
                 userId: context.get("userId"),
                 xPost
             });
