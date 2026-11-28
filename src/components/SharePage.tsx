@@ -1,3 +1,4 @@
+// oxlint-disable import/max-dependencies -- The share page wires the confirmation form and the add loop.
 // The share outcome is a set of counters: zero is where they start, one is their step.
 // oxlint-disable no-magic-numbers
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
@@ -7,8 +8,10 @@ import { useLoaderData, useNavigate } from "@tanstack/react-router";
 import { Button } from "./ui/button";
 import { LoaderCircleIcon } from "lucide-react";
 import type { TFunction } from "i18next";
+import { TagInput } from "./TagInput";
 import { requestBookmark } from "../lib/addBookmark";
 import { useLoginRedirect } from "../hooks/useLoginRedirect";
+import { useTagListContext } from "../hooks/useTagList";
 import { useTranslation } from "react-i18next";
 
 interface ShareOutcome {
@@ -41,12 +44,21 @@ const reportOutcome = (outcome: ShareOutcome, translate: TFunction, separator: s
 interface ShareConfirmationProps {
     onCancel: () => void;
     onConfirm: () => void;
+    onTagNamesChange: (tags: string[]) => void;
+    tagNames: string[];
     urls: string[];
 }
 
 // A share target launch adds without asking. A link from another site opens the same route but
 // has a referrer, so the user confirms the URLs before anything is saved.
-const ShareConfirmation = ({ onCancel, onConfirm, urls }: ShareConfirmationProps): ReactNode => {
+const ShareConfirmation = ({
+    onCancel,
+    onConfirm,
+    onTagNamesChange,
+    tagNames,
+    urls
+}: ShareConfirmationProps): ReactNode => {
+    const { tags } = useTagListContext();
     const { t: translate } = useTranslation();
 
     return (
@@ -72,6 +84,15 @@ const ShareConfirmation = ({ onCancel, onConfirm, urls }: ShareConfirmationProps
                         </li>
                     ))}
                 </ul>
+                <div className="space-y-1">
+                    <p className="text-sm font-medium">{translate("bookmark.tagsLabel")}</p>
+                    <TagInput
+                        disabled={false}
+                        onChange={onTagNamesChange}
+                        suggestions={tags.map((tag) => tag.name)}
+                        value={tagNames}
+                    />
+                </div>
                 <DialogFooter className="flex-row justify-end">
                     <Button onClick={onCancel} type="button" variant="outline">
                         {translate("common.cancel")}
@@ -85,12 +106,56 @@ const ShareConfirmation = ({ onCancel, onConfirm, urls }: ShareConfirmationProps
     );
 };
 
+interface AddShareUrlsInput {
+    onDone: (count: number) => void;
+    redirectToLogin: () => void;
+    tagNames: string[];
+    urls: string[];
+}
+
+// A 401 ends the run: the share route starts over after sign-in with the same URLs.
+const addShareUrls = async ({
+    onDone,
+    redirectToLogin,
+    tagNames,
+    urls
+}: AddShareUrlsInput): Promise<ShareOutcome | null> => {
+    const outcome: ShareOutcome = {
+        added: 0,
+        duplicate: 0,
+        failed: 0
+    };
+
+    for (const [index, href] of urls.entries()) {
+        // One request at a time keeps the progress count meaningful and the server load flat.
+        // oxlint-disable-next-line no-await-in-loop
+        const result = await requestBookmark(new URL(href), tagNames);
+
+        if ("bookmark" in result) {
+            outcome.added += 1;
+        } else if (result.failure === "auth") {
+            redirectToLogin();
+
+            return null;
+        } else if (result.failure === "duplicate") {
+            outcome.duplicate += 1;
+        } else {
+            outcome.failed += 1;
+        }
+
+        onDone(index + 1);
+    }
+
+    return outcome;
+};
+
 const SharePage = (): ReactNode => {
     const { requiresConfirmation, urls } = useLoaderData({ from: "/share" });
     const navigate = useNavigate();
     const redirectToLogin = useLoginRedirect();
     const [confirmed, setConfirmed] = useState(!requiresConfirmation);
     const [done, setDone] = useState(0);
+    const [tagNames, setTagNames] = useState<string[]>([]);
     const started = useRef(false);
     const answered = useRef(false);
     const waitsForConfirmation = requiresConfirmation && urls.length > 0 && !confirmed;
@@ -111,9 +176,7 @@ const SharePage = (): ReactNode => {
         setConfirmed(true);
     };
 
-    // The run starts at most once per mount (the started ref guards re-entry), so overlapping
-    // runs cannot write stale progress; the rule cannot trace the ref guard through the loop.
-    // oxlint-disable-next-line react-doctor/no-set-state-after-await-in-effect
+    // The run starts at most once per mount, so overlapping runs cannot write stale progress.
     useEffect(() => {
         if (started.current || waitsForConfirmation) {
             return;
@@ -129,31 +192,15 @@ const SharePage = (): ReactNode => {
         }
 
         void (async (): Promise<void> => {
-            const outcome: ShareOutcome = {
-                added: 0,
-                duplicate: 0,
-                failed: 0
-            };
+            const outcome = await addShareUrls({
+                onDone: setDone,
+                redirectToLogin,
+                tagNames,
+                urls
+            });
 
-            for (const [index, href] of urls.entries()) {
-                // One request at a time keeps the progress count meaningful and the server load flat.
-                // oxlint-disable-next-line no-await-in-loop
-                const result = await requestBookmark(new URL(href));
-
-                if ("bookmark" in result) {
-                    outcome.added += 1;
-                } else if (result.failure === "auth") {
-                    // The share route runs again with the original URLs once sign-in completes.
-                    redirectToLogin();
-
-                    return;
-                } else if (result.failure === "duplicate") {
-                    outcome.duplicate += 1;
-                } else {
-                    outcome.failed += 1;
-                }
-
-                setDone(index + 1);
+            if (!outcome) {
+                return;
             }
 
             // The user may have left the share screen while the requests ran; do not pull them back.
@@ -163,10 +210,18 @@ const SharePage = (): ReactNode => {
 
             reportOutcome(outcome, translate, separator);
         })();
-    }, [navigate, redirectToLogin, separator, translate, urls, waitsForConfirmation]);
+    }, [navigate, redirectToLogin, separator, tagNames, translate, urls, waitsForConfirmation]);
 
     if (waitsForConfirmation) {
-        return <ShareConfirmation onCancel={cancel} onConfirm={confirm} urls={urls} />;
+        return (
+            <ShareConfirmation
+                onCancel={cancel}
+                onConfirm={confirm}
+                onTagNamesChange={setTagNames}
+                tagNames={tagNames}
+                urls={urls}
+            />
+        );
     }
 
     if (!urls.length) {
