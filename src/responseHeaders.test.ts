@@ -7,7 +7,7 @@ const buildApp = (): Hono<SecurityEnv> =>
     new Hono<SecurityEnv>().use("*", responseHeaders).get("/", (context) => context.text("ok"));
 
 const contentSecurityPolicy = (nonce: string): string =>
-    `default-src 'self'; img-src 'self' data: https:; style-src 'self' 'nonce-${nonce}'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'`;
+    `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; img-src 'self' data: https:; style-src 'self' 'nonce-${nonce}'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'`;
 
 const nonceFrom = (response: Response): string => {
     const policy = response.headers.get("content-security-policy") ?? "";
