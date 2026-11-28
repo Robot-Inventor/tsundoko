@@ -1,18 +1,12 @@
 import { deleteTag, listTags, updateTag } from "./db/tags";
+import { tagListRateLimit, tagWriteRateLimit } from "./lib/rateLimits";
 import { Hono } from "hono";
 import { apiError } from "./lib/apiError";
-import { createRateLimit } from "./lib/rateLimit";
 import { httpStatus } from "./lib/httpStatus";
 import { isTagColor } from "./lib/tagColor";
 import { normalizeTagNames } from "./lib/tags";
 import { type } from "arktype";
 import { validator } from "hono/validator";
-
-const tagListLimit = 60;
-const tagWriteLimit = 30;
-
-const tagListRateLimit = createRateLimit({ limit: tagListLimit });
-const tagWriteRateLimit = createRateLimit({ limit: tagWriteLimit });
 
 const tagId = type("string.uuid");
 

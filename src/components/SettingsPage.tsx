@@ -1,4 +1,5 @@
 import { AccountSettings } from "./AccountSettings";
+import { ApiTokenSettings } from "./ApiTokenSettings";
 import { Button } from "./ui/button";
 import { PasskeySettings } from "./PasskeySettings";
 import type { ReactNode } from "react";
@@ -30,6 +31,7 @@ const SettingsContent = (): ReactNode => {
         <>
             <AccountSettings />
             <PasskeySettings />
+            <ApiTokenSettings />
         </>
     );
 };

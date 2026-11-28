@@ -1,5 +1,7 @@
-import { account, passkey as passkeys, session, user, verification } from "../db/auth-schema";
+// oxlint-disable import/max-dependencies -- Auth config wires the adapter, plugins, hooks, and signup context.
+import { account, apikey, passkey as passkeys, session, user, verification } from "../db/auth-schema";
 import { createSignupUser, resolveSignupUser, verifySignup } from "./signupUser";
+import { apiKey } from "@better-auth/api-key";
 import { authHooks } from "./authHooks";
 import { betterAuth } from "better-auth";
 import { db } from "../db";
@@ -15,6 +17,7 @@ const auth = betterAuth({
         provider: "pg",
         schema: {
             account,
+            apikey,
             passkey: passkeys,
             session,
             user,
@@ -27,6 +30,18 @@ const auth = betterAuth({
     },
     hooks: authHooks,
     plugins: [
+        apiKey({
+            defaultPrefix: "tsd_",
+            keyExpiration: {
+                maxExpiresIn: 365
+            },
+            // The app applies its own fixed-window token limit; the plugin's counter only resets
+            // after a quiet window, which throttles a steadily busy client for the wrong reason.
+            rateLimit: {
+                enabled: false
+            },
+            requireName: true
+        }),
         passkey({
             registration: {
                 afterVerification: async (contextData) => {

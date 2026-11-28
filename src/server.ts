@@ -11,7 +11,9 @@ import { bookmarkApi } from "./bookmarkApi";
 import { httpStatus } from "./lib/httpStatus";
 import { imageApi } from "./imageApi";
 import { manifestApi } from "./manifestApi";
+import { mcpApi } from "./mcpApi";
 import { tagApi } from "./tagApi";
+import { tokenApi } from "./tokenApi";
 
 const isProduction = process.env["NODE_ENV"] === "production";
 
@@ -42,12 +44,17 @@ app.use("/api/me", requireAuth);
 app.use("/api/me/*", requireAuth);
 app.use("/api/passkeys", requireAuth);
 app.use("/api/passkeys/*", requireAuth);
+app.use("/api/tokens", requireAuth);
+app.use("/api/tokens/*", requireAuth);
 app.use("/api/thumbnail", requireAuth);
 app.use("/api/favicon", requireAuth);
 app.route("/", bookmarkApi);
 app.route("/", tagApi);
+app.route("/", tokenApi);
 app.route("/", imageApi);
 app.route("/", accountApi);
+// The MCP endpoint authenticates its own bearer token, so it does not use the cookie session above.
+app.route("/", mcpApi);
 
 // Unknown API paths must not fall through to the SPA fallback below.
 app.get("/api/*", (context) => context.json(apiError("notFound"), httpStatus.notFound));

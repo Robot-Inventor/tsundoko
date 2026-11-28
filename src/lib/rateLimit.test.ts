@@ -1,7 +1,7 @@
+import { createRateLimit, createRateLimiter, rateLimitMiddleware } from "./rateLimit";
 import { describe, expect, it } from "vitest";
 import type { AuthEnv } from "../authMiddleware";
 import { Hono } from "hono";
-import { createRateLimit } from "./rateLimit";
 
 const requestLimit = 2;
 const ok = 200;
@@ -14,7 +14,7 @@ const buildApp = (): Hono<AuthEnv> =>
 
             return next();
         })
-        .use("*", createRateLimit({ limit: requestLimit }))
+        .use("*", rateLimitMiddleware(createRateLimiter({ limit: requestLimit })))
         .get("/", (context) => context.text("ok"));
 
 const requestAs = async (app: Hono<AuthEnv>, user: string): Promise<Response> =>

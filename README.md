@@ -31,6 +31,54 @@ On first launch with no accounts, the app asks you to create the first account w
 
 Keep the `data/` directory across restarts to retain the cached thumbnails and favicons. Health checks are available at `/api/health`.
 
+## MCP
+
+Tsundoko exposes a stateless Streamable HTTP MCP endpoint at `/api/mcp`, so AI clients can search, read, add, edit, archive, and delete bookmarks.
+
+Open Settings and create a token under "Personal access tokens". Choose the permissions (`read`, `write`, `delete`) and an expiry. The token is shown once; copy it then.
+
+Write and delete tokens always include read, so an agent can inspect what it changes. A read-only token sees only `search_bookmarks`, `get_bookmark`, and `list_tags`. `get_bookmark` returns the extracted article body as Markdown, truncated at 100,000 characters.
+
+Claude Code:
+
+```sh
+claude mcp add --transport http tsundoko https://tsundoko.example.invalid/api/mcp --header "Authorization: Bearer tsd_your_token"
+```
+
+Codex CLI (`~/.codex/config.toml`):
+
+```toml
+[mcp_servers.tsundoko]
+url = "https://tsundoko.example.invalid/api/mcp"
+bearer_token_env_var = "TSUNDOKO_TOKEN"
+```
+
+Export the token in the environment before starting Codex:
+
+```sh
+export TSUNDOKO_TOKEN=tsd_your_token
+```
+
+OpenCode (`opencode.jsonc`):
+
+```jsonc
+{
+    "$schema": "https://opencode.ai/config.json",
+    "mcp": {
+        "servers": {
+            "tsundoko": {
+                "type": "remote",
+                "url": "https://tsundoko.example.invalid/api/mcp",
+                "oauth": false,
+                "headers": {
+                    "Authorization": "Bearer {env:TSUNDOKO_TOKEN}"
+                }
+            }
+        }
+    }
+}
+```
+
 ## Tracking parameter rules
 
 Saved URLs are cleaned with the rules from [Actually Legitimate URL Shortener Tool](https://github.com/DandelionSprout/adfilt/discussions/163), which is licensed under [Dandelicence v1.4](https://github.com/DandelionSprout/Dandelicence). The bundled rules are generated from [LegitimateURLShortener.txt](https://github.com/DandelionSprout/adfilt/blob/master/LegitimateURLShortener.txt); the paragraph of rules borrowed from AdGuard URL Tracking Protection under GPL-3.0 is excluded.
