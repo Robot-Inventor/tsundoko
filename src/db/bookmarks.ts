@@ -9,7 +9,7 @@ import type { PreviewData } from "../lib/preview";
 import type { XPostThumbnail } from "../lib/xPost";
 import { bookmarks } from "./schema";
 import { db } from "./index";
-import { normalizeBookmarkUrl } from "../lib/bookmarkUrl";
+import { normalizeBookmarkUrl } from "../lib/normalizeBookmarkUrl";
 
 type BookmarkRow = typeof bookmarks.$inferSelect;
 

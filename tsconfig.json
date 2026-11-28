@@ -1,3 +1,8 @@
 {
-    "extends": "@robot-inventor/tsconfig-base/react.json"
+    "extends": "@robot-inventor/tsconfig-base/react.json",
+    "compilerOptions": {
+        "rootDir": "."
+    },
+    "include": ["src/**/*.ts", "src/**/*.tsx", "scripts/**/*.ts"],
+    "exclude": ["src/**/*.test.ts", "scripts/**/*.test.ts"]
 }

@@ -2,11 +2,12 @@
 import { type BookmarkScope, httpStatus } from "./lib/bookmark";
 import { type SortBy, parseSortBy } from "./lib/bookmarkSort";
 import { bookmarkExists, deleteBookmark, listBookmarks, saveBookmark, setBookmarkArchived } from "./db/bookmarks";
-import { bookmarkUrl, normalizeBookmarkUrl } from "./lib/bookmarkUrl";
 import { fetchPreview, warmImageCache } from "./lib/bookmarkPreview";
 import { Hono } from "hono";
 import { apiError } from "./lib/apiError";
+import { bookmarkUrl } from "./lib/bookmarkUrl";
 import { createRateLimit } from "./lib/rateLimit";
+import { normalizeBookmarkUrl } from "./lib/normalizeBookmarkUrl";
 import { normalizeTagNames } from "./lib/tags";
 import { parseContentType } from "./lib/mediaType";
 import { requestBodyLimit } from "./lib/requestBodyLimit";
