@@ -39,13 +39,19 @@ const imageUrl = (value: string | undefined, pageUrl: URL): string | null => {
     }
 };
 
-// `url` is filled by the save path, so the page fetch returns the rest only.
+// `url` is filled by the save path, so the preview carries the rest only.
 type PreviewData = Omit<BookmarkPreview, "url"> & {
     content: string | null;
     publishedAt?: Date | null;
 };
 
-const getPreview = async (url: URL): Promise<PreviewData> => {
+// Redirects can land on a different URL, which the save path normalises.
+interface FetchedPage {
+    pageUrl: URL;
+    preview: PreviewData;
+}
+
+const getPreview = async (url: URL): Promise<FetchedPage> => {
     const { response, url: pageUrl } = await publicFetch(url, {
         credentials: "omit",
         headers: {
@@ -74,20 +80,24 @@ const getPreview = async (url: URL): Promise<PreviewData> => {
     const { result } = await ogs({ html, onlyGetOpenGraphInfo: ["image"] });
 
     return {
-        // X post pages have no article body: xeet renders the text into the title instead,
-        // so the expensive extraction is skipped rather than discarded afterwards.
-        content: isXPostUrl(url) ? null : await extractArticleContent(html),
-        description:
-            cleanText(result.ogDescription, maxDescriptionLength) ??
-            cleanText(result.twitterDescription, maxDescriptionLength),
-        faviconUrl: imageUrl(result.favicon, pageUrl),
-        publishedAt: extractPublishedDate(result),
-        siteName: cleanText(result.ogSiteName, maxSiteNameLength) ?? pageUrl.hostname,
-        thumbnailUrl: imageUrl(result.ogImage?.[0]?.url, pageUrl) ?? imageUrl(result.twitterImage?.[0]?.url, pageUrl),
-        title:
-            cleanText(result.ogTitle, maxTitleLength) ??
-            cleanText(result.twitterTitle, maxTitleLength) ??
-            pageUrl.hostname
+        pageUrl,
+        preview: {
+            // X post pages have no article body: xeet renders the text into the title instead,
+            // so the expensive extraction is skipped rather than discarded afterwards.
+            content: isXPostUrl(url) ? null : await extractArticleContent(html),
+            description:
+                cleanText(result.ogDescription, maxDescriptionLength) ??
+                cleanText(result.twitterDescription, maxDescriptionLength),
+            faviconUrl: imageUrl(result.favicon, pageUrl),
+            publishedAt: extractPublishedDate(result),
+            siteName: cleanText(result.ogSiteName, maxSiteNameLength) ?? pageUrl.hostname,
+            thumbnailUrl:
+                imageUrl(result.ogImage?.[0]?.url, pageUrl) ?? imageUrl(result.twitterImage?.[0]?.url, pageUrl),
+            title:
+                cleanText(result.ogTitle, maxTitleLength) ??
+                cleanText(result.twitterTitle, maxTitleLength) ??
+                pageUrl.hostname
+        }
     };
 };
 
