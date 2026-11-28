@@ -241,7 +241,8 @@ const BookmarkListItem = ({ archived, bookmark, eager, showPublishedDate }: Book
             />
 
             {/* pan-y keeps vertical scrolling with the browser; horizontal pans reach the handlers.
-                Native long-press UI must not steal the gesture from the drawer. */}
+                Native long-press UI must not steal the gesture from the drawer, while desktop
+                right-click keeps the browser's own context menu. */}
             {/* h-full passes the grid-stretched li height down to the Card's sm:h-full so one row's cards keep equal heights. */}
             {/* Swipe margins ride inside the transform: 16px sides, half the row gap top and bottom. */}
             {/* The wrapper is not interactive; this only cancels the stretched link's click after a swipe. */}
@@ -250,7 +251,10 @@ const BookmarkListItem = ({ archived, bookmark, eager, showPublishedDate }: Book
                 className="relative h-full touch-pan-y select-none [-webkit-touch-callout:none] max-sm:px-4 max-sm:py-3"
                 onClickCapture={swipe.onContentClickCapture}
                 onContextMenu={(event) => {
-                    event.preventDefault();
+                    // Only touch devices need the native menu suppressed; desktop keeps right-click actions.
+                    if (window.matchMedia("(hover: none)").matches) {
+                        event.preventDefault();
+                    }
                 }}
                 onPointerCancel={swipe.onPointerCancel}
                 onPointerDown={swipe.onPointerDown}
