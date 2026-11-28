@@ -1,10 +1,10 @@
-import { bookmarkListLimiter, bookmarkWriteLimiter, tagListLimiter } from "../lib/rateLimits";
+import { bookmarkListLimiter, bookmarkWriteLimiter, tagListLimiter, tagWriteLimiter } from "../lib/rateLimits";
 import { deleteBookmark, listBookmarks, setBookmarkArchived } from "../db/bookmarks";
 import { getBookmarkMetadata, getBookmarkWithContent } from "../db/bookmarkContent";
+import { isValidTagColor, normalizeTagNames } from "../lib/tags";
+import { listTags, updateTag } from "../db/tags";
 import type { CallToolResult } from "@modelcontextprotocol/server";
 import type { RateLimitResult } from "../lib/rateLimit";
-import { listTags } from "../db/tags";
-import { normalizeTagNames } from "../lib/tags";
 import { saveBookmarkFromUrl } from "../lib/saveBookmarkFlow";
 import { type } from "arktype";
 import { updateBookmark } from "../db/bookmarkUpdate";
@@ -40,6 +40,12 @@ const updateBookmarkInput = type({
 const archiveBookmarkInput = type({
     archived: "boolean",
     id: "string.uuid"
+});
+
+const updateTagInput = type({
+    color: "string | null",
+    id: "string.uuid",
+    name: "string"
 });
 
 const textResult = (value: unknown): CallToolResult => ({
@@ -125,6 +131,29 @@ const listTagsForTool = async (userId: string): Promise<CallToolResult> => {
     const limited = await rateLimitFailure(tagListLimiter, userId);
 
     return limited ?? textResult(await listTags(userId));
+};
+
+const editTag = async (userId: string, input: typeof updateTagInput.infer): Promise<CallToolResult> => {
+    const limited = await rateLimitFailure(tagWriteLimiter, userId);
+
+    if (limited) {
+        return limited;
+    }
+
+    const [name] = normalizeTagNames([input.name]) ?? [];
+    const color = input.color?.toLowerCase() ?? null;
+
+    if (!name) {
+        return errorResult("Invalid tag name.");
+    }
+
+    if (!isValidTagColor(color)) {
+        return errorResult("Invalid color. Use a hex value like #12a594, or null to clear it.");
+    }
+
+    const updated = await updateTag({ color, id: input.id, name, userId });
+
+    return updated ? textResult(updated) : errorResult("Tag not found.");
 };
 
 const addBookmark = async (userId: string, input: typeof addBookmarkInput.infer): Promise<CallToolResult> => {
@@ -221,11 +250,13 @@ export {
     archiveBookmarkInput,
     bookmarkIdInput,
     editBookmark,
+    editTag,
     getBookmark,
     listTagsForTool,
     removeBookmark,
     searchBookmarks,
     searchInput,
     setArchived,
-    updateBookmarkInput
+    updateBookmarkInput,
+    updateTagInput
 };

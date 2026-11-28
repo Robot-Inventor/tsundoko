@@ -1,10 +1,9 @@
 import { deleteTag, listTags, updateTag } from "./db/tags";
+import { isValidTagColor, normalizeTagNames } from "./lib/tags";
 import { tagListRateLimit, tagWriteRateLimit } from "./lib/rateLimits";
 import { Hono } from "hono";
 import { apiError } from "./lib/apiError";
 import { httpStatus } from "./lib/httpStatus";
-import { isTagColor } from "./lib/tagColor";
-import { normalizeTagNames } from "./lib/tags";
 import { type } from "arktype";
 import { validator } from "hono/validator";
 
@@ -34,13 +33,12 @@ const tagUpdatePayload = validator("json", (value, context) => {
 
     const [name] = normalizeTagNames([parsed.name]) ?? [];
     const color = parsed.color?.toLowerCase() ?? null;
-    const colorInvalid = color !== null && !isTagColor(color);
 
     if (!name) {
         return context.json(apiError("tag.invalidName"), httpStatus.badRequest);
     }
 
-    if (colorInvalid) {
+    if (!isValidTagColor(color)) {
         return context.json(apiError("tag.invalidColor"), httpStatus.badRequest);
     }
 

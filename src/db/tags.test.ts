@@ -96,7 +96,11 @@ describe("tag management", () => {
                 name: "Renamed",
                 userId
             })
-        ).toBe(true);
+        ).toMatchObject({
+            color: "#30a46c",
+            id: tag.id,
+            name: "Renamed"
+        });
 
         const renamed = await findTag("Renamed");
 
@@ -128,7 +132,11 @@ describe("tag management", () => {
                 name: "MergeInto",
                 userId
             })
-        ).toBe(true);
+        ).toMatchObject({
+            color: "#e93d82",
+            id: target.id,
+            name: "MergeInto"
+        });
 
         expect(
             await updateTag({
@@ -137,7 +145,11 @@ describe("tag management", () => {
                 name: "mergeinto",
                 userId
             })
-        ).toBe(true);
+        ).toMatchObject({
+            color: "#e93d82",
+            id: target.id,
+            name: "MergeInto"
+        });
 
         const merged = await findTag("MergeInto");
 
@@ -185,7 +197,7 @@ describe("tag cleanup and ownership", () => {
                 name: "Stolen",
                 userId
             })
-        ).toBe(false);
+        ).toBeNull();
 
         expect(await deleteTag(others.id, userId)).toBe(false);
 
@@ -196,7 +208,7 @@ describe("tag cleanup and ownership", () => {
                 name: "Missing",
                 userId
             })
-        ).toBe(false);
+        ).toBeNull();
 
         expect((await listTags(otherUserId)).map((candidate) => candidate.name)).toContain("OtherOwned");
         expect((await listTags(userId)).map((candidate) => candidate.name)).toContain("Owned");
