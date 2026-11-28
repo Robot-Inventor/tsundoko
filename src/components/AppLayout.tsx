@@ -1,6 +1,6 @@
 // oxlint-disable import/max-dependencies -- The layout wires navigation, search, tags, and account state.
 import { AccountProvider, MobileAccountMenu, SidebarAccountMenu } from "./AccountMenu";
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "./ui/drawer";
+import { Drawer, DrawerContent, DrawerTitle } from "./ui/drawer";
 import { Outlet, useLocation, useNavigate, useParams } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { SearchContext, desktopLayout, useSearch } from "../hooks/useSearch";
@@ -62,9 +62,8 @@ const AppLayout = (): ReactNode => {
     const [menuOpen, setMenuOpen] = useState(false);
     const [editingTag, setEditingTag] = useState<TagSummary | null>(null);
     const [actionsTag, setActionsTag] = useState<TagSummary | null>(null);
-    // Tags picked in the navigation sheet and the action drawer wait in refs until the modal
-    // that chose them has finished closing, so two overlays never compete for focus.
-    const pendingActionsTag = useRef<TagSummary | null>(null);
+    // A tag picked in the action drawer waits in a ref until the drawer has finished closing,
+    // so the editor never mounts while the drawer still owns focus.
     const pendingEditTag = useRef<TagSummary | null>(null);
     const desktopHomeLink = useRef<HTMLAnchorElement>(null);
     const accountState = useAccountState();
@@ -81,26 +80,7 @@ const AppLayout = (): ReactNode => {
     };
 
     const openTagActions = (tag: TagSummary): void => {
-        // The sidebar stands in for the sheet on wide touch screens, where no sheet is open to
-        // wait for; closing it would leave the drawer request pending forever.
-        if (!menuOpen) {
-            setActionsTag(tag);
-
-            return;
-        }
-
-        pendingActionsTag.current = tag;
-        setMenuOpen(false);
-    };
-
-    const flushTagActions = (): void => {
-        const tag = pendingActionsTag.current;
-
-        if (!tag) {
-            return;
-        }
-
-        pendingActionsTag.current = null;
+        // The drawer layers over the open sheet, so the menu stays where the user left it.
         setActionsTag(tag);
     };
 
@@ -157,7 +137,6 @@ const AppLayout = (): ReactNode => {
                 <header className="sticky top-0 z-20 flex h-[calc(3.5rem_+_env(safe-area-inset-top))] items-center gap-2 border-b bg-background px-3 pt-[env(safe-area-inset-top)] md:px-4">
                     <MobileMenu
                         finalFocus={() => (window.matchMedia(desktopLayout).matches ? desktopHomeLink.current : true)}
-                        onClosed={flushTagActions}
                         onOpenChange={setMenuOpen}
                         open={menuOpen}
                         searchOpen={search.searchOpen}
@@ -225,10 +204,8 @@ const AppLayout = (): ReactNode => {
                 showSwipeHandle
             >
                 <DrawerContent>
-                    <DrawerHeader>
-                        <DrawerTitle className="truncate">{actionsTag?.name ?? ""}</DrawerTitle>
-                    </DrawerHeader>
-                    <ul className="pb-2">
+                    <DrawerTitle className="sr-only">{actionsTag?.name ?? ""}</DrawerTitle>
+                    <ul className="py-2">
                         <li>
                             <button
                                 className="flex w-full items-center gap-3 px-4 py-3 text-sm hover:bg-muted"
