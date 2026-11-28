@@ -73,7 +73,7 @@
   "devDependencies": {
     "@changesets/changelog-github": "^1.0.1",
     "@changesets/cli": "^3.0.3",
-    "@robot-inventor/oxlint-config": "^2.2.0",
+    "@robot-inventor/oxlint-config": "^2.2.1",
     "@robot-inventor/tsconfig-base": "^7.2.0",
     "@tailwindcss/vite": "^4.3.5",
     "@testcontainers/postgresql": "^12.2.2",
