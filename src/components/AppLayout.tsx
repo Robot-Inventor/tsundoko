@@ -51,13 +51,11 @@ const MobilePageTitle = ({ query, searchOpen }: { query: string; searchOpen: boo
 // oxlint-disable-next-line max-lines-per-function, max-statements -- The layout composes the header, sidebar, and overlays in one tree; splitting it would only thread the same state through props.
 const AppLayout = (): ReactNode => {
     const { pathname } = useLocation();
-    // These pages put the sort button in their leading row, so on mobile that row replaces the
-    // top content padding instead of sitting below it.
-    const showsSort = pathname === "/" || pathname === "/archive";
-    // Tag pages list bookmarks too, so they keep the same search bar and progress indicator.
-    const isListPage = showsSort || pathname.startsWith("/tags/");
-    const showsSearch = isListPage;
-    const search = useSearch(showsSearch, pathname);
+    // Bookmark list pages put the sort button in their leading row, so on mobile that row replaces
+    // the top content padding instead of sitting below it. They also carry the search bar and the
+    // search progress indicator.
+    const isBookmarkListPage = pathname === "/" || pathname === "/archive" || pathname.startsWith("/tags/");
+    const search = useSearch(isBookmarkListPage, pathname);
     const tagList = useTagList(pathname);
     const [menuOpen, setMenuOpen] = useState(false);
     const [editingTag, setEditingTag] = useState<TagSummary | null>(null);
@@ -153,9 +151,9 @@ const AppLayout = (): ReactNode => {
                     </MobileMenu>
                     <Logo className="hidden h-auto w-32 md:block" />
                     <MobilePageTitle query={search.query} searchOpen={search.searchOpen} />
-                    <HeaderSearch search={search} visible={showsSearch} />
+                    <HeaderSearch search={search} visible={isBookmarkListPage} />
                     {/* Only bookmark list pages fetch a list, so only they can show search progress. */}
-                    {isListPage ? (
+                    {isBookmarkListPage ? (
                         <SearchProgress loading={search.isListLoading} searching={search.isSearching} />
                     ) : null}
                 </header>
@@ -176,7 +174,7 @@ const AppLayout = (): ReactNode => {
                     <main
                         className={cn(
                             "min-w-0 flex-1 p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))] md:p-6 md:pb-6",
-                            showsSort && search.query === "" && "max-md:pt-0"
+                            isBookmarkListPage && search.query === "" && "max-md:pt-0"
                         )}
                     >
                         <SearchContext value={search}>
