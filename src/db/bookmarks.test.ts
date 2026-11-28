@@ -220,10 +220,13 @@ describe("bookmark tags", () => {
             )
         ).toEqual([]);
 
-        expect(await listTags(userId)).toContainEqual({
-            count: 1,
-            name: "PrivateTag"
-        });
+        expect(await listTags(userId)).toContainEqual(
+            expect.objectContaining({
+                color: null,
+                count: 1,
+                name: "PrivateTag"
+            })
+        );
 
         expect(await listTags(otherUserId)).toEqual([]);
     });

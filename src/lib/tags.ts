@@ -2,7 +2,9 @@ const maxTagLength = 30;
 const maxTagsPerBookmark = 10;
 
 interface TagSummary {
+    color: string | null;
     count: number;
+    id: string;
     name: string;
 }
 

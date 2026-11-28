@@ -12,6 +12,8 @@ import {
 } from "./ui/combobox";
 import { type ReactNode, useState } from "react";
 import { maxTagLength, maxTagsPerBookmark, tagNameKey, trimTagName } from "../lib/tags";
+import { tagChipStyle } from "../lib/tagColor";
+import { useTagListContext } from "../hooks/useTagList";
 import { useTranslation } from "react-i18next";
 
 interface TagInputProps {
@@ -21,12 +23,33 @@ interface TagInputProps {
     value: string[];
 }
 
+interface TagChipProps {
+    color: string | null;
+    name: string;
+}
+
+// The registry chip owns its text styles, so the colored variant is a separate branch instead of
+// an inline style that would also apply when the tag has no color.
+const TagChip = ({ color, name }: TagChipProps): ReactNode => {
+    if (!color) {
+        return <ComboboxChip className="bg-primary text-primary-foreground">{name}</ComboboxChip>;
+    }
+
+    return (
+        <ComboboxChip className="tag-color-chip" style={tagChipStyle(color)}>
+            {name}
+        </ComboboxChip>
+    );
+};
+
 const TagInput = ({ disabled, onChange, suggestions, value }: TagInputProps): ReactNode => {
     const [input, setInput] = useState("");
     const [error, setError] = useState("");
     const anchor = useComboboxAnchor();
+    const { tags } = useTagListContext();
     const { t: translate } = useTranslation();
     const typed = trimTagName(input);
+    const colorByKey = new Map(tags.map((tag) => [tagNameKey(tag.name), tag.color]));
 
     // A typed name that only differs in case from an existing tag selects that tag instead of
     // creating a second spelling of it.
@@ -63,9 +86,7 @@ const TagInput = ({ disabled, onChange, suggestions, value }: TagInputProps): Re
                         {(values: string[]) => (
                             <>
                                 {values.map((tag) => (
-                                    <ComboboxChip className="bg-primary text-primary-foreground" key={tag}>
-                                        {tag}
-                                    </ComboboxChip>
+                                    <TagChip color={colorByKey.get(tagNameKey(tag)) ?? null} key={tag} name={tag} />
                                 ))}
                                 <ComboboxChipsInput
                                     aria-label={translate("bookmark.tagsLabel")}

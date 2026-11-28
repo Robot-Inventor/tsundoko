@@ -1,15 +1,63 @@
+import { deleteTag, listTags, updateTag } from "./db/tags";
 import { Hono } from "hono";
 import { apiError } from "./lib/apiError";
 import { createRateLimit } from "./lib/rateLimit";
 import { httpStatus } from "./lib/httpStatus";
-import { listTags } from "./db/tags";
+import { isTagColor } from "./lib/tagColor";
+import { normalizeTagNames } from "./lib/tags";
+import { type } from "arktype";
+import { validator } from "hono/validator";
 
 const tagListLimit = 60;
+const tagWriteLimit = 30;
 
-const tagApi = new Hono<{ Variables: { userId: string } }>().get(
-    "/api/tags",
-    createRateLimit({ limit: tagListLimit }),
-    async (context) => {
+const tagListRateLimit = createRateLimit({ limit: tagListLimit });
+const tagWriteRateLimit = createRateLimit({ limit: tagWriteLimit });
+
+const tagId = type("string.uuid");
+
+const tagUpdateRequest = type({
+    color: "string | null",
+    name: "string"
+});
+
+const tagIdParam = validator("param", (value, context) => {
+    const id = value["id"]?.trim() ?? "";
+
+    return tagId(id) instanceof type.errors
+        ? context.json(apiError("tag.notFound"), httpStatus.notFound)
+        : {
+              id
+          };
+});
+
+const tagUpdatePayload = validator("json", (value, context) => {
+    const parsed = tagUpdateRequest(value);
+
+    if (parsed instanceof type.errors) {
+        return context.json(apiError("tag.invalid"), httpStatus.badRequest);
+    }
+
+    const [name] = normalizeTagNames([parsed.name]) ?? [];
+    const color = parsed.color?.toLowerCase() ?? null;
+    const colorInvalid = color !== null && !isTagColor(color);
+
+    if (!name) {
+        return context.json(apiError("tag.invalidName"), httpStatus.badRequest);
+    }
+
+    if (colorInvalid) {
+        return context.json(apiError("tag.invalidColor"), httpStatus.badRequest);
+    }
+
+    return {
+        color,
+        name
+    };
+});
+
+const tagApi = new Hono<{ Variables: { userId: string } }>()
+    .get("/api/tags", tagListRateLimit, async (context) => {
         context.header("Cache-Control", "no-store");
 
         try {
@@ -17,8 +65,36 @@ const tagApi = new Hono<{ Variables: { userId: string } }>().get(
         } catch {
             return context.json(apiError("tag.loadFailed"), httpStatus.internalServerError);
         }
-    }
-);
+    })
+    .patch("/api/tags/:id", tagWriteRateLimit, tagIdParam, tagUpdatePayload, async (context) => {
+        context.header("Cache-Control", "no-store");
+        const { id } = context.req.valid("param");
+        const { color, name } = context.req.valid("json");
+
+        try {
+            const updated = await updateTag({ color, id, name, userId: context.get("userId") });
+
+            return updated
+                ? context.body(null, httpStatus.noContent)
+                : context.json(apiError("tag.notFound"), httpStatus.notFound);
+        } catch {
+            return context.json(apiError("tag.saveFailed"), httpStatus.internalServerError);
+        }
+    })
+    .delete("/api/tags/:id", tagWriteRateLimit, tagIdParam, async (context) => {
+        context.header("Cache-Control", "no-store");
+        const { id } = context.req.valid("param");
+
+        try {
+            const deleted = await deleteTag(id, context.get("userId"));
+
+            return deleted
+                ? context.body(null, httpStatus.noContent)
+                : context.json(apiError("tag.notFound"), httpStatus.notFound);
+        } catch {
+            return context.json(apiError("tag.saveFailed"), httpStatus.internalServerError);
+        }
+    });
 
 type TagApi = typeof tagApi;
 

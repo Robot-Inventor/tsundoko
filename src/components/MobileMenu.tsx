@@ -10,6 +10,7 @@ import { useTranslation } from "react-i18next";
 interface MobileMenuProps {
     children: ReactNode;
     finalFocus: (closeType: string) => HTMLElement | boolean | null;
+    onClosed: () => void;
     onOpenChange: (open: boolean) => void;
     open: boolean;
     searchOpen: boolean;
@@ -17,7 +18,7 @@ interface MobileMenuProps {
 
 // The header's sheet and the empty-space swipe share one open state, so the gesture lives
 // beside the trigger instead of in the layout that renders them.
-const MobileMenu = ({ children, finalFocus, onOpenChange, open, searchOpen }: MobileMenuProps): ReactNode => {
+const MobileMenu = ({ children, finalFocus, onClosed, onOpenChange, open, searchOpen }: MobileMenuProps): ReactNode => {
     // Stays set after closing: Base UI reads finalFocus while the popup unmounts, so clearing it
     // on close would restore focus to the trigger again. The next trigger open clears it.
     const [openedBySwipe, setOpenedBySwipe] = useState(false);
@@ -55,7 +56,15 @@ const MobileMenu = ({ children, finalFocus, onOpenChange, open, searchOpen }: Mo
     });
 
     return (
-        <Sheet onOpenChange={handleOpenChange} open={open}>
+        <Sheet
+            onOpenChange={handleOpenChange}
+            onOpenChangeComplete={(nextOpen) => {
+                if (!nextOpen) {
+                    onClosed();
+                }
+            }}
+            open={open}
+        >
             <SheetTrigger
                 aria-label={translate("common.openMenu")}
                 render=<Button

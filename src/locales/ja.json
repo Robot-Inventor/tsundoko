@@ -137,6 +137,21 @@
     "passkey.renameTitle": "パスキー名を変更",
     "passkey.title": "パスキー",
 
+    "tag.colorLabel": "色",
+    "tag.colorSwatch": "{{color}}を使用",
+    "tag.delete": "タグを削除",
+    "tag.deleteDescription": "「{{name}}」を削除しますか？このタグは使用しているすべてのブックマークから外れます。",
+    "tag.deleteTitle": "タグを削除",
+    "tag.edit": "編集",
+    "tag.editTitle": "タグを編集",
+    "tag.hexLabel": "HEXカラー",
+    "tag.mergeConfirm": "統合",
+    "tag.mergeDescription": "「{{name}}」は既に存在します。名前と色はそちらのまま残り、このタグのブックマークはそちらに移動します。",
+    "tag.mergeTitle": "タグを統合",
+    "tag.menuLabel": "「{{name}}」のメニューを開く",
+    "tag.nameLabel": "タグ名",
+    "tag.noColor": "色なし",
+
     "errors.auth.accountNotFound": "ユーザーが見つかりませんでした。",
     "errors.auth.avatarReadFailed": "画像を読み込めませんでした。",
     "errors.auth.avatarTooLarge": "画像が大きすぎます。",
@@ -180,6 +195,10 @@
     "errors.rateLimit": "リクエストが多すぎます。しばらくしてからお試しください。",
     "errors.signup.startFailed": "サインアップを開始できませんでした。",
     "errors.tag.invalid": "タグは30文字以内で、1件につき最大10個まで指定してください。",
+    "errors.tag.invalidColor": "有効な色を選択してください。",
+    "errors.tag.invalidName": "タグ名は30文字以内で入力してください。",
     "errors.tag.loadFailed": "タグを読み込めませんでした。",
+    "errors.tag.notFound": "タグが見つかりませんでした。",
+    "errors.tag.saveFailed": "タグを保存できませんでした。",
     "errors.tag.tooMany": "タグは最大10個までです。"
 }
