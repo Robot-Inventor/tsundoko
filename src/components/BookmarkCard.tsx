@@ -44,7 +44,9 @@ const BookmarkCardMenu = ({ archived, bookmark }: BookmarkCardMenuProps): ReactN
             >
                 <EllipsisVerticalIcon aria-hidden="true" className="size-4" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            {/* The trigger is a small icon, so the menu sizes itself to its labels rather than
+                to the anchor width and never wraps them. */}
+            <DropdownMenuContent align="end" className="w-auto whitespace-nowrap">
                 {getBookmarkCardActions(archived, bookmark).map(({ icon: Icon, label, onSelect, variant }) => (
                     <DropdownMenuItem key={label} onClick={onSelect} variant={variant ?? "default"}>
                         <Icon aria-hidden="true" />
