@@ -17,13 +17,13 @@ const tagNameKey = (value: string): string => trimTagName(value).toLowerCase();
 const normalizeTagNames = (values: string[]): string[] | null => {
     const names = values.map(trimTagName);
 
-    if (names.length > maxTagsPerBookmark || names.some((name) => !name || name.length > maxTagLength)) {
+    if (names.some((name) => !name || name.length > maxTagLength)) {
         return null;
     }
 
     const seen = new Set<string>();
 
-    return names.filter((name) => {
+    const uniqueNames = names.filter((name) => {
         const key = tagNameKey(name);
 
         if (seen.has(key)) {
@@ -34,6 +34,8 @@ const normalizeTagNames = (values: string[]): string[] | null => {
 
         return true;
     });
+
+    return uniqueNames.length > maxTagsPerBookmark ? null : uniqueNames;
 };
 
 export { type TagSummary, maxTagLength, maxTagsPerBookmark, normalizeTagNames, tagNameKey, trimTagName };
