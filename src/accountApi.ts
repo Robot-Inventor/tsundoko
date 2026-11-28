@@ -1,10 +1,12 @@
 // oxlint-disable import/max-dependencies -- The account API wires auth, avatars, locales, and passkeys.
 import { type Account, readAccount } from "./lib/account";
+import { RateLimiterRes, createGate } from "./lib/outboundLimit";
 import { isAvatarType, renderAvatar } from "./lib/avatarImage";
 import type { AuthEnv } from "./authMiddleware";
 import { Hono } from "hono";
 import { apiError } from "./lib/apiError";
 import { bodyLimit } from "hono/body-limit";
+import { createRateLimit } from "./lib/rateLimit";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 import { httpStatus } from "./lib/httpStatus";
@@ -15,6 +17,16 @@ import { type } from "arktype";
 import { user } from "./db/auth-schema";
 
 const maxAvatarBytes = 5_242_880;
+const avatarRequestLimit = 10;
+// A decode can expand a 5 MiB upload to 16 megapixels, so only a couple may run at once. One slot
+// per account keeps parallel uploads from filling the pool on their own.
+const maxConcurrentAvatarDecodes = 2;
+const maxConcurrentAvatarDecodesPerUser = 1;
+
+const avatarRateLimit = createRateLimit({ limit: avatarRequestLimit });
+const runAvatarDecode = createGate(maxConcurrentAvatarDecodes, maxConcurrentAvatarDecodesPerUser);
+// Distinguishes a busy decoder from a corrupt upload: both have no URL, but only one is retriable.
+const avatarBusy = Symbol("avatarBusy");
 
 const accountPatchRequest = type({
     "locale?": '"ja" | "en"',
@@ -74,6 +86,7 @@ const accountApi = new Hono<AuthEnv>()
     })
     .post(
         "/api/me/avatar",
+        avatarRateLimit,
         bodyLimit({
             maxSize: maxAvatarBytes,
             onError: (context) => context.json(apiError("auth.avatarTooLarge"), httpStatus.payloadTooLarge)
@@ -88,7 +101,22 @@ const accountApi = new Hono<AuthEnv>()
             const bytes = new Uint8Array(await context.req.arrayBuffer());
 
             // sharp reports unsupported or corrupt data by throwing; both mean the upload is unusable.
-            const avatarUrl = await renderAvatar(bytes).catch(() => null);
+            // The gate rejects with RateLimiterRes when all decode slots are taken.
+            const avatarUrl = await runAvatarDecode(context.get("userId"), () =>
+                renderAvatar(bytes).catch(() => null)
+            ).catch((error: unknown): string | null | typeof avatarBusy => {
+                if (error instanceof RateLimiterRes) {
+                    return avatarBusy;
+                }
+
+                throw error;
+            });
+
+            if (avatarUrl === avatarBusy) {
+                context.header("Retry-After", "1");
+
+                return context.json(apiError("rateLimit"), httpStatus.tooManyRequests);
+            }
 
             if (!avatarUrl) {
                 return context.json(apiError("auth.avatarReadFailed"), httpStatus.badRequest);
@@ -102,7 +130,7 @@ const accountApi = new Hono<AuthEnv>()
             return context.body(null, httpStatus.noContent);
         }
     )
-    .delete("/api/me/avatar", async (context) => {
+    .delete("/api/me/avatar", avatarRateLimit, async (context) => {
         await db
             .update(user)
             .set({ image: null })
