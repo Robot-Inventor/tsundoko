@@ -1,5 +1,5 @@
-import { parseBookmarkUrl } from "./bookmarkUrl";
 import { parseContentType } from "./mediaType";
+import { parseImageUrl } from "./bookmarkUrl";
 import { publicFetch } from "./publicFetch";
 import { readCappedBody } from "./cappedBody";
 import { userAgent } from "./userAgent";
@@ -15,7 +15,7 @@ interface RemoteImage {
 // Fetches a stored image URL through the SSRF guard; returns null when the URL is malformed or the
 // response is not a usable raster image.
 const fetchValidImage = async (imageUrl: string): Promise<RemoteImage | null> => {
-    const url = parseBookmarkUrl(imageUrl);
+    const url = parseImageUrl(imageUrl);
 
     if (!url) {
         return null;

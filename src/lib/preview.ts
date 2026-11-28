@@ -5,8 +5,8 @@ import { extractArticleContent } from "./articleContent";
 import { extractPublishedDate } from "./publishedDate";
 import { isXPostUrl } from "./xPost";
 import ogs from "open-graph-scraper";
-import { parseBookmarkUrl } from "./bookmarkUrl";
 import { parseContentType } from "./mediaType";
+import { parseImageUrl } from "./bookmarkUrl";
 import { publicFetch } from "./publicFetch";
 import { readCappedBody } from "./cappedBody";
 import { userAgent } from "./userAgent";
@@ -31,7 +31,7 @@ const imageUrl = (value: string | undefined, pageUrl: URL): string | null => {
     }
 
     try {
-        const url = parseBookmarkUrl(new URL(value, pageUrl).href);
+        const url = parseImageUrl(new URL(value, pageUrl).href);
 
         return url?.protocol === "https:" ? url.href : null;
     } catch {
