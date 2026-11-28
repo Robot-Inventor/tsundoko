@@ -27,7 +27,7 @@ const isSignupVerify = (body: unknown): boolean => {
 };
 
 // Settings can add or remove passkeys only while the sign-in is recent. Signup has no session yet, so
-// it is recognised by its token and left to the existing validation in auth.ts.
+// it is recognised by the query marker and left to the existing validation in auth.ts.
 const guardPasskeyChanges = createAuthMiddleware(async (context) => {
     // Deletion runs through /api/passkeys/:id, which checks freshness and keeps the last passkey inside
     // one transaction; the plugin's own endpoint would allow a concurrent check-then-delete race.

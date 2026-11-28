@@ -1,10 +1,14 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { env } from "../env";
+import { parse as parseCookie } from "hono/utils/cookie";
 import { type } from "arktype";
 
-const tokenTtlMinutes = 5;
-const millisecondsPerMinute = 60_000;
-const tokenTtlMs = tokenTtlMinutes * millisecondsPerMinute;
+const signupCookieName = "signup-context";
+const tokenTtlMinutes = 2;
+const secondsPerMinute = 60;
+const millisecondsPerSecond = 1000;
+const signupTokenTtlSeconds = tokenTtlMinutes * secondsPerMinute;
+const tokenTtlMs = signupTokenTtlSeconds * millisecondsPerSecond;
 
 const tokenPayload = type({
     email: "string >= 1",
@@ -70,4 +74,18 @@ const readSignupToken = (token: string): SignupInfo | null => {
     };
 };
 
-export { createSignupToken, readSignupToken, type SignupInfo };
+const readSignupTokenFromRequest = (request: Request | undefined): SignupInfo | null => {
+    const cookie = request?.headers.get("cookie") ?? "";
+    const token = parseCookie(cookie, signupCookieName)[signupCookieName];
+
+    return token ? readSignupToken(token) : null;
+};
+
+export {
+    createSignupToken,
+    readSignupToken,
+    readSignupTokenFromRequest,
+    signupCookieName,
+    signupTokenTtlSeconds,
+    type SignupInfo
+};
