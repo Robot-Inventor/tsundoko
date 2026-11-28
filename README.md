@@ -30,3 +30,9 @@ Run `bun run migrate:apply` to apply the latest migrations, and run `bun run bui
 On first launch with no accounts, the app asks you to create the first account with an email address, a display name, and a passkey. Later signups are only offered when `ENABLE_SIGNUP=true`.
 
 Keep the `data/` directory across restarts to retain the cached thumbnails and favicons. Health checks are available at `/api/health`.
+
+## Tracking parameter rules
+
+Saved URLs are cleaned with the rules from [Actually Legitimate URL Shortener Tool](https://github.com/DandelionSprout/adfilt/discussions/163), which is licensed under [Dandelicence v1.4](https://github.com/DandelionSprout/Dandelicence). The bundled rules are generated from [LegitimateURLShortener.txt](https://github.com/DandelionSprout/adfilt/blob/master/LegitimateURLShortener.txt); the paragraph of rules borrowed from AdGuard URL Tracking Protection under GPL-3.0 is excluded.
+
+A weekly GitHub Actions workflow refreshes the rules and opens a pull request. Run `bun run update:tracking-params` to refresh them manually.

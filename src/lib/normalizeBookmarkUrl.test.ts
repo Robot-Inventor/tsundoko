@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { normalizeBookmarkUrl } from "./bookmarkUrl";
+import { normalizeBookmarkUrl } from "./normalizeBookmarkUrl";
 
 describe("normalizeBookmarkUrl", () => {
-    it("drops X tracking parameters but keeps other query parameters", () => {
+    it("drops X and general tracking parameters but keeps other query parameters", () => {
         const url = new URL("https://x.com/user/status/123?s=20&a=1&t=abc&utm_source=share");
 
-        expect(normalizeBookmarkUrl(url)).toBe("https://x.com/user/status/123?t=abc&utm_source=share");
+        expect(normalizeBookmarkUrl(url)).toBe("https://x.com/user/status/123?t=abc");
     });
 
     it("canonicalises every X host to https://x.com", () => {
