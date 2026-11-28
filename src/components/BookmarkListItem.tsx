@@ -1,12 +1,11 @@
 import { type BookmarkActionKind, requestBookmarkAction } from "../lib/bookmarkActions";
-import { Drawer, DrawerContent, DrawerTitle } from "./ui/drawer";
 import { type ReactNode, useRef, useState } from "react";
 import { exitAnimationMs, restingOffsetPx, touchPointerType } from "../lib/swipe";
 import type { Bookmark } from "../lib/bookmark";
 import { BookmarkCard } from "./BookmarkCard";
+import { BookmarkItemDrawer } from "./BookmarkItemDrawer";
+import { EditBookmarkDialog } from "./EditBookmarkDialog";
 import { SwipeReveal } from "./SwipeReveal";
-import { cn } from "../lib/utils";
-import { getBookmarkCardActions } from "./bookmarkCardActions";
 
 // A swipe reveals the colored background in proportion to the finger travel; crossing
 // 30% of the row width reveals the icon, releasing past it commits the action.
@@ -220,6 +219,7 @@ interface BookmarkListItemProps {
 
 const BookmarkListItem = ({ archived, bookmark, showPublishedDate }: BookmarkListItemProps): ReactNode => {
     const [drawerOpen, setDrawerOpen] = useState(false);
+    const [editOpen, setEditOpen] = useState(false);
     const swipe = useSwipeToAction(archived, bookmark, () => {
         setDrawerOpen(true);
     });
@@ -257,34 +257,27 @@ const BookmarkListItem = ({ archived, bookmark, showPublishedDate }: BookmarkLis
                 onPointerUp={swipe.onPointerEnd}
                 style={contentStyle}
             >
-                <BookmarkCard archived={archived} bookmark={bookmark} showPublishedDate={showPublishedDate} />
+                <BookmarkCard
+                    archived={archived}
+                    bookmark={bookmark}
+                    onEdit={() => {
+                        setEditOpen(true);
+                    }}
+                    showPublishedDate={showPublishedDate}
+                />
             </div>
 
-            <Drawer onOpenChange={setDrawerOpen} open={drawerOpen} showSwipeHandle>
-                <DrawerContent>
-                    <DrawerTitle className="sr-only">{bookmark.title}</DrawerTitle>
-                    <ul className="py-2">
-                        {getBookmarkCardActions(archived, bookmark).map(({ icon: Icon, label, onSelect, variant }) => (
-                            <li key={label}>
-                                <button
-                                    className={cn(
-                                        "flex w-full items-center gap-3 px-4 py-3 text-sm hover:bg-muted",
-                                        variant === "destructive" && "text-destructive hover:bg-destructive/10"
-                                    )}
-                                    onClick={() => {
-                                        onSelect();
-                                        setDrawerOpen(false);
-                                    }}
-                                    type="button"
-                                >
-                                    <Icon aria-hidden="true" className="size-4" />
-                                    {label}
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                </DrawerContent>
-            </Drawer>
+            <BookmarkItemDrawer
+                archived={archived}
+                bookmark={bookmark}
+                onEdit={() => {
+                    setEditOpen(true);
+                }}
+                onOpenChange={setDrawerOpen}
+                open={drawerOpen}
+            />
+
+            <EditBookmarkDialog bookmark={bookmark} onOpenChange={setEditOpen} open={editOpen} />
         </li>
     );
 };

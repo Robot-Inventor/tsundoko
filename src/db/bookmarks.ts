@@ -277,4 +277,13 @@ const deleteBookmark = async (id: string, userId: string): Promise<boolean> => {
     return true;
 };
 
-export { bookmarkExists, deleteBookmark, getBookmarkImageUrls, listBookmarks, saveBookmark, setBookmarkArchived };
+export {
+    bookmarkExists,
+    bookmarkListItemColumns,
+    deleteBookmark,
+    getBookmarkImageUrls,
+    listBookmarks,
+    saveBookmark,
+    setBookmarkArchived,
+    toSavedBookmark
+};

@@ -3,6 +3,7 @@ import { type SortBy, defaultSortBy, insertBySortBy } from "../lib/bookmarkSort"
 import { applyPendingActions, usePendingBookmarkActions } from "../lib/bookmarkActions";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { bookmarkClient } from "../lib/bookmarkClient";
+import { onBookmarkChanged } from "../lib/bookmarkChange";
 
 type LoadState = "error" | "loading" | "ready";
 
@@ -93,6 +94,11 @@ const useBookmarkList = ({
             return;
         }
 
+        // An edit changes rows this list may show, so the reload counter is bumped.
+        const unsubscribe = onBookmarkChanged(() => {
+            setReload((current) => !current);
+        });
+
         // A changed sort order replaces the list; merging would keep the old positions on top.
         // The first settled value after the account loads is not a user-initiated sort change.
         const sortChanged = previousSortBy.current !== null && previousSortBy.current !== sortBy;
@@ -129,6 +135,7 @@ const useBookmarkList = ({
         })();
 
         return (): void => {
+            unsubscribe();
             request.cancelled = true;
         };
     }, [onSettled, onSortStart, query, reload, scope, sortBy, tag]);

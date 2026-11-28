@@ -1,10 +1,21 @@
-import { ArchiveIcon, ArchiveRestoreIcon, LinkIcon, type LucideIcon, ShareIcon, Trash2Icon } from "lucide-react";
+import {
+    ArchiveIcon,
+    ArchiveRestoreIcon,
+    LinkIcon,
+    type LucideIcon,
+    PencilIcon,
+    ShareIcon,
+    Trash2Icon
+} from "lucide-react";
 import { notifyError, notifySuccess } from "../lib/appToast";
 import type { Bookmark } from "../lib/bookmark";
 import { i18n } from "../lib/i18n";
 import { requestBookmarkAction } from "../lib/bookmarkActions";
 
 interface BookmarkCardAction {
+    // The mobile drawer runs a deferred action only after it has closed, so a dialog it opens
+    // does not compete with the drawer's exit and focus handling.
+    deferUntilClosed?: boolean;
     icon: LucideIcon;
     label: string;
     onSelect: () => void;
@@ -39,8 +50,14 @@ const shareBookmark = async (bookmark: Bookmark): Promise<void> => {
 
 // One definition drives both the desktop hover menu and the mobile long-press drawer,
 // so adding an action to either one automatically adds it to the other.
-const getBookmarkCardActions = (archived: boolean, bookmark: Bookmark): BookmarkCardAction[] => {
+const getBookmarkCardActions = (archived: boolean, bookmark: Bookmark, onEdit: () => void): BookmarkCardAction[] => {
     const actions: BookmarkCardAction[] = [
+        {
+            deferUntilClosed: true,
+            icon: PencilIcon,
+            label: i18n.t("bookmark.actionEdit"),
+            onSelect: onEdit
+        },
         {
             icon: LinkIcon,
             label: i18n.t("bookmark.actionCopyLink"),
