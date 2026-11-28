@@ -28,9 +28,6 @@ const bookmarks = pgTable(
         // Publication date from the page's OGP or structured data. Null when the page has no usable date.
         publishedAt: timestamp({ withTimezone: true }),
         siteName: text().notNull(),
-        // Legacy path of an X render saved before the shared image cache. The migration converts
-        // every file to WebP and clears this column, so only a failed conversion leaves a value.
-        thumbnailFile: text(),
         // Which edge of the card the thumbnail is cropped from. Rendered X posts are tall
         // screenshots, so they keep their top; Open Graph images are cropped from the center.
         thumbnailFit: thumbnailFitEnum().notNull().default("center"),

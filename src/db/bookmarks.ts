@@ -3,7 +3,7 @@ import type { BookmarkListFilter, BookmarkPreview, SavedBookmark } from "../lib/
 import { type SQL, and, asc, cosineDistance, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { type SortBy, defaultSortBy } from "../lib/bookmarkSort";
 import { attachTags, getBookmarkTags, tagFilterCondition, textSearchCondition } from "./bookmarkTags";
-import { deleteFavicon, deleteLegacyThumbnail, deleteThumbnail } from "../lib/imageCache";
+import { deleteFavicon, deleteThumbnail } from "../lib/imageCache";
 import { embed, embeddingInput } from "../lib/embedding";
 import type { PreviewData } from "../lib/preview";
 import type { XPostThumbnail } from "../lib/xPost";
@@ -28,7 +28,7 @@ const bookmarkListItemColumns = {
 } as const;
 
 // `content` and `embedding` are excluded from list reads: they are search-only internals.
-type BookmarkListItem = Omit<BookmarkRow, "archivedAt" | "content" | "embedding" | "thumbnailFile" | "userId">;
+type BookmarkListItem = Omit<BookmarkRow, "archivedAt" | "content" | "embedding" | "userId">;
 
 const toSavedBookmark = (row: BookmarkListItem, tagNames: string[]): SavedBookmark => ({
     addedAt: row.addedAt.toISOString(),
@@ -254,18 +254,13 @@ const deleteBookmark = async (id: string, userId: string): Promise<boolean> => {
     const [row] = await db
         .delete(bookmarks)
         .where(and(eq(bookmarks.id, id), eq(bookmarks.userId, userId)))
-        .returning({ thumbnailFile: bookmarks.thumbnailFile, url: bookmarks.url });
+        .returning({ url: bookmarks.url });
 
     if (!row) {
         return false;
     }
 
     await deleteThumbnail(id);
-
-    // Only a row the startup migration has not converted yet still has a legacy file.
-    if (row.thumbnailFile) {
-        await deleteLegacyThumbnail(row.thumbnailFile);
-    }
 
     const { hostname } = new URL(row.url);
     const [remaining] = await db
