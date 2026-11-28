@@ -9,14 +9,16 @@ interface SecurityEnv {
 
 const nonceBytes = 16;
 
-// Vite emits hashed module scripts and same-origin stylesheets, so the SPA needs nothing beyond
-// 'self'. Inline style attributes set through the DOM (React's style prop) are not covered by
+// Vite emits hashed module scripts and same-origin stylesheets. The reader's Markdown renderer
+// compiles WebAssembly, so allow that without enabling JavaScript string evaluation.
+// Inline style attributes set through the DOM (React's style prop) are not covered by
 // style-src, so they keep working. The nonce signs the stylesheets that Base UI and the color
 // picker inject at runtime. https: covers both Gravatar avatars and images embedded in saved
 // articles; referrer-policy below keeps their URLs from leaking the app's origin.
 const contentSecurityPolicy = (nonce: string): string =>
     [
         "default-src 'self'",
+        "script-src 'self' 'wasm-unsafe-eval'",
         "img-src 'self' data: https:",
         `style-src 'self' 'nonce-${nonce}'`,
         "frame-ancestors 'none'",
