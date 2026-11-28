@@ -13,7 +13,11 @@ const sharePath = "/share";
 
 const isSharePath = (path: string): boolean => path.replace(/\/+$/u, "").toLowerCase() === sharePath;
 
-const needsShareConfirmation = (site: string | undefined, marked: boolean): boolean => site === "cross-site" && !marked;
+// Only a browser-initiated share launch ("none") or a link from our own site is safe to apply
+// without asking. Browsers that omit Sec-Fetch-Site (older Safari, some WebViews) would otherwise
+// let any link add bookmarks, so an absent value takes the confirmation path too.
+const needsShareConfirmation = (site: string | undefined, marked: boolean): boolean =>
+    !marked && site !== "none" && site !== "same-origin" && site !== "same-site";
 
 const pickSharedContent = (source: Record<string, unknown>): SharedContent => {
     const content: SharedContent = {};

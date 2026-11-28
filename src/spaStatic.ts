@@ -25,10 +25,11 @@ const serveAppHtml = async (context: Context<SecurityEnv>): Promise<Response> =>
 };
 
 // A link from another site opens the same route as a share target launch. A share launch is a
-// browser-initiated navigation, so Sec-Fetch-Site is "none" and adds without asking; a cross-site
-// navigation is redirected to the same URL with a marker the client turns into the confirmation
-// dialog. Unlike a referrer, the browser sets this header and the page cannot suppress it. The
-// marker also ends the redirect: Sec-Fetch-Site keeps its original value across redirects.
+// browser-initiated navigation, so Sec-Fetch-Site is "none" and adds without asking; every other
+// navigation, including one with no Sec-Fetch-Site header, is redirected to the same URL with a
+// marker the client turns into the confirmation dialog. Unlike a referrer, the browser sets this
+// header and the page cannot suppress it, though older browsers may omit it. The marker also ends
+// the redirect: Sec-Fetch-Site keeps its original value across redirects.
 const serveShareGate: MiddlewareHandler<SecurityEnv> = async (context, next) => {
     if (!isSharePath(context.req.path)) {
         await next();
