@@ -1,13 +1,13 @@
 // oxlint-disable import/max-dependencies -- The route module legitimately wires validation, storage, and rate limiting.
 import { type BookmarkScope, httpStatus } from "./lib/bookmark";
 import { type SortBy, parseSortBy } from "./lib/bookmarkSort";
-import { bookmarkExists, deleteBookmark, listBookmarks, saveBookmark, setBookmarkArchived } from "./db/bookmarks";
-import { fetchPreview, warmImageCache } from "./lib/bookmarkPreview";
+import { bookmarkListRateLimit, bookmarkWriteRateLimit } from "./lib/rateLimits";
+import { deleteBookmark, listBookmarks, setBookmarkArchived } from "./db/bookmarks";
+import { saveBookmarkFromUrl, saveBookmarkOutcomeStatus } from "./lib/saveBookmarkFlow";
+import type { ErrorCode } from "./lib/errorCodes";
 import { Hono } from "hono";
 import { apiError } from "./lib/apiError";
 import { bookmarkUrl } from "./lib/bookmarkUrl";
-import { createRateLimit } from "./lib/rateLimit";
-import { normalizeBookmarkUrl } from "./lib/normalizeBookmarkUrl";
 import { normalizeTagNames } from "./lib/tags";
 import { parseContentType } from "./lib/mediaType";
 import { requestBodyLimit } from "./lib/requestBodyLimit";
@@ -15,14 +15,8 @@ import { type } from "arktype";
 import { updateBookmark } from "./db/bookmarkUpdate";
 import { validator } from "hono/validator";
 
-const bookmarkSaveLimit = 30;
-const bookmarkListLimit = 60;
 // An edited title only needs to be non-empty; pages may legitimately have no title of their own.
 const minimumTitleLength = 1;
-
-// Saving and editing both may call the embedding API, so they share one budget.
-const bookmarkWriteRateLimit = createRateLimit({ limit: bookmarkSaveLimit });
-const bookmarkListRateLimit = createRateLimit({ limit: bookmarkListLimit });
 
 const previewRequest = type("string.json.parse").to({
     tags: type("string[]").optional(),
@@ -71,15 +65,6 @@ const bookmarkIdParam = validator("param", (value): { id: string } => {
     };
 });
 
-// A failed lookup is reported as null so the route can distinguish it from "not a duplicate".
-const bookmarkAlreadyExists = async (url: URL, userId: string): Promise<boolean | null> => {
-    try {
-        return await bookmarkExists(url.href, userId);
-    } catch {
-        return null;
-    }
-};
-
 const archivePayload = validator("json", (value, context) => {
     const parsed = archiveRequest(value);
 
@@ -122,7 +107,6 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
             return context.json(apiError("bookmark.loadFailed"), httpStatus.internalServerError);
         }
     })
-    // oxlint-disable-next-line max-statements -- The save pipeline is linear; splitting it further would erase Hono's typed response.
     .post("/api/bookmarks", bookmarkWriteRateLimit, requestBodyLimit("bookmark.tooLong"), async (context) => {
         context.header("Cache-Control", "no-store");
 
@@ -142,57 +126,28 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
             return context.json(apiError("tag.invalid"), httpStatus.badRequest);
         }
 
-        const submittedUrl = new URL(normalizeBookmarkUrl(input.url));
-        const alreadySubmitted = await bookmarkAlreadyExists(submittedUrl, context.get("userId"));
+        const outcome = await saveBookmarkFromUrl({
+            tags: tagNames,
+            url: input.url.href,
+            userId: context.get("userId")
+        });
 
-        if (alreadySubmitted === null) {
-            return context.json(apiError("bookmark.saveFailed"), httpStatus.internalServerError);
+        if (outcome.status === "created") {
+            return context.json(outcome.bookmark, httpStatus.created);
         }
 
-        if (alreadySubmitted) {
-            return context.json(apiError("bookmark.duplicate"), httpStatus.conflict);
-        }
+        const errorByOutcome = {
+            duplicate: "bookmark.duplicate",
+            fetchFailed: "bookmark.fetchFailed",
+            invalidUrl: "bookmark.invalidUrl",
+            saveFailed: "bookmark.saveFailed"
+        } as const satisfies Record<typeof outcome.status, ErrorCode>;
 
-        const { preview, url: resolvedUrl, xPost } = await fetchPreview(context.get("userId"), input.url);
-
-        if (!preview && !xPost) {
-            return context.json(apiError("bookmark.fetchFailed"), httpStatus.badGateway);
-        }
-
-        const normalizedUrl = new URL(normalizeBookmarkUrl(resolvedUrl));
-
-        try {
-            const saved = await saveBookmark({
-                preview,
-                tagNames,
-                url: normalizedUrl,
-                userId: context.get("userId"),
-                xPost
-            });
-
-            if (!saved) {
-                return context.json(apiError("bookmark.duplicate"), httpStatus.conflict);
-            }
-
-            // Warming the cache before the response makes the first card render local.
-            await warmImageCache(
-                context.get("userId"),
-                {
-                    faviconUrl: preview?.faviconUrl ?? null,
-                    hostname: new URL(saved.url).hostname,
-                    id: saved.id,
-                    thumbnailUrl: preview?.thumbnailUrl ?? null
-                },
-                xPost?.png ?? null
-            );
-
-            return context.json(saved, httpStatus.created);
-        } catch {
-            return context.json(apiError("bookmark.saveFailed"), httpStatus.internalServerError);
-        }
+        return context.json(apiError(errorByOutcome[outcome.status]), saveBookmarkOutcomeStatus[outcome.status]);
     })
     .patch(
         "/api/bookmarks/:id",
+        bookmarkWriteRateLimit,
         requestBodyLimit("bookmark.tooLong"),
         bookmarkIdParam,
         archivePayload,
@@ -239,7 +194,7 @@ const bookmarkApi = new Hono<{ Variables: { userId: string } }>()
             }
         }
     )
-    .delete("/api/bookmarks/:id", bookmarkIdParam, async (context) => {
+    .delete("/api/bookmarks/:id", bookmarkWriteRateLimit, bookmarkIdParam, async (context) => {
         context.header("Cache-Control", "no-store");
         const { id } = context.req.valid("param");
 

@@ -7,8 +7,8 @@ import {
     readFavicon,
     readThumbnail
 } from "./lib/imageCache";
+import { createRateLimiter, rateLimitMiddleware } from "./lib/rateLimit";
 import type { AuthEnv } from "./authMiddleware";
-import { createRateLimit } from "./lib/rateLimit";
 import { fetchValidImage } from "./lib/remoteImage";
 import { getBookmarkImageUrls } from "./db/bookmarks";
 import { httpStatus } from "./lib/httpStatus";
@@ -23,7 +23,7 @@ const imageCacheControl = "private, max-age=2592000, immutable";
 // third-party bytes, so it gets a shorter lifetime without the immutable promise.
 const proxyCacheControl = "private, max-age=86400";
 
-const imageRateLimit = createRateLimit({ limit: imageRequestLimit });
+const imageRateLimit = rateLimitMiddleware(createRateLimiter({ limit: imageRequestLimit }));
 
 // The proxy is keyed by bookmark id, so only saved bookmarks' images can be fetched.
 const bookmarkId = type("string.uuid");
